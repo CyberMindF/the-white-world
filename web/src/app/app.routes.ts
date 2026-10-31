@@ -256,16 +256,13 @@ export const routes: Routes = [
       },
       {
         path: 'tavolo-da-gioco/gdr/il-prezzo-della-verita/avventura',
-        data: { bodyClasses: ['tavolo-page'] },
-        loadComponent: () => import('./pages/avventura/avventura').then((m) => m.Avventura),
+        pathMatch: 'full',
+        redirectTo: 'tavolo-da-gioco/gdr/gioca/il-prezzo-della-verita',
       },
       {
         path: 'tavolo-da-gioco/gdr/la-casa-che-trattiene-il-respiro',
-        data: { bodyClasses: ['tavolo-page'] },
-        loadComponent: () =>
-          import('./pages/la-casa-che-trattiene-il-respiro/la-casa-che-trattiene-il-respiro').then(
-            (m) => m.LaCasaCheTrattieneIlRespiro,
-          ),
+        pathMatch: 'full',
+        redirectTo: 'tavolo-da-gioco/gdr/gioca/la-casa-che-trattiene-il-respiro',
       },
       {
         path: 'tavolo-da-gioco/cruciverba',
