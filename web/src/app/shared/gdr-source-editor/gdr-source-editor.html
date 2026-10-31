@@ -1,4 +1,7 @@
 <div class="editor">
+  <p class="hint">Scrivi liberamente cosa fai o dici. Puoi aggiungere dialoghi, azioni e immagini dagli strumenti facoltativi.</p>
+  <details class="writing-tools">
+    <summary>Strumenti di scrittura e anteprima</summary>
   <div class="toolbar" role="group" aria-label="Inserisci nel testo">
     <label [for]="editorId() + '-voice'">Voce</label>
     @if (characters()[characterIndex()]?.portrait) {
@@ -84,6 +87,7 @@
       Solo anteprima
     </button>
   </div>
+  </details>
   @if (voiceMessage()) {
     <p class="hint editor-status" role="status">{{ voiceMessage() }}</p>
   }
@@ -94,7 +98,7 @@
         #sourceArea
         [readOnly]="inlineEditing()"
         [id]="editorId()"
-        rows="18"
+        [rows]="document() ? 18 : 7"
         [ngModel]="source()"
         (ngModelChange)="sourceChange.emit($event)"
         spellcheck="true"

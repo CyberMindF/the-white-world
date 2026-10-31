@@ -23,7 +23,7 @@ export class GdrSourceEditor {
   readonly characters = input<NarrativeCharacter[]>([]);
   readonly editorId = input('gdr-source');
   protected readonly inlineEditing = signal(false);
-  protected readonly mode = signal<'split' | 'source' | 'preview'>('split');
+  protected readonly mode = signal<'split' | 'source' | 'preview'>('source');
   protected readonly characterIndex = signal(0);
   protected readonly voiceMessage = signal('');
   private readonly parsed = computed(() => parseNarrative(this.source()));

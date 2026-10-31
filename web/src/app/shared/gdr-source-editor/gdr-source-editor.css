@@ -196,3 +196,6 @@ summary:focus-visible {
   object-fit: cover;
   flex: none;
 }
+
+.editor > .hint, .writing-tools > summary { padding: .65rem .75rem; margin: 0; }
+.writing-tools > summary { cursor: pointer; }

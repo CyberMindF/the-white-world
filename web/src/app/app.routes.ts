@@ -236,6 +236,7 @@ export const routes: Routes = [
       },
       {
         path: 'tavolo-da-gioco/gdr/laboratorio',
+        canActivate: [adminGuard],
         data: { bodyClasses: ['tavolo-page'] },
         loadComponent: () => import('./pages/gdr-laboratorio/gdr-laboratorio').then((m) => m.GdrLaboratorio),
       },
@@ -245,9 +246,32 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/gdr/gdr').then((m) => m.Gdr),
       },
       {
-        path: 'tavolo-da-gioco/gdr/gioca/:adventureId',
+        path: 'tavolo-da-gioco/gdr/gioca/il-prezzo-della-verita',
+        pathMatch: 'full',
+        redirectTo: 'tavolo-da-gioco/gdr/il-prezzo-della-verita/avventura',
+      },
+      {
+        path: 'tavolo-da-gioco/gdr/gioca/la-casa-che-trattiene-il-respiro',
+        pathMatch: 'full',
+        redirectTo: 'tavolo-da-gioco/gdr/la-casa-che-trattiene-il-respiro',
+      },
+      {
+        path: 'tavolo-da-gioco/gdr/anteprima/gioca/:adventureId',
+        canActivate: [adminGuard],
         data: { bodyClasses: ['tavolo-page'] },
         loadComponent: () => import('./pages/gdr-laboratorio/gdr-laboratorio').then((m) => m.GdrLaboratorio),
+      },
+      {
+        path: 'tavolo-da-gioco/gdr/gioca/:adventureId',
+        canActivate: [adminGuard],
+        data: { bodyClasses: ['tavolo-page'] },
+        loadComponent: () => import('./pages/gdr-laboratorio/gdr-laboratorio').then((m) => m.GdrLaboratorio),
+      },
+      {
+        path: 'tavolo-da-gioco/gdr/anteprima',
+        canActivate: [adminGuard],
+        data: { bodyClasses: ['tavolo-page'], preview: true },
+        loadComponent: () => import('./pages/gdr/gdr').then((m) => m.Gdr),
       },
       {
         path: 'tavolo-da-gioco/gdr',
