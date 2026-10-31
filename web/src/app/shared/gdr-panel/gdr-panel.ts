@@ -90,7 +90,7 @@ export class GdrPanel implements OnInit {
   async ngOnInit(): Promise<void> {
     if (this.workspaceMode) {
       if (this.legacyCharacterSheet) await Promise.all([this.loadSchemaAndValues(), this.loadBlocks()]);
-      try { const tab=sessionStorage.getItem('gdr-panel-tab-'+this.adventure); if (tab && ['personaggio','regole','appunti','dadi','inventario'].includes(tab)) {this.activeTab.set(tab as GdrPanelTab);queueMicrotask(()=>this.tabChange.emit(tab as GdrPanelTab));} } catch { /* Preferenze facoltative. */ }
+      try { const tab=sessionStorage.getItem('gdr-panel-tab-'+this.adventure); if (tab && ['personaggio','regole','appunti','dadi'].includes(tab)) {this.activeTab.set(tab as GdrPanelTab);queueMicrotask(()=>this.tabChange.emit(tab as GdrPanelTab));} } catch { /* Preferenze facoltative. */ }
       return;
     }
     await Promise.all([this.loadSchemaAndValues(), this.loadBlocks()]);

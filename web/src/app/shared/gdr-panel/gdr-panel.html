@@ -78,7 +78,6 @@
       <button type="button" role="tab" [disabled]="pendingChanges" [class.is-active]="activeTab() === 'dadi'" (click)="setTab('dadi')">
         <span aria-hidden="true">🎲</span> Dadi
       </button>
-      @if(workspaceMode){<button type="button" role="tab" [disabled]="pendingChanges" [class.is-active]="activeTab() === 'inventario'" (click)="setTab('inventario')">🎒 Zaino</button>}
     </div>
 
     <div class="gdr-panel-content" [scrollTop]="scrollPositions[activeTab()] || 0" (scroll)="rememberScroll($event)">
