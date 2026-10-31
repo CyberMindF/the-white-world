@@ -280,7 +280,8 @@
                 (click)="publish()"
               >
                 {{ sendingTurn() ? 'Invio…' : liveGame ? 'Invia turno' : 'Invia turno di prova' }}</button
-              ><span class="lab-help">{{ liveGame ? 'Il turno viene salvato e condiviso con chi gioca con te.' : 'Visibile solo in questo browser.' }}</span>
+              >
+              <small class="turn-submit-hint">{{ liveGame ? 'Il turno sarà visibile a entrambi' : 'Prova locale · visibile solo in questo browser' }}</small>
             </div>
           </section>
         </section>
