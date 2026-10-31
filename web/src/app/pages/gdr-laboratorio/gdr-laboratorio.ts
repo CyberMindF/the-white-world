@@ -1,4 +1,6 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { RealtimeService } from '../../core/realtime.service';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -119,6 +121,9 @@ export class GdrLaboratorio implements OnInit {
   protected readonly readingEdit = signal(false);
   protected readonly documentEdit = signal(false);
   protected readonly turnEdit = signal(false);
+  protected readonly sendingTurn = signal(false);
+  private readonly realtime = inject(RealtimeService);
+  private readonly destroyRef = inject(DestroyRef);
   protected readonly inlineBusy = computed(
     () => this.readingEdit() || this.documentEdit() || this.turnEdit(),
   );
@@ -249,11 +254,16 @@ export class GdrLaboratorio implements OnInit {
   });
   private readonly route = inject(ActivatedRoute);
   private requestVersion = 0;
+  private turnsRequestVersion = 0;
+  protected readonly liveGame = this.route.snapshot.paramMap.has('adventureId');
   async ngOnInit(): Promise<void> {
     const requested = this.route.snapshot.paramMap.get('adventureId');
     if (requested && !ADVENTURES.some((a) => a.id === requested)) {
       await this.workspace.load(requested);
     }
+    this.realtime.on('gdr-turns:changed').pipe(takeUntilDestroyed(this.destroyRef)).subscribe(event => {
+      if (this.liveGame && event['adventure'] === this.selected()) void this.loadTurns(this.selected());
+    });
     await this.select(
       this.adventures().some((a) => a.id === requested) ? requested! : this.selected(),
     );
@@ -330,7 +340,7 @@ export class GdrLaboratorio implements OnInit {
       !this.adventures().some((a) => a.id === id) ||
       this.workspace.pendingChanges() ||
       this.workspace.saving() ||
-      this.inlineBusy()
+      this.inlineBusy() || this.sendingTurn()
     )
       return;
     const version = ++this.requestVersion;
@@ -353,6 +363,7 @@ export class GdrLaboratorio implements OnInit {
     const encoded = encodeURIComponent(id);
     await Promise.all([
       this.workspace.load(id),
+      this.loadTurns(id),
       ...(this.adventure().legacy
         ? [
             this.read<{ blocks: GdrBlockRow[] }>('/api/gdr-blocks')
@@ -364,14 +375,6 @@ export class GdrLaboratorio implements OnInit {
                   this.contentError.set(
                     'Non è stato possibile caricare i contenuti esistenti. Riprova: non vengono sostituiti con esempi.',
                   );
-              }),
-            this.read<{ turns: ExistingTurn[] }>(`/api/gdr/turns?adventure=${encoded}`)
-              .then((data) => {
-                if (version === this.requestVersion) this.turns.set(data.turns ?? []);
-              })
-              .catch(() => {
-                if (version === this.requestVersion)
-                  this.turnsError.set('Non è stato possibile caricare la cronologia esistente.');
               }),
             Promise.all([
               this.read<{ fields: Field[] }>(`/api/gdr/character-schema?adventure=${encoded}`),
@@ -429,7 +432,56 @@ export class GdrLaboratorio implements OnInit {
       this.status.set('Avventura salvata nel laboratorio.');
     }
   }
-  protected publish(): void {
+  private async loadTurns(id: string): Promise<void> {
+    const version = ++this.turnsRequestVersion;
+    try {
+      const data = await this.read<{ turns: ExistingTurn[] }>(`/api/gdr/turns?adventure=${encodeURIComponent(id)}`);
+      if (id !== this.selected() || version !== this.turnsRequestVersion) return;
+      this.turns.set(data.turns ?? []);
+      this.turnsError.set('');
+    } catch {
+      if (id === this.selected() && version === this.turnsRequestVersion)
+        this.turnsError.set('Non è stato possibile aggiornare i turni. Riprova il caricamento.');
+    }
+  }
+  protected async publish(): Promise<void> {
+    if (this.invalidTurn() || this.sendingTurn() || this.turnEdit()) return;
+    if (!this.liveGame) {
+      this.publishLocal();
+      return;
+    }
+    const adventure = this.selected();
+    const body = this.local().draft;
+    this.sendingTurn.set(true);
+    this.status.set('Invio del turno…');
+    try {
+      const form = new FormData();
+      form.set('adventure', adventure);
+      form.set('body', body);
+      const response = await fetch('/api/gdr/turns', {
+        method: 'POST', credentials: 'same-origin', body: form,
+      });
+      const result = await response.json();
+      if (!response.ok || !result.saved) throw new Error(result.error || 'Non è stato possibile inviare il turno.');
+      // Mostra subito il turno confermato, anche se la rilettura successiva fallisce.
+      if (adventure === this.selected()) {
+        if (!this.turns().some(t => t.id === result.turnId)) this.turns.update(turns => [...turns, {
+          id: result.turnId, author: result.author, createdAt: result.createdAt, body: body.trim(), isMine: true,
+        }]);
+        if (this.local().draft === body) {
+          this.local.update(state => ({...state, draft: ''}));
+          this.persist();
+        }
+        this.status.set('Turno inviato e salvato nella partita condivisa.');
+      }
+      await this.loadTurns(adventure);
+    } catch (error) {
+      this.status.set(error instanceof Error ? error.message + ' La bozza è ancora disponibile.' : 'Invio non riuscito. La bozza è ancora disponibile.');
+    } finally {
+      this.sendingTurn.set(false);
+    }
+  }
+  private publishLocal(): void {
     if (this.invalidTurn()) return;
     this.local.update((s) => ({
       ...s,

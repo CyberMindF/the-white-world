@@ -240,7 +240,7 @@
                   <span class="gdr-turn-author">{{ turn.isMine ? 'Tu' : turn.author }}</span
                   ><span class="gdr-turn-date">{{ formatDate(turn.createdAt) }}</span>
                 </div>
-                <p class="gdr-turn-body">{{ turn.body }}</p>
+                <app-gdr-turn [source]="turn.body" />
               </article>
             }
             @if (!turns().length && !turnsError()) {
@@ -276,11 +276,11 @@
             <div class="gdr-turn-submit-row">
               <button
                 class="btn btn-submit"
-                [disabled]="invalidTurn() || turnEdit()"
+                [disabled]="invalidTurn() || turnEdit() || sendingTurn()"
                 (click)="publish()"
               >
-                Invia turno di prova</button
-              ><span class="lab-help">Visibile solo in questo browser.</span>
+                {{ sendingTurn() ? 'Invio…' : liveGame ? 'Invia turno' : 'Invia turno di prova' }}</button
+              ><span class="lab-help">{{ liveGame ? 'Il turno viene salvato e condiviso con chi gioca con te.' : 'Visibile solo in questo browser.' }}</span>
             </div>
           </section>
         </section>
