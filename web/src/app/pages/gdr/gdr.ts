@@ -17,7 +17,7 @@ import { EditorialText } from '../../shared/editorial-text/editorial-text';
 })
 export class Gdr implements OnInit {
   protected readonly safe = inject(SafeModeService);
-  protected readonly classic = inject(ActivatedRoute).snapshot.data['preview'] !== true;
+  protected readonly classic = inject(ActivatedRoute).snapshot.data['classic'] === true;
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   protected readonly workspace = inject(GdrWorkspaceService);
@@ -41,7 +41,7 @@ export class Gdr implements OnInit {
       await this.workspace.save({ action: 'createAdventure', id, title: this.title(), source: '' })
     ) {
       this.newAdventureId = crypto.randomUUID();
-      await this.router.navigate(['/tavolo-da-gioco/gdr/anteprima/gioca', id]);
+      await this.router.navigate(['/tavolo-da-gioco/gdr/gioca', id]);
     }
   }
 }

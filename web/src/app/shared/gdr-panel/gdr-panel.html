@@ -1,3 +1,51 @@
+<ng-template #legacyCharacter>
+          @if (portraitBlocks().length > 0) {
+            <app-gdr-blocks [blocks]="portraitBlocks()" />
+          }
+          @if (canEditSchema()) {
+            @if (fieldsDocumentKey) {
+              <app-gdr-document-editor [documentKey]="fieldsDocumentKey" />
+            }
+            <button type="button" class="gdr-panel-link-btn" (click)="openSchemaEditor()">Modifica struttura scheda (JSON)</button>
+          }
+
+          @if (fieldsLoading()) {
+            <p class="gdr-panel-status">Sto caricando la scheda...</p>
+          } @else {
+            @for (field of schema(); track field.key) {
+              <div class="gdr-field-row" [class.gdr-field-row-long]="field.type === 'text' && field.long">
+                <span class="gdr-field-label">{{ field.label }}</span>
+                @if (field.type === 'number') {
+                  <div class="gdr-stat-control">
+                    <button type="button" [disabled]="(readOnly && !legacyCharacterSheet) || (+(fieldValues()[field.key] ?? field.min!)) <= field.min!" (click)="setField(field.key, '' + ((+(fieldValues()[field.key] ?? field.min!)) - 1))" aria-label="Diminuisci">−</button>
+                    <span class="gdr-stat-value">{{ fieldValues()[field.key] ?? field.min }}</span>
+                    <button type="button" [disabled]="(readOnly && !legacyCharacterSheet) || (+(fieldValues()[field.key] ?? field.min!)) >= field.max!" (click)="setField(field.key, '' + ((+(fieldValues()[field.key] ?? field.min!)) + 1))" aria-label="Aumenta">+</button>
+                  </div>
+                } @else if (field.long) {
+                  <textarea [readOnly]="readOnly && !legacyCharacterSheet" class="gdr-field-textarea" [value]="fieldValues()[field.key] ?? ''" (change)="onTextInput(field.key, $event)" rows="4"></textarea>
+                } @else {
+                  <input type="text" [readOnly]="readOnly && !legacyCharacterSheet" class="gdr-field-input" [value]="fieldValues()[field.key] ?? ''" (change)="onTextInput(field.key, $event)" />
+                }
+              </div>
+            }
+            <p class="gdr-panel-status" role="status" aria-live="polite">{{ fieldsStatus() }}</p>
+          }
+
+          @if (schemaEditorOpen()) {
+            <div class="gdr-schema-editor">
+              <label class="sr-only" for="gdr-schema-json">Struttura della scheda (JSON)</label>
+              <textarea id="gdr-schema-json" class="gdr-schema-textarea" [value]="schemaDraft()" (input)="schemaDraft.set($any($event.target).value)" rows="12"></textarea>
+              @if (schemaError()) {
+                <p class="gdr-schema-error">{{ schemaError() }}</p>
+              }
+              <div class="gdr-schema-actions">
+                <button type="button" class="btn" (click)="saveSchema()">Salva struttura</button>
+                <button type="button" class="gdr-panel-link-btn" (click)="closeSchemaEditor()">Annulla</button>
+              </div>
+            </div>
+          }
+
+</ng-template>
 <button type="button" class="gdr-panel-trigger glass-surface" (click)="togglePanel()" [attr.aria-expanded]="open()">
   <span aria-hidden="true">📜</span> Scheda
 </button>
@@ -19,7 +67,7 @@
     }
     <div class="gdr-panel-tabs" [class.is-workspace]="workspaceMode" role="tablist">
       <button type="button" role="tab" [disabled]="pendingChanges" [class.is-active]="activeTab() === 'personaggio'" (click)="setTab('personaggio')">
-        <span aria-hidden="true">{{ personaggioIcon }}</span> {{ workspaceMode ? 'Personaggi' : personaggioLabel }}
+        <span aria-hidden="true">{{ personaggioIcon }}</span> {{ workspaceMode && !legacyCharacterSheet ? 'Personaggi' : personaggioLabel }}
       </button>
       <button type="button" role="tab" [disabled]="pendingChanges" [class.is-active]="activeTab() === 'regole'" (click)="setTab('regole')">
         <span aria-hidden="true">📖</span> Regole
@@ -36,7 +84,7 @@
     <div class="gdr-panel-content" [scrollTop]="scrollPositions[activeTab()] || 0" (scroll)="rememberScroll($event)">
       @if (readOnly && !workspaceMode) { <p class="gdr-panel-status">Anteprima: scheda e appunti in sola lettura. I dati della partita non vengono modificati.</p> }
       @if (workspaceMode) {
-        @if(activeTab() === 'personaggio' || activeTab() === 'inventario') { <ng-content select="[gdrCharacters]" /> } @else {
+        @if(activeTab() === 'personaggio' && legacyCharacterSheet) { <ng-container [ngTemplateOutlet]="legacyCharacter" /> } @else if(activeTab() === 'personaggio' || activeTab() === 'inventario') { <ng-content select="[gdrCharacters]" /> } @else {
         @switch(activeTab()) {
           @case('regole'){<ng-content select="[gdrRules]" />}
           @case('appunti'){<ng-content select="[gdrNotes]" />}
@@ -46,51 +94,7 @@
       } @else {
       @switch (activeTab()) {
         @case ('personaggio') {
-          @if (portraitBlocks().length > 0) {
-            <app-gdr-blocks [blocks]="portraitBlocks()" />
-          }
-          @if (canEditSchema()) {
-            @if (fieldsDocumentKey) {
-              <app-gdr-document-editor [documentKey]="fieldsDocumentKey" />
-            }
-            <button type="button" class="gdr-panel-link-btn" (click)="openSchemaEditor()">Modifica struttura scheda (JSON)</button>
-          }
-
-          @if (fieldsLoading()) {
-            <p class="gdr-panel-status">Sto caricando la scheda...</p>
-          } @else {
-            @for (field of schema(); track field.key) {
-              <div class="gdr-field-row" [class.gdr-field-row-long]="field.type === 'text' && field.long">
-                <span class="gdr-field-label">{{ field.label }}</span>
-                @if (field.type === 'number') {
-                  <div class="gdr-stat-control">
-                    <button type="button" [disabled]="readOnly || (+(fieldValues()[field.key] ?? field.min!)) <= field.min!" (click)="setField(field.key, '' + ((+(fieldValues()[field.key] ?? field.min!)) - 1))" aria-label="Diminuisci">−</button>
-                    <span class="gdr-stat-value">{{ fieldValues()[field.key] ?? field.min }}</span>
-                    <button type="button" [disabled]="readOnly || (+(fieldValues()[field.key] ?? field.min!)) >= field.max!" (click)="setField(field.key, '' + ((+(fieldValues()[field.key] ?? field.min!)) + 1))" aria-label="Aumenta">+</button>
-                  </div>
-                } @else if (field.long) {
-                  <textarea [readOnly]="readOnly" class="gdr-field-textarea" [value]="fieldValues()[field.key] ?? ''" (change)="onTextInput(field.key, $event)" rows="4"></textarea>
-                } @else {
-                  <input type="text" [readOnly]="readOnly" class="gdr-field-input" [value]="fieldValues()[field.key] ?? ''" (change)="onTextInput(field.key, $event)" />
-                }
-              </div>
-            }
-            <p class="gdr-panel-status" role="status" aria-live="polite">{{ fieldsStatus() }}</p>
-          }
-
-          @if (schemaEditorOpen()) {
-            <div class="gdr-schema-editor">
-              <label class="sr-only" for="gdr-schema-json">Struttura della scheda (JSON)</label>
-              <textarea id="gdr-schema-json" class="gdr-schema-textarea" [value]="schemaDraft()" (input)="schemaDraft.set($any($event.target).value)" rows="12"></textarea>
-              @if (schemaError()) {
-                <p class="gdr-schema-error">{{ schemaError() }}</p>
-              }
-              <div class="gdr-schema-actions">
-                <button type="button" class="btn" (click)="saveSchema()">Salva struttura</button>
-                <button type="button" class="gdr-panel-link-btn" (click)="closeSchemaEditor()">Annulla</button>
-              </div>
-            </div>
-          }
+          <ng-container [ngTemplateOutlet]="legacyCharacter" />
         }
         @case ('regole') {
           <app-gdr-blocks [blocks]="rulesBlocks()" />

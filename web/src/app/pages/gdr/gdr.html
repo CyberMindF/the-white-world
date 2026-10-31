@@ -6,13 +6,9 @@
   <section class="tavolo-hero tavolo-hero-text-only" aria-labelledby="gdr-title">
     <p class="tavolo-eyebrow">Il tavolo · giochi di ruolo</p>
     <h1 id="gdr-title">
-      <span aria-hidden="true">🐉</span> Gioco di Ruolo{{ classic ? '' : ' · anteprima' }}
+      <span aria-hidden="true">🐉</span> Gioco di Ruolo{{ classic ? ' · versione classica' : '' }}
     </h1>
   </section>
-
-  @if (!classic) {
-    <p class="tavolo-intro">Anteprima del prossimo aggiornamento. I turni di prova restano in questo browser. Per giocare insieme, usa le avventure nella versione attuale.</p>
-  }
 
   <div class="tavolo-intro" [class.tavolo-intro-rules]="safe.enabled()">
     @if (safe.enabled()) {
@@ -39,7 +35,7 @@
         [routerLink]="
           classic
             ? '/tavolo-da-gioco/gdr/il-prezzo-della-verita/avventura'
-            : '/tavolo-da-gioco/gdr/anteprima/gioca/il-prezzo-della-verita'
+            : '/tavolo-da-gioco/gdr/gioca/il-prezzo-della-verita'
         "
         ><span class="tavolo-game-emoji">🪄</span><strong>Il Prezzo della Verità</strong
         ><small>Entra</small></a
@@ -49,7 +45,7 @@
         [routerLink]="
           classic
             ? '/tavolo-da-gioco/gdr/la-casa-che-trattiene-il-respiro'
-            : '/tavolo-da-gioco/gdr/anteprima/gioca/la-casa-che-trattiene-il-respiro'
+            : '/tavolo-da-gioco/gdr/gioca/la-casa-che-trattiene-il-respiro'
         "
         ><span class="tavolo-game-emoji">📜</span><strong>La casa che trattiene il respiro</strong
         ><small>Entra</small></a
@@ -58,7 +54,7 @@
         @for (a of customAdventures(); track a.id) {
           <a
             class="tavolo-game-card card glass-surface is-available"
-            [routerLink]="['/tavolo-da-gioco/gdr/anteprima/gioca', a.id]"
+            [routerLink]="['/tavolo-da-gioco/gdr/gioca', a.id]"
             ><span class="tavolo-game-emoji">📖</span><strong>{{ a.title }}</strong
             ><small>{{ a.published ? 'Entra' : 'Bozza · solo admin' }}</small></a
           >
@@ -111,9 +107,9 @@
     </div>
   </section>
 
-  @if (!classic) {
-    <p class="tavolo-intro"><a routerLink="/tavolo-da-gioco/gdr">Torna alle avventure per giocare</a></p>
-  } @else if (canCreate()) {
-    <p class="tavolo-intro"><a routerLink="/tavolo-da-gioco/gdr/anteprima">Anteprima del prossimo aggiornamento · solo master</a></p>
+  @if (classic) {
+    <p class="tavolo-intro">
+      <a routerLink="/tavolo-da-gioco/gdr">Torna alle avventure · nuova esperienza</a>
+    </p>
   }
 </app-shell>

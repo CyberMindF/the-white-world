@@ -1,4 +1,5 @@
 import { Component, EventEmitter, HostListener, Input, Output, OnInit, computed, inject, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { GdrBlocks } from '../gdr-blocks/gdr-blocks';
 import { GdrDocumentEditor } from '../gdr-blocks/gdr-document-editor';
@@ -32,7 +33,7 @@ type GdrPanelTab = 'personaggio' | 'regole' | 'appunti' | 'dadi' | 'inventario';
 @Component({
   selector: 'app-gdr-panel',
   standalone: true,
-  imports: [FormsModule, GdrBlocks, GdrDocumentEditor, GdrNotesEditor, GdrDiceRoller],
+  imports: [NgTemplateOutlet, FormsModule, GdrBlocks, GdrDocumentEditor, GdrNotesEditor, GdrDiceRoller],
   templateUrl: './gdr-panel.html',
   styleUrl: './gdr-panel.css'
 })
@@ -47,6 +48,7 @@ export class GdrPanel implements OnInit {
   // Il laboratorio consulta i dati reali senza offrire scritture sulle partite.
   @Input() readOnly = false;
   @Input() workspaceMode = false;
+  @Input() legacyCharacterSheet = false;
   @Input() pendingChanges = false;
   @Output() tabChange = new EventEmitter<GdrPanelTab>();
   protected readonly wide = signal(false);
@@ -57,7 +59,7 @@ export class GdrPanel implements OnInit {
 
   private readonly api = inject(ApiService);
   protected readonly authService = inject(AuthService);
-  protected readonly canEditSchema = computed(() => !this.readOnly && this.authService.isAdmin() && this.authService.adminModeEnabled());
+  protected readonly canEditSchema = computed(() => (!this.readOnly || this.legacyCharacterSheet) && this.authService.isAdmin() && this.authService.adminModeEnabled());
 
   protected readonly open = signal(false);
   protected readonly activeTab = signal<GdrPanelTab>('personaggio');
@@ -87,6 +89,7 @@ export class GdrPanel implements OnInit {
 
   async ngOnInit(): Promise<void> {
     if (this.workspaceMode) {
+      if (this.legacyCharacterSheet) await Promise.all([this.loadSchemaAndValues(), this.loadBlocks()]);
       try { const tab=sessionStorage.getItem('gdr-panel-tab-'+this.adventure); if (tab && ['personaggio','regole','appunti','dadi','inventario'].includes(tab)) {this.activeTab.set(tab as GdrPanelTab);queueMicrotask(()=>this.tabChange.emit(tab as GdrPanelTab));} } catch { /* Preferenze facoltative. */ }
       return;
     }
@@ -140,7 +143,7 @@ export class GdrPanel implements OnInit {
   }
 
   protected async setField(key: string, value: string): Promise<void> {
-    if (this.readOnly) return;
+    if (this.readOnly && !this.legacyCharacterSheet) return;
     this.fieldValues.update((values) => ({ ...values, [key]: value }));
     this.fieldsStatus.set('Sto salvando...');
     try {
@@ -172,7 +175,7 @@ export class GdrPanel implements OnInit {
   }
 
   protected async saveSchema(): Promise<void> {
-    if (this.readOnly) return;
+    if (this.readOnly && !this.legacyCharacterSheet) return;
     let fields: unknown;
     try {
       fields = JSON.parse(this.schemaDraft());

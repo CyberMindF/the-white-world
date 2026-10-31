@@ -298,6 +298,7 @@
         [personaggioIcon]="adventure().id === 'il-prezzo-della-verita' ? '✨' : '🧍'"
         [readOnly]="true"
         [workspaceMode]="workspace.available()"
+        [legacyCharacterSheet]="adventure().legacy"
         [pendingChanges]="workspace.pendingChanges()"
         (tabChange)="panelTab.set($event)"
       >
