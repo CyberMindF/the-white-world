@@ -22,7 +22,7 @@ export function rollArcanoFinitura() {
   return "flat";
 }
 
-export async function readOpenOffer(env, userId) {
+export async function readOpenOffer(env, userId, {readOnly=false} = {}) {
   const offer = await env.DB
     .prepare("SELECT id, created_at FROM carte_evocazioni_offerte WHERE user_id = ? AND stato = 'aperta'")
     .bind(userId)
@@ -44,6 +44,7 @@ export async function readOpenOffer(env, userId) {
     .all();
 
   if (results.length === 0) {
+    if(readOnly) return null;
     // Un admin puo aver eliminato gli Arcani mentre l'offerta era aperta. In tal caso non
     // lasciamo l'utente bloccato: restituiamo l'evocazione e rimuoviamo l'offerta vuota.
     await env.DB.batch([

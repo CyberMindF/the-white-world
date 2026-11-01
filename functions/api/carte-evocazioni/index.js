@@ -10,7 +10,7 @@ export async function onRequestGet(context) {
 
     const [state, offerta] = await Promise.all([
       session.impersonation ? readBustineState(env, session.user.id) : ensureBustineState(env, session.user.id),
-      readOpenOffer(env, session.user.id)
+      readOpenOffer(env, session.user.id, {readOnly:!!session.impersonation})
     ]);
     return json({
       evocazioniDisponibili: state.evocazioniDisponibili,

@@ -54,3 +54,10 @@ test('eliminare il target non restituisce privilegi admin a una pagina ancora im
  const h=await fixture();await h.call('POST','admin-token',{userId:2});h.sql.prepare('DELETE FROM users WHERE id=2').run();
  assert.equal(await h.session(),null);assert.equal((await h.call('DELETE')).status,200);assert.equal((await h.session()).user.id,1);h.sql.close();
 });
+
+test('la lettura di un’offerta vuota non provoca rimborsi o eliminazioni durante impersonazione',async()=>{
+ const read=new Function(source('../carte-evocazioni/_shared.js')+';return readOpenOffer;')();let writes=0;
+ const db={prepare(){return{bind(){return{async first(){return{id:1};},async all(){return{results:[]};}};}};},async batch(){writes++;}};
+ assert.equal(await read({DB:db},2,{readOnly:true}),null);assert.equal(writes,0);
+ assert.equal(await read({DB:db},2),null);assert.equal(writes,1);
+});
