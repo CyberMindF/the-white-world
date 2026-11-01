@@ -139,33 +139,6 @@
                 <p class="hint">Nessun personaggio corrispondente. Prova a cambiare i filtri.</p>
               }
             </div>
-            <details class="legacy-tools">
-              <summary>Personaggi dal racconto originale</summary>
-              @if (legacySheet()) {
-                <div class="legacy-import">
-                  <h4>La scheda attuale</h4>
-                  <p class="hint">
-                    Crea una copia nella gestione. La scheda usata nella partita resta invariata.
-                  </p>
-                  <button class="btn" [disabled]="hasChanges()" (click)="create(true)">
-                    Copia come PG
-                  </button>
-                </div>
-              }
-              @if (legacyNpcs().length) {
-                <div class="legacy-import">
-                  <h4>PNG già nel racconto</h4>
-                  @for (npc of legacyNpcs(); track npc.name) {
-                    <div class="legacy-npc">
-                      <img [src]="npc.portrait" alt="" /><span>{{ npc.name }}</span
-                      ><button class="btn" [disabled]="hasChanges()" (click)="copyNpc(npc)">
-                        Copia
-                      </button>
-                    </div>
-                  }
-                </div>
-              }
-            </details>
           </aside>
         }
         <section
@@ -413,6 +386,30 @@
                             (ngModelChange)="sheet.set($event); dirty.set(true)"
                           ></textarea>
                         </details>
+                        @if (extraFields().length) {
+                          <h4>Caratteristiche dell’avventura</h4>
+                          @for (field of extraFields(); track field.key) {
+                            <label [for]="'sheet-field-' + field.key">{{ field.label }}</label>
+                            @if (field.type === 'number') {
+                              <input
+                                [id]="'sheet-field-' + field.key"
+                                type="number"
+                                [min]="field.min ?? null"
+                                [max]="field.max ?? null"
+                                [ngModel]="sheetFields()[field.key]"
+                                (ngModelChange)="changeField(field.key, $event)"
+                              />
+                            } @else {
+                              <textarea
+                                [id]="'sheet-field-' + field.key"
+                                [rows]="field.long ? 3 : 1"
+                                maxlength="4000"
+                                [ngModel]="sheetFields()[field.key]"
+                                (ngModelChange)="changeField(field.key, $event)"
+                              ></textarea>
+                            }
+                          }
+                        }
                         <div class="actions save-profile">
                           <button class="btn" (click)="saveSheet()">Salva scheda</button
                           ><button class="btn" (click)="discard()">Annulla modifiche</button>
@@ -433,6 +430,7 @@
                         }
                       </dl>
                       @if (
+                        !extraFields().length &&
                         !c.sheet &&
                         !c.photo &&
                         !c.profile?.appearance &&
@@ -450,7 +448,18 @@
                           </p>
                         </div>
                       }
+                      @if (extraFields().length) {
+                        <dl class="profile-details adventure-fields">
+                          @for (field of extraFields(); track field.key) {
+                            <div>
+                              <dt>{{ field.label }}</dt>
+                              <dd>{{ c.characterFields?.[field.key] || '—' }}</dd>
+                            </div>
+                          }
+                        </dl>
+                      }
                       <app-gdr-turn [source]="c.sheet" />
+                  @if(!canManage() && c.inventory.length){<details><summary>Oggetti · {{c.inventory.length}}</summary><ul>@for(item of c.inventory;track item.id){<li>{{item.name}} × {{item.quantity}} @if(item.notes){<small>{{item.notes}}</small>}</li>}</ul></details>}
                       <div class="character-actions">
                         @if (c.canEditSheet) {
                           <button class="btn" (click)="editing.set(true)">Modifica scheda</button>

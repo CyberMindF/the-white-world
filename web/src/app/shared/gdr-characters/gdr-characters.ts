@@ -25,6 +25,21 @@ import { GdrTurn } from '../gdr-turn/gdr-turn';
 export class GdrCharacters {
   protected readonly workspace = inject(GdrWorkspaceService);
   readonly inventoryOnly = input(false);
+  readonly fields = input<
+    { key: string; label: string; type: string; min?: number; max?: number; long?: boolean }[]
+  >([]);
+  protected readonly sheetFields = signal<Record<string, string>>({});
+  protected readonly extraFields = computed(() =>
+    this.workspace.active()?.kind === 'pg'
+      ? this.fields().filter(
+          (f) => !/^(name|nome|surname|cognome|nome_personaggio|character_name|inventory)$/i.test(f.key),
+        )
+      : [],
+  );
+  protected changeField(key: string, value: string): void {
+    this.sheetFields.update((fields) => ({ ...fields, [key]: String(value) }));
+    this.dirty.set(true);
+  }
   readonly managementMode = input(false);
   protected readonly canManage = computed(() => this.managementMode() && this.workspace.isMaster());
   readonly legacySheet = input('');
@@ -132,6 +147,7 @@ export class GdrCharacters {
     this.name.set(c.name);
     this.portrait.set(c.portrait);
     this.sheet.set(c.sheet);
+    this.sheetFields.set({ ...c.characterFields });
     this.items.set(structuredClone(c.inventory));
     this.editingRevision = c.revision;
     this.dirty.set(false);
@@ -202,6 +218,7 @@ export class GdrCharacters {
         photo: this.photo(),
         profile: this.profile(),
         sheet: this.sheet(),
+        characterFields: this.sheetFields(),
       })
     ) {
       const next = this.workspace.active();
@@ -342,6 +359,7 @@ export class GdrCharacters {
         profile: bundle.profile,
         sheet: bundle.sheet,
         items: bundle.inventory,
+        characterFields: bundle.characterFields,
       }))
     )
       return;

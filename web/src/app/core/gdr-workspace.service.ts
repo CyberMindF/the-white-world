@@ -30,6 +30,7 @@ export interface WorkspaceCharacter {
   photo: string;
   profile: CharacterProfile;
   sheet: string;
+  characterFields?: Record<string, string>;
   inventory: InventoryItem[];
   archived: boolean;
   revision: number;
@@ -50,10 +51,18 @@ interface WorkspaceResponse {
   grants: CharacterGrant[];
   users: { id: number; nickname: string }[];
   isMaster: boolean;
+  storyCharacters?: {
+    sourceKey: string;
+    deleted: boolean;
+    name: string;
+    portrait: string;
+    description: string;
+  }[];
 }
 @Injectable()
 export class GdrWorkspaceService {
   readonly adventures = signal<WorkspaceAdventure[]>([]);
+  readonly storyCharacters = signal<NonNullable<WorkspaceResponse['storyCharacters']>>([]);
   readonly characters = signal<WorkspaceCharacter[]>([]);
   readonly grants = signal<CharacterGrant[]>([]);
   readonly users = signal<{ id: number; nickname: string }[]>([]);
@@ -68,29 +77,52 @@ export class GdrWorkspaceService {
   readonly active = computed(
     () =>
       this.characters().find((c) => c.id === this.activeId()) ??
+      this.characters().find((c) => c.kind === 'pg' && !c.archived) ??
       this.characters().find((c) => !c.archived) ??
       this.characters()[0] ??
       null,
   );
   readonly voices = computed(() => this.characters().filter((c) => c.canSpeak && !c.archived));
   private version = 0;
+  private initialized = new Set<string>();
   async load(adventureId: string): Promise<void> {
     const version = ++this.version;
     this.selectedId.set(adventureId);
     this.error.set('');
     try {
-      const response = await fetch(
+      let response = await fetch(
         '/api/gdr-workspace?adventure=' + encodeURIComponent(adventureId),
         { credentials: 'same-origin' },
       );
-      const data = await response.json();
+      let data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Gestione personaggi non disponibile.');
       if (!Array.isArray(data.adventures) || !Array.isArray(data.characters))
         throw new Error('Gestione personaggi non disponibile in questo ambiente.');
+      if (
+        data.isMaster &&
+        data.adventures.some((a: WorkspaceAdventure) => a.id === adventureId && a.legacy) &&
+        !this.initialized.has(adventureId)
+      ) {
+        const sync = await fetch('/api/gdr-workspace/mutate', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'syncLegacy', adventureId }),
+        });
+        if (!sync.ok)
+          throw new Error('Non è stato possibile collegare le schede esistenti. Riprova.');
+        this.initialized.add(adventureId);
+        response = await fetch('/api/gdr-workspace?adventure=' + encodeURIComponent(adventureId), {
+          credentials: 'same-origin',
+        });
+        data = await response.json();
+        if (!response.ok) throw new Error('Impossibile rileggere i personaggi collegati.');
+      }
       if (version !== this.version) return;
       const state = data as WorkspaceResponse;
       this.adventures.set(state.adventures ?? []);
       this.characters.set(state.characters ?? []);
+      this.storyCharacters.set(state.storyCharacters ?? []);
       this.grants.set(state.grants ?? []);
       this.users.set(state.users ?? []);
       this.isMaster.set(state.isMaster === true);

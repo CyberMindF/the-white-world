@@ -50,6 +50,7 @@ export class GdrPanel implements OnInit {
   @Input() workspaceMode = false;
   @Input() legacyCharacterSheet = false;
   @Input() pendingChanges = false;
+  @Output() opened = new EventEmitter<void>();
   @Output() tabChange = new EventEmitter<GdrPanelTab>();
   protected readonly wide = signal(false);
   protected readonly pinned = signal(false);
@@ -99,6 +100,7 @@ export class GdrPanel implements OnInit {
   public openCharacters():void {if(this.pendingChanges)return;this.open.set(true);this.wide.set(true);this.setTab('personaggio');}
   protected togglePanel(): void {
     this.open.update((value) => !value);
+    if(this.open()) this.opened.emit();
   }
 
   protected closePanel(): void {

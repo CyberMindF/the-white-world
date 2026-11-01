@@ -125,3 +125,20 @@ describe('gestione personaggi del master', () => {
     expect(fixture.nativeElement.querySelector('.identity').textContent).toContain('Vecchio');
   });
 });
+
+describe('scheda unica nel pannello della giocatrice',()=>{
+ afterEach(()=>TestBed.resetTestingModule());
+ it('legge lo stesso nome e gli stessi campi della gestione e li salva sullo stesso ID',async()=>{
+  const {workspace,fixture}=setup();
+  workspace.characters.set([{...character('ada','Ada'),revision:2,characterFields:{catName:'Luna',statMente:'4'}}]);
+  fixture.componentRef.setInput('managementMode',false);
+  fixture.componentRef.setInput('fields',[{key:'name',label:'Nome',type:'text'},{key:'catName',label:'Nome del gatto',type:'text'},{key:'statMente',label:'Mente',type:'number',min:1,max:5}]);fixture.detectChanges();
+  expect(fixture.nativeElement.textContent).toContain('Luna');expect(fixture.nativeElement.textContent).toContain('Ada');
+  const button=(label:string)=>Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>).find(b=>b.textContent?.trim()===label)!;
+  button('Modifica scheda').click();fixture.detectChanges();await fixture.whenStable();
+  const name=fixture.nativeElement.querySelector('#character-name') as HTMLInputElement;name.value='Alba';name.dispatchEvent(new Event('input'));
+  const pet=fixture.nativeElement.querySelector('#sheet-field-catName') as HTMLTextAreaElement;pet.value='Stella';pet.dispatchEvent(new Event('input'));fixture.detectChanges();
+  const save=vi.spyOn(workspace,'save').mockResolvedValue(false);button('Salva scheda').click();await fixture.whenStable();
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({characterId:'ada',name:'Alba',characterFields:{catName:'Stella',statMente:'4'}}));
+ });
+});

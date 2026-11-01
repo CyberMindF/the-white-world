@@ -127,3 +127,47 @@ test('revoca completa: il personaggio scompare alla giocatrice e gli editor aper
   assert.equal((await (await h.call(2)).json()).characters[0].id,'revoked');
   h.sqlite.close();
 });
+
+test('unificazione: conserva PG assegnato, statistiche e gatto; il nome modificato dalla giocatrice arriva al master',async()=>{
+ const h=apiHarness();await character(h.db,'original');h.sqlite.prepare("UPDATE gdr_workspace_characters SET name='Il mio personaggio' WHERE id='original'").run();await grant(h.db,h.sqlite,'original',{canEditSheet:true});
+ h.sqlite.prepare('INSERT INTO gdr_character_schema VALUES(?,?)').run(adventureId,JSON.stringify([{key:'name',label:'Nome',type:'text',default:''},{key:'catName',label:'Gatto',type:'text',default:''},{key:'statMente',label:'Mente',type:'number',min:1,max:5,default:1},{key:'inventory',label:'Inventario',type:'text',default:'Bacchetta\nTaccuino'}]));
+ for(const [k,v] of Object.entries({name:'Ada',catName:'Luna',statMente:'4'})) h.sqlite.prepare('INSERT INTO gdr_character_fields VALUES(?,?,?)').run(adventureId,k,v);
+ await mutate(h.db,master,{action:'syncLegacy',adventureId});
+ let c=(await (await h.call(2)).json()).characters[0];
+ assert.equal(c.id,'original');assert.equal(c.characterFields.catName,'Luna');assert.equal(c.characterFields.statMente,'4');assert.equal(c.characterFields.name,undefined);assert.deepEqual(c.inventory.map(i=>i.name),['Bacchetta','Taccuino']);assert.equal(c.characterFields.inventory,undefined);
+ await mutate(h.db,member,{action:'saveCharacter',characterId:c.id,revision:c.revision,name:'Nuovo nome',portrait:'',sheet:c.sheet,profile:{surname:'Alba'},characterFields:{catName:'Stella',statMente:'5'}});
+ await mutate(h.db,master,{action:'syncLegacy',adventureId});
+ c=(await (await h.call(1)).json()).characters[0];assert.equal(c.name,'Nuovo nome');assert.equal(c.profile.surname,'Alba');assert.equal(c.characterFields.catName,'Stella');assert.equal(c.characterFields.statMente,'5');
+ assert.equal(h.sqlite.prepare("SELECT COUNT(*) n FROM gdr_workspace_characters WHERE kind='pg'").get().n,1);h.sqlite.close();
+});
+test('PNG del racconto: una sola identità, rinomina visibile nella storia e nessuna ricreazione dopo eliminazione',async()=>{
+ const h=apiHarness();h.sqlite.prepare('INSERT INTO gdr_character_schema VALUES(?,?)').run(adventureId,'[]');
+ h.sqlite.prepare('INSERT INTO gdr_blocks VALUES(1,?,?,?,0)').run('avventura','npc_grid',JSON.stringify({entries:[{name:'Shivay',image:'',description:'Una compagna'}]}));
+ await mutate(h.db,master,{action:'createCharacter',id:'existing-npc',adventureId,kind:'png',name:'Shivay'});
+ await mutate(h.db,master,{action:'syncLegacy',adventureId});await mutate(h.db,master,{action:'syncLegacy',adventureId});
+ let view=await (await h.call(1)).json();assert.equal(view.characters.filter(c=>c.kind==='png').length,1);
+ let npc=view.characters.find(c=>c.id==='existing-npc');
+ await mutate(h.db,master,{action:'saveCharacter',characterId:npc.id,revision:npc.revision,name:'Shivay nuova',portrait:'',sheet:'',profile:{appearance:'Descrizione aggiornata'}});
+ let story=(await (await h.call(2)).json()).storyCharacters[0];assert.equal(story.name,'Shivay nuova');assert.equal(story.description,'Descrizione aggiornata');
+ await mutate(h.db,master,{action:'deleteCharacter',characterId:npc.id,revision:revision(h.sqlite,npc.id)});
+ await mutate(h.db,master,{action:'syncLegacy',adventureId});
+ assert.equal((await (await h.call(1)).json()).characters.filter(c=>c.kind==='png').length,0);
+ assert.equal((await (await h.call(2)).json()).storyCharacters[0].deleted,true);h.sqlite.close();
+});
+test('campi numerici della scheda unica: valori non validi non sovrascrivono il personaggio',async()=>{
+ const h=apiHarness();await character(h.db,'numbers');
+ h.sqlite.prepare('INSERT INTO gdr_character_schema VALUES(?,?)').run(adventureId,JSON.stringify([{key:'mente',label:'Mente',type:'number',min:1,max:5}]));
+ const c=h.sqlite.prepare('SELECT * FROM gdr_workspace_characters WHERE id=?').get('numbers');
+ await assert.rejects(()=>mutate(h.db,master,{action:'saveCharacter',characterId:c.id,revision:c.revision,name:c.name,portrait:'',sheet:'',characterFields:{mente:'6'}}),e=>e.status===400);
+ assert.equal(revision(h.sqlite,'numbers'),c.revision);h.sqlite.close();
+});
+test('anche i vecchi pannelli leggono e scrivono sul PG canonico senza creare copie del nome',async()=>{
+ const h=apiHarness();h.sqlite.prepare('INSERT INTO gdr_character_schema VALUES(?,?)').run(adventureId,JSON.stringify([{key:'name',label:'Nome',type:'text',default:''},{key:'catName',label:'Gatto',type:'text',default:''}]));
+ h.sqlite.prepare('INSERT INTO gdr_character_fields VALUES(?,?,?)').run(adventureId,'name','Ada');
+ await mutate(h.db,master,{action:'syncLegacy',adventureId});
+ assert.equal((await (await h.oldFields(2)).json()).values.name,'Ada');
+ assert.equal((await h.oldFields(2,'name','Alba')).status,200);
+ assert.equal((await h.oldFields(2,'catName','Luna')).status,200);
+ const c=(await (await h.call(1)).json()).characters[0];assert.equal(c.name,'Alba');assert.equal(c.characterFields.catName,'Luna');
+ assert.equal((await (await h.oldFields(2)).json()).values.name,'Alba');h.sqlite.close();
+});

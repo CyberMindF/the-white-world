@@ -82,6 +82,9 @@ interface Field {
   key: string;
   label: string;
   type: string;
+  min?: number;
+  max?: number;
+  long?: boolean;
 }
 const emptyState = (): LocalState => ({
   version: 2,
@@ -135,6 +138,7 @@ export class GdrLaboratorio implements OnInit {
   protected readonly workspace = inject(GdrWorkspaceService);
   protected readonly panelTab = signal('personaggio');
   protected readonly masterCharactersOpen = signal(false);
+  protected refreshCharacters():void { if(!this.workspace.pendingChanges() && !this.workspace.saving()) void this.workspace.load(this.selected()); }
   protected setMasterCharacters(open: boolean): void {
     if (
       !this.canPrepare() ||
@@ -144,6 +148,7 @@ export class GdrLaboratorio implements OnInit {
     )
       return;
     this.masterCharactersOpen.set(open);
+    if(open) this.refreshCharacters();
   }
 
   protected readonly adventureTitle = signal('');
@@ -175,7 +180,14 @@ export class GdrLaboratorio implements OnInit {
   protected readonly canPrepare = computed(
     () => !this.safe.enabled() && this.auth.isAdmin() && !this.auth.currentUser()?.isTest,
   );
-  protected readonly narrativeBlocks = computed(() => this.forDocument(this.adventure().document));
+  protected readonly narrativeBlocks = computed(() => this.forDocument(this.adventure().document).map(block => {
+    if(block.type!=='npc_grid') return block;
+    const data=block.data as GdrNpcGridData;
+    return {...block,data:{...data,entries:data.entries.flatMap((entry,index)=>{
+      const current=this.workspace.storyCharacters().find(c=>c.sourceKey===`npc:${block.id}:${index}`);
+      return current?.deleted ? [] : [{...entry,...(current ? {name:current.name,image:current.portrait,description:current.description}: {})}];
+    })}};
+  }));
   protected readonly rulesSearch = signal('');
   protected readonly filteredRules = computed(() => {
     const query = this.rulesSearch().trim().toLocaleLowerCase('it');
@@ -225,38 +237,7 @@ export class GdrLaboratorio implements OnInit {
       .map((f) => `${f.label}: ${this.values()[f.key] ?? ''}`)
       .join('\n\n'),
   );
-  protected readonly characters = computed<NarrativeCharacter[]>(() => {
-    if (this.adventure().legacy && !this.canPrepare()) {
-      return [
-        { name: this.legacyName(), portrait: this.legacyPortrait() },
-        ...this.workspace.voices().map(c => ({id:c.id, name:c.name + (c.profile?.surname ? ' ' + c.profile.surname : ''), portrait:c.portrait, kind:c.kind})),
-      ];
-    }
-    if (
-      this.workspace.available() &&
-      (this.workspace.characters().length || !this.adventure().legacy || !this.canPrepare())
-    )
-      return this.workspace.voices().map((c) => ({
-        id: c.id,
-        name: c.name + (c.profile?.surname ? ' ' + c.profile.surname : ''),
-        portrait: c.portrait,
-        kind: c.kind,
-      }));
-    const nameField = this.fields().find(
-      (f) =>
-        /^(nome|name|nome_personaggio|character_name)$/i.test(f.key) ||
-        /^nome(?: del personaggio)?$/i.test(f.label),
-    );
-    const name = (nameField && this.values()[nameField.key]) || 'Il mio personaggio';
-    const image = this.characterBlocks().find((b) => b.type === 'image');
-    const pg = { name, portrait: image ? (image.data as GdrImageData).src : '' };
-    const npcs = this.narrativeBlocks()
-      .filter((b) => b.type === 'npc_grid')
-      .flatMap((b) =>
-        (b.data as GdrNpcGridData).entries.map((e) => ({ name: e.name, portrait: e.image })),
-      );
-    return this.canPrepare() ? [pg, ...npcs] : [pg];
-  });
+  protected readonly characters = computed<NarrativeCharacter[]>(() => this.workspace.available() ? this.workspace.voices().map(c=>({id:c.id,name:c.name + (c.profile?.surname ? ' '+c.profile.surname : ''),portrait:c.portrait,kind:c.kind})) : []);
   private readonly route = inject(ActivatedRoute);
   private requestVersion = 0;
   private turnsRequestVersion = 0;

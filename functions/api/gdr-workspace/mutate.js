@@ -1,3 +1,4 @@
+import { syncLegacy, validateCharacterFields } from "./legacy.js";
 import { getAuthenticatedSession, json } from "../auth/_shared.js";
 import {
   WorkspaceError,
@@ -22,6 +23,11 @@ export async function mutate(db, user, payload) {
   const p = payload;
   if (!p || typeof p !== "object")
     throw new WorkspaceError("Richiesta non valida.", 400);
+  if (p.action === "syncLegacy") {
+    requireMaster(user);
+    await syncLegacy(db, user, p.adventureId);
+    return { saved: true };
+  }
   if (p.action === "createAdventure") {
     requireMaster(user);
     if (!validId(p.id))
@@ -94,7 +100,7 @@ export async function mutate(db, user, payload) {
     if (!adventure) throw new WorkspaceError("Avventura non trovata.", 404);
     await db
       .prepare(
-        `INSERT INTO gdr_workspace_characters (id,adventure_id,kind,name,portrait,sheet,profile_json,photo,inventory_json,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`,
+        `INSERT INTO gdr_workspace_characters (id,adventure_id,kind,name,portrait,sheet,profile_json,photo,inventory_json,created_by,created_at,fields_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`,
       )
       .bind(
         p.id,
@@ -108,6 +114,13 @@ export async function mutate(db, user, payload) {
         JSON.stringify(inventory(p.items ?? [])),
         user.id,
         new Date().toISOString(),
+        JSON.stringify(
+          await validateCharacterFields(
+            db,
+            p.adventureId,
+            p.characterFields ?? {},
+          ),
+        ),
       )
       .run();
     return { saved: true, id: p.id };
@@ -170,7 +183,7 @@ export async function mutate(db, user, payload) {
   if (p.action === "saveCharacter") {
     const result = await db
       .prepare(
-        `UPDATE gdr_workspace_characters SET name=?,portrait=?,sheet=?,profile_json=?,photo=?,revision=revision+1
+        `UPDATE gdr_workspace_characters SET name=?,portrait=?,sheet=?,profile_json=?,photo=?,fields_json=?,revision=revision+1
       WHERE id=? AND revision=? AND (?=1 OR (kind='pg' AND archived=0 AND EXISTS(SELECT 1 FROM gdr_workspace_grants g WHERE g.character_id=gdr_workspace_characters.id AND g.user_id=? AND g.can_edit_sheet=1)))`,
       )
       .bind(
@@ -181,6 +194,13 @@ export async function mutate(db, user, payload) {
           profile(p.profile ?? JSON.parse(character.profile_json)),
         ),
         portrait(p.photo ?? character.photo),
+        JSON.stringify(
+          await validateCharacterFields(
+            db,
+            character.adventure_id,
+            p.characterFields ?? JSON.parse(character.fields_json),
+          ),
+        ),
         character.id,
         p.revision,
         master ? 1 : 0,

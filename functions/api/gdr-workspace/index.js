@@ -51,7 +51,26 @@ export async function onRequestGet(context) {
             .all()
         ).results
       : [];
+    const storyCharacters = adventure
+      ? (
+          await db
+            .prepare(
+              `SELECT l.source_key,c.name,c.portrait,c.profile_json,l.character_id FROM gdr_workspace_story_links l LEFT JOIN gdr_workspace_characters c ON c.id=l.character_id WHERE l.adventure_id=? AND l.source_key LIKE 'npc:%'`,
+            )
+            .bind(adventure)
+            .all()
+        ).results.map((r) => ({
+          sourceKey: r.source_key,
+          deleted: !r.character_id,
+          name: r.name,
+          portrait: r.portrait,
+          description: r.profile_json
+            ? (JSON.parse(r.profile_json).appearance ?? "")
+            : "",
+        }))
+      : [];
     return json({
+      storyCharacters,
       adventures: adventures.results.map((a) => ({
         ...a,
         legacy: a.legacy === 1,

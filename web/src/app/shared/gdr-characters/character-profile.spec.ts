@@ -11,6 +11,8 @@ const file = () => ({
   images: { photo: '', avatar: '' },
 });
 describe('file personaggio portabile', () => {
+  it('conserva statistiche e compagno nel file del personaggio',()=>{const result=parseCharacterBundle(JSON.stringify({...file(),characterFields:{catName:'Luna',statMente:'4'}}));expect(result.characterFields).toEqual({catName:'Luna',statMente:'4'});});
+
   it('mantiene profilo e inventario e genera nuovi identificativi per gli oggetti', () => {
     const result = parseCharacterBundle(
       JSON.stringify({

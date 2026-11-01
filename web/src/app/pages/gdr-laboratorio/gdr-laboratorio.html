@@ -10,7 +10,7 @@
       [legacySheet]="legacySheet()"
       [legacyName]="legacyName()"
       [legacyPortrait]="legacyPortrait()"
-      [legacyNpcs]="legacyNpcs()"
+      [fields]="fields()"
     />
   </ng-template>
   @if (masterCharactersOpen() && canPrepare()) {
@@ -19,9 +19,6 @@
       <h1 id="master-characters-title">PG e PNG</h1>
     </section>
     <div class="avventura-body character-management">
-      @if (adventure().legacy) {
-        <p class="lab-help">La scheda classica della giocatrice resta separata dai personaggi gestiti qui. Assegnare un personaggio non sostituisce quella scheda.</p>
-      }
       <div class="lab-document-controls">
         <button
           class="btn"
@@ -282,10 +279,11 @@
         "
         [personaggioIcon]="adventure().id === 'il-prezzo-della-verita' ? '✨' : '🧍'"
         [readOnly]="true"
-        [workspaceMode]="workspace.available()"
-        [legacyCharacterSheet]="adventure().legacy"
+        [workspaceMode]="true"
+        [legacyCharacterSheet]="false"
         [pendingChanges]="workspace.pendingChanges()"
         (tabChange)="panelTab.set($event)"
+        (opened)="refreshCharacters()"
       >
         <div gdrCharacters>
           <ng-container
@@ -295,15 +293,6 @@
               inventoryOnly: panelTab() === 'inventario',
             }"
           />
-          @if (!workspace.active() && adventure().legacy && panelTab() !== 'inventario') {
-            <details>
-              <summary>Scheda attuale · originale in sola lettura</summary>
-              <app-gdr-blocks [blocks]="characterBlocks()" />
-              @for (field of fields(); track field.key) {
-                <p>{{ field.label }}: {{ values()[field.key] ?? '—' }}</p>
-              }
-            </details>
-          }
         </div>
         <div gdrRules>
           <label for="rules-search">Cerca nelle regole</label

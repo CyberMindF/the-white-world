@@ -54,7 +54,7 @@
   @if (!pinned()) { <div class="gdr-panel-backdrop" (click)="closePanel()"></div> }
   <section class="gdr-panel-sheet" [class.is-wide]="wide()" aria-label="Scheda di gioco">
     <div class="gdr-panel-header">
-      <span class="gdr-panel-title">La tua scheda</span>
+      <span class="gdr-panel-title">{{ workspaceMode ? 'Scheda personaggio' : 'La tua scheda' }}</span>
       <button type="button" class="gdr-panel-close" (click)="closePanel()" aria-label="Chiudi la scheda">✕</button>
     </div>
 

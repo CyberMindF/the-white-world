@@ -28,6 +28,7 @@ export interface CharacterBundle {
   name: string;
   profile: CharacterProfile;
   sheet: string;
+  characterFields?: Record<string, string>;
   inventory: InventoryItem[];
   images: { photo: string; avatar: string };
 }
@@ -52,6 +53,18 @@ export function parseCharacterBundle(raw: string): CharacterBundle {
       throw new Error('Un campo del personaggio è mancante o troppo lungo.');
     return v;
   };
+  const characterFields: Record<string, string> = {};
+  if (
+    value.characterFields &&
+    (typeof value.characterFields !== 'object' ||
+      Array.isArray(value.characterFields) ||
+      Object.keys(value.characterFields).length > 100)
+  )
+    throw new Error('Campi non validi.');
+  for (const [key, field] of Object.entries(value.characterFields ?? {})) {
+    if (!/^[a-zA-Z0-9_-]{1,100}$/.test(key)) throw new Error('Campo non valido.');
+    characterFields[key] = string(field, 4000);
+  }
   const profile = emptyProfile();
   for (const f of PROFILE_FIELDS)
     profile[f.key] = string(value.profile?.[f.key] ?? '', f.key === 'surname' ? 160 : 6000);
@@ -84,6 +97,7 @@ export function parseCharacterBundle(raw: string): CharacterBundle {
     name: string(value.name, 160, true),
     profile,
     sheet: string(value.sheet ?? '', 20000),
+    characterFields,
     inventory,
     images: { photo: image(value.images?.photo ?? ''), avatar: image(value.images?.avatar ?? '') },
   };
@@ -115,6 +129,7 @@ export async function exportCharacter(c: WorkspaceCharacter): Promise<CharacterB
     name: c.name,
     profile: { ...emptyProfile(), ...c.profile },
     sheet: c.sheet,
+    characterFields: { ...c.characterFields },
     inventory: structuredClone(c.inventory),
     images: { photo, avatar },
   };
