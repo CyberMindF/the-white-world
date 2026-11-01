@@ -281,30 +281,89 @@
                 } @else {
                   @if (!canManage() || section() === 'sheet') {
                     @if (editing() && c.canEditSheet) {
-                      <div class="profile-form">
-                        <h4>Identità e descrizione</h4>
-                        <label for="character-name">Nome</label
-                        ><input
-                          id="character-name"
-                          maxlength="160"
-                          [ngModel]="name()"
-                          (ngModelChange)="name.set($event); dirty.set(true)"
-                        />
-                        <details class="form-group">
-                          <summary>Foto e avatar</summary>
-                          <p class="hint">
-                            La foto conserva l’inquadratura completa. Alla prima foto viene creato
-                            anche un avatar quadrato, con ritaglio centrale. Puoi caricare un avatar
-                            diverso.
-                          </p>
-                          <div class="image-tools">
-                            <figure>
-                              @if (photo()) {
-                                <img class="photo" [src]="photo()" alt="Foto del personaggio" />
-                              } @else {
-                                <span class="photo-empty">Nessuna foto</span>
+                      @if (!canManage()) {
+                        <div class="player-edit-form">
+                          <section class="edit-section">
+                            <h4>Il tuo personaggio</h4>
+                            <div class="identity-inputs">
+                              <label for="character-name"
+                                >Nome<input
+                                  id="character-name"
+                                  maxlength="160"
+                                  [ngModel]="name()"
+                                  (ngModelChange)="name.set($event); dirty.set(true)" /></label
+                              ><label for="profile-surname"
+                                >Cognome<input
+                                  id="profile-surname"
+                                  maxlength="160"
+                                  [ngModel]="profile().surname"
+                                  (ngModelChange)="changeProfile('surname', $event)"
+                              /></label>
+                            </div>
+                          </section>
+                          @if (textFields().length) {
+                            <section class="edit-section">
+                              <h4>Descrizione e compagno</h4>
+                              @for (field of textFields(); track field.key) {
+                                <label [for]="'sheet-field-' + field.key">{{ field.label }}</label>
+                                @if (field.long) {
+                                  <textarea
+                                    [id]="'sheet-field-' + field.key"
+                                    rows="3"
+                                    maxlength="4000"
+                                    [ngModel]="sheetFields()[field.key]"
+                                    (ngModelChange)="changeField(field.key, $event)"
+                                  ></textarea>
+                                } @else {
+                                  <input
+                                    [id]="'sheet-field-' + field.key"
+                                    maxlength="4000"
+                                    [ngModel]="sheetFields()[field.key]"
+                                    (ngModelChange)="changeField(field.key, $event)"
+                                  />
+                                }
                               }
-                              <figcaption>
+                            </section>
+                          }
+                          @if (numericFields().length) {
+                            <section class="edit-section">
+                              <h4>Caratteristiche dell’avventura</h4>
+                              <div class="player-stats">
+                                @for (field of numericFields(); track field.key) {
+                                  <label [for]="'sheet-field-' + field.key"
+                                    >{{ field.label
+                                    }}<input
+                                      [id]="'sheet-field-' + field.key"
+                                      type="number"
+                                      [min]="field.min ?? null"
+                                      [max]="field.max ?? null"
+                                      [ngModel]="sheetFields()[field.key]"
+                                      (ngModelChange)="changeField(field.key, $event)"
+                                  /></label>
+                                }
+                              </div>
+                            </section>
+                          }
+                          <details class="edit-section">
+                            <summary>Altri dettagli personali</summary>
+                            @for (field of playerProfileFields(); track field.key) {
+                              <label [for]="'profile-' + field.key">{{ field.label }}</label
+                              ><textarea
+                                [id]="'profile-' + field.key"
+                                [rows]="3"
+                                maxlength="6000"
+                                [ngModel]="profile()[field.key]"
+                                (ngModelChange)="changeProfile(field.key, $event)"
+                              ></textarea>
+                            }
+                          </details>
+                          <details class="edit-section">
+                            <summary>Foto e ritratto</summary>
+                            <div class="image-tools">
+                              <figure>
+                                @if (photo()) {
+                                  <img class="photo" [src]="photo()" alt="Foto del personaggio" />
+                                }
                                 <label class="file-button"
                                   >Carica foto<input
                                     type="file"
@@ -312,110 +371,180 @@
                                     (change)="upload($event, 'photo')"
                                     aria-label="Carica foto del personaggio"
                                 /></label>
-                              </figcaption>
-                            </figure>
-                            <figure>
-                              @if (portrait()) {
-                                <img
-                                  class="avatar-preview"
-                                  [src]="portrait()"
-                                  alt="Avatar del personaggio"
-                                />
-                              } @else {
-                                <span class="avatar-initial">{{ name().slice(0, 1) }}</span>
-                              }
-                              <figcaption>
+                              </figure>
+                              <figure>
+                                @if (portrait()) {
+                                  <img
+                                    class="avatar-preview"
+                                    [src]="portrait()"
+                                    alt="Ritratto del personaggio"
+                                  />
+                                }
                                 <label class="file-button"
-                                  >Carica avatar<input
+                                  >Carica ritratto<input
                                     type="file"
                                     accept="image/png,image/jpeg,image/webp"
                                     (change)="upload($event, 'avatar')"
-                                    aria-label="Carica avatar del personaggio"
+                                    aria-label="Carica ritratto del personaggio"
                                 /></label>
-                              </figcaption>
-                            </figure>
-                          </div>
-                          @if (photo()) {
-                            <button class="btn" (click)="avatarFromPhoto()">
-                              Usa la foto per l’avatar
-                            </button>
-                          }
-                          <details>
-                            <summary>Usa immagini già presenti nel sito</summary>
-                            <label for="character-photo">Percorso della foto</label
-                            ><input
-                              id="character-photo"
-                              [ngModel]="photo()"
-                              (ngModelChange)="photo.set($event); dirty.set(true)"
-                            /><label for="character-portrait">Percorso dell’avatar</label
-                            ><input
-                              id="character-portrait"
-                              [ngModel]="portrait()"
-                              (ngModelChange)="portrait.set($event); dirty.set(true)"
-                            />
+                              </figure>
+                            </div>
                           </details>
-                        </details>
-                        <h4>Descrizione e storia</h4>
-                        @for (field of profileFields; track field.key) {
-                          <label [for]="'profile-' + field.key">{{ field.label }}</label>
-                          @if (field.rows === 1) {
-                            <input
-                              [id]="'profile-' + field.key"
-                              maxlength="160"
-                              [ngModel]="profile()[field.key]"
-                              (ngModelChange)="changeProfile(field.key, $event)"
-                            />
-                          } @else {
-                            <textarea
-                              [id]="'profile-' + field.key"
-                              [rows]="field.rows"
-                              maxlength="6000"
-                              [ngModel]="profile()[field.key]"
-                              (ngModelChange)="changeProfile(field.key, $event)"
-                            ></textarea>
-                          }
-                        }
-                        <details>
-                          <summary>Altri dettagli della scheda</summary>
-                          <label for="character-sheet">Scheda del personaggio</label
-                          ><textarea
-                            id="character-sheet"
-                            rows="8"
-                            maxlength="20000"
-                            [ngModel]="sheet()"
-                            (ngModelChange)="sheet.set($event); dirty.set(true)"
-                          ></textarea>
-                        </details>
-                        @if (extraFields().length) {
-                          <h4>Caratteristiche dell’avventura</h4>
-                          @for (field of extraFields(); track field.key) {
-                            <label [for]="'sheet-field-' + field.key">{{ field.label }}</label>
-                            @if (field.type === 'number') {
+                          <div class="player-save-bar">
+                            <button class="btn" (click)="discard()">Annulla</button
+                            ><button
+                              class="btn player-save"
+                              [disabled]="!dirty()"
+                              (click)="saveSheet()"
+                            >
+                              Salva modifiche
+                            </button>
+                          </div>
+                        </div>
+                      } @else {
+                        <div class="profile-form">
+                          <h4>Identità e descrizione</h4>
+                          <label for="character-name">Nome</label
+                          ><input
+                            id="character-name"
+                            maxlength="160"
+                            [ngModel]="name()"
+                            (ngModelChange)="name.set($event); dirty.set(true)"
+                          />
+                          <details class="form-group">
+                            <summary>Foto e avatar</summary>
+                            <p class="hint">
+                              La foto conserva l’inquadratura completa. Alla prima foto viene creato
+                              anche un avatar quadrato, con ritaglio centrale. Puoi caricare un
+                              avatar diverso.
+                            </p>
+                            <div class="image-tools">
+                              <figure>
+                                @if (photo()) {
+                                  <img class="photo" [src]="photo()" alt="Foto del personaggio" />
+                                } @else {
+                                  <span class="photo-empty">Nessuna foto</span>
+                                }
+                                <figcaption>
+                                  <label class="file-button"
+                                    >Carica foto<input
+                                      type="file"
+                                      accept="image/png,image/jpeg,image/webp"
+                                      (change)="upload($event, 'photo')"
+                                      aria-label="Carica foto del personaggio"
+                                  /></label>
+                                </figcaption>
+                              </figure>
+                              <figure>
+                                @if (portrait()) {
+                                  <img
+                                    class="avatar-preview"
+                                    [src]="portrait()"
+                                    alt="Avatar del personaggio"
+                                  />
+                                } @else {
+                                  <span class="avatar-initial">{{ name().slice(0, 1) }}</span>
+                                }
+                                <figcaption>
+                                  <label class="file-button"
+                                    >Carica avatar<input
+                                      type="file"
+                                      accept="image/png,image/jpeg,image/webp"
+                                      (change)="upload($event, 'avatar')"
+                                      aria-label="Carica avatar del personaggio"
+                                  /></label>
+                                </figcaption>
+                              </figure>
+                            </div>
+                            @if (photo()) {
+                              <button class="btn" (click)="avatarFromPhoto()">
+                                Usa la foto per l’avatar
+                              </button>
+                            }
+                            <details>
+                              <summary>Usa immagini già presenti nel sito</summary>
+                              <label for="character-photo">Percorso della foto</label
+                              ><input
+                                id="character-photo"
+                                [ngModel]="photo()"
+                                (ngModelChange)="photo.set($event); dirty.set(true)"
+                              /><label for="character-portrait">Percorso dell’avatar</label
+                              ><input
+                                id="character-portrait"
+                                [ngModel]="portrait()"
+                                (ngModelChange)="portrait.set($event); dirty.set(true)"
+                              />
+                            </details>
+                          </details>
+                          <h4>Descrizione e storia</h4>
+                          @for (field of profileFields; track field.key) {
+                            <label [for]="'profile-' + field.key">{{ field.label }}</label>
+                            @if (field.rows === 1) {
                               <input
-                                [id]="'sheet-field-' + field.key"
-                                type="number"
-                                [min]="field.min ?? null"
-                                [max]="field.max ?? null"
-                                [ngModel]="sheetFields()[field.key]"
-                                (ngModelChange)="changeField(field.key, $event)"
+                                [id]="'profile-' + field.key"
+                                maxlength="160"
+                                [ngModel]="profile()[field.key]"
+                                (ngModelChange)="changeProfile(field.key, $event)"
                               />
                             } @else {
                               <textarea
-                                [id]="'sheet-field-' + field.key"
-                                [rows]="field.long ? 3 : 1"
-                                maxlength="4000"
-                                [ngModel]="sheetFields()[field.key]"
-                                (ngModelChange)="changeField(field.key, $event)"
+                                [id]="'profile-' + field.key"
+                                [rows]="field.rows"
+                                maxlength="6000"
+                                [ngModel]="profile()[field.key]"
+                                (ngModelChange)="changeProfile(field.key, $event)"
                               ></textarea>
                             }
                           }
-                        }
-                        <div class="actions save-profile">
-                          <button class="btn" (click)="saveSheet()">Salva scheda</button
-                          ><button class="btn" (click)="discard()">Annulla modifiche</button>
+                          <details>
+                            <summary>Altri dettagli della scheda</summary>
+                            <label for="character-sheet">Scheda del personaggio</label
+                            ><textarea
+                              id="character-sheet"
+                              rows="8"
+                              maxlength="20000"
+                              [ngModel]="sheet()"
+                              (ngModelChange)="sheet.set($event); dirty.set(true)"
+                            ></textarea>
+                          </details>
+                          @if (extraFields().length) {
+                            <h4>Caratteristiche dell’avventura</h4>
+                            @for (field of extraFields(); track field.key) {
+                              <label [for]="'sheet-field-' + field.key">{{ field.label }}</label>
+                              @if (field.type === 'number') {
+                                <input
+                                  [id]="'sheet-field-' + field.key"
+                                  type="number"
+                                  [min]="field.min ?? null"
+                                  [max]="field.max ?? null"
+                                  [ngModel]="sheetFields()[field.key]"
+                                  (ngModelChange)="changeField(field.key, $event)"
+                                />
+                              } @else {
+                                <textarea
+                                  [id]="'sheet-field-' + field.key"
+                                  [rows]="field.long ? 3 : 1"
+                                  maxlength="4000"
+                                  [ngModel]="sheetFields()[field.key]"
+                                  (ngModelChange)="changeField(field.key, $event)"
+                                ></textarea>
+                              }
+                            }
+                          }
+                          <div class="actions save-profile">
+                            <button class="btn" (click)="saveSheet()">Salva scheda</button
+                            ><button class="btn" (click)="discard()">Annulla modifiche</button>
+                          </div>
                         </div>
-                      </div>
+                      }
                     } @else {
+                      <div class="character-actions">
+                        @if (c.canEditSheet) {
+                          <button class="btn" (click)="editing.set(true)">
+                            {{ canManage() ? 'Modifica scheda' : 'Modifica personaggio' }}
+                          </button>
+                        }
+                      </div>
                       @if (c.photo) {
                         <img class="character-photo" [src]="c.photo" [alt]="'Foto di ' + c.name" />
                       }
@@ -458,18 +587,37 @@
                           }
                         </dl>
                       }
-                      <app-gdr-turn [source]="c.sheet" />
-                  @if(!canManage() && c.inventory.length){<details><summary>Oggetti · {{c.inventory.length}}</summary><ul>@for(item of c.inventory;track item.id){<li>{{item.name}} × {{item.quantity}} @if(item.notes){<small>{{item.notes}}</small>}</li>}</ul></details>}
-                      <div class="character-actions">
-                        @if (c.canEditSheet) {
-                          <button class="btn" (click)="editing.set(true)">Modifica scheda</button>
-                        }
-                        @if (!canManage()) {
-                          <button class="btn" [disabled]="dirty()" (click)="export()">
-                            Esporta personaggio
+                      @if (c.sheet) {
+                        <section class="master-guidance">
+                          <h4>
+                            {{ canManage() ? 'Dettagli della scheda' : 'Indicazioni del master' }}
+                          </h4>
+                          <app-gdr-turn [source]="c.sheet" />
+                        </section>
+                      }
+                      @if (!canManage() && c.inventory.length) {
+                        <details>
+                          <summary>Oggetti · {{ c.inventory.length }}</summary>
+                          <ul>
+                            @for (item of c.inventory; track item.id) {
+                              <li>
+                                {{ item.name }} × {{ item.quantity }}
+                                @if (item.notes) {
+                                  <small>{{ item.notes }}</small>
+                                }
+                              </li>
+                            }
+                          </ul>
+                        </details>
+                      }
+                      @if (!canManage()) {
+                        <details>
+                          <summary>Altre opzioni</summary>
+                          <button class="btn" (click)="export()">
+                            Scarica una copia del personaggio
                           </button>
-                        }
-                      </div>
+                        </details>
+                      }
                       @if (!c.canEditSheet) {
                         <p class="hint">
                           Scheda in sola lettura. Interpretazione e zaino hanno permessi separati.

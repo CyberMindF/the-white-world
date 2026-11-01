@@ -189,9 +189,17 @@ export async function mutate(db, user, payload) {
       .bind(
         text(p.name, 160),
         portrait(p.portrait ?? ""),
-        text(p.sheet, 20000, true),
+        master ? text(p.sheet, 20000, true) : character.sheet,
         JSON.stringify(
-          profile(p.profile ?? JSON.parse(character.profile_json)),
+          profile({
+            ...JSON.parse(character.profile_json),
+            ...p.profile,
+            ...(!master
+              ? {
+                  abilities: JSON.parse(character.profile_json).abilities ?? "",
+                }
+              : {}),
+          }),
         ),
         portrait(p.photo ?? character.photo),
         JSON.stringify(

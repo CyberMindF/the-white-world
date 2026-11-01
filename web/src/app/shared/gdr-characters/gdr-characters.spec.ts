@@ -135,10 +135,13 @@ describe('scheda unica nel pannello della giocatrice',()=>{
   fixture.componentRef.setInput('fields',[{key:'name',label:'Nome',type:'text'},{key:'catName',label:'Nome del gatto',type:'text'},{key:'statMente',label:'Mente',type:'number',min:1,max:5}]);fixture.detectChanges();
   expect(fixture.nativeElement.textContent).toContain('Luna');expect(fixture.nativeElement.textContent).toContain('Ada');
   const button=(label:string)=>Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>).find(b=>b.textContent?.trim()===label)!;
-  button('Modifica scheda').click();fixture.detectChanges();await fixture.whenStable();
+  button('Modifica personaggio').click();fixture.detectChanges();await fixture.whenStable();
+  expect(fixture.nativeElement.querySelector('#character-sheet')).toBeNull();
+  expect(fixture.nativeElement.querySelector('#character-photo')).toBeNull();
+  expect(fixture.nativeElement.querySelector('#profile-abilities')).toBeNull();
   const name=fixture.nativeElement.querySelector('#character-name') as HTMLInputElement;name.value='Alba';name.dispatchEvent(new Event('input'));
   const pet=fixture.nativeElement.querySelector('#sheet-field-catName') as HTMLTextAreaElement;pet.value='Stella';pet.dispatchEvent(new Event('input'));fixture.detectChanges();
-  const save=vi.spyOn(workspace,'save').mockResolvedValue(false);button('Salva scheda').click();await fixture.whenStable();
+  const save=vi.spyOn(workspace,'save').mockResolvedValue(false);button('Salva modifiche').click();await fixture.whenStable();
   expect(save).toHaveBeenCalledWith(expect.objectContaining({characterId:'ada',name:'Alba',characterFields:{catName:'Stella',statMente:'4'}}));
  });
 });

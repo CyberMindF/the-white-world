@@ -32,7 +32,8 @@ export class GdrCharacters {
   protected readonly extraFields = computed(() =>
     this.workspace.active()?.kind === 'pg'
       ? this.fields().filter(
-          (f) => !/^(name|nome|surname|cognome|nome_personaggio|character_name|inventory)$/i.test(f.key),
+          (f) =>
+            !/^(name|nome|surname|cognome|nome_personaggio|character_name|inventory)$/i.test(f.key),
         )
       : [],
   );
@@ -47,6 +48,23 @@ export class GdrCharacters {
   readonly legacyPortrait = input('');
   readonly legacyNpcs = input<{ name: string; portrait: string; description: string }[]>([]);
   protected readonly profileFields = PROFILE_FIELDS;
+  protected readonly playerProfileFields = computed(() =>
+    PROFILE_FIELDS.filter(
+      (f) =>
+        f.key !== 'surname' &&
+        f.key !== 'abilities' &&
+        !(
+          f.key === 'appearance' && this.extraFields().some((field) => field.key === 'description')
+        ),
+    ),
+  );
+  protected readonly numericFields = computed(() =>
+    this.extraFields().filter((f) => f.type === 'number'),
+  );
+  protected readonly textFields = computed(() =>
+    this.extraFields().filter((f) => f.type !== 'number'),
+  );
+
   protected readonly profile = signal<CharacterProfile>(emptyProfile());
   protected readonly photo = signal('');
   protected readonly mediaBusy = signal(false);

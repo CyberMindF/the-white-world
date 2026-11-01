@@ -171,3 +171,10 @@ test('anche i vecchi pannelli leggono e scrivono sul PG canonico senza creare co
  const c=(await (await h.call(1)).json()).characters[0];assert.equal(c.name,'Alba');assert.equal(c.characterFields.catName,'Luna');
  assert.equal((await (await h.oldFields(2)).json()).values.name,'Alba');h.sqlite.close();
 });
+test('la giocatrice modifica i dati personali senza sovrascrivere il testo e le abilità preparati dal master',async()=>{
+ const h=apiHarness();await mutate(h.db,master,{action:'createCharacter',id:'restricted-sheet',adventureId,kind:'pg',name:'Ada',sheet:'Regole del master',profile:{abilities:'Abilità del master'}});
+ await grant(h.db,h.sqlite,'restricted-sheet',{canEditSheet:true});
+ await mutate(h.db,member,{action:'saveCharacter',characterId:'restricted-sheet',revision:revision(h.sqlite,'restricted-sheet'),name:'Alba',sheet:'Testo sostituito',portrait:'',profile:{surname:'Neri',appearance:'Capelli chiari',abilities:'Nuovi poteri'}});
+ const c=(await (await h.call(1)).json()).characters[0];assert.equal(c.name,'Alba');assert.equal(c.profile.surname,'Neri');assert.equal(c.profile.appearance,'Capelli chiari');assert.equal(c.sheet,'Regole del master');assert.equal(c.profile.abilities,'Abilità del master');
+ h.sqlite.close();
+});
