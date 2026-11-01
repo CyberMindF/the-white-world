@@ -81,7 +81,7 @@
       class="btn"
       type="button"
       [attr.aria-pressed]="mode() === 'preview'"
-      [disabled]="inlineEditing()"
+      [disabled]="inlineEditing() || !source().trim()"
       (click)="mode.set('preview')"
     >
       Solo anteprima
