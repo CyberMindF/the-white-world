@@ -66,7 +66,7 @@ export class GdrCharacters {
       .grants()
       .filter((g) => g.characterId === id && (g.canSpeak || g.canEditSheet || g.canInventory))
       .map((g) => this.workspace.users().find((u) => u.id === g.userId)?.nickname ?? 'Giocatore');
-    return names.length ? names.join(', ') : 'Non assegnato';
+    return names.length ? 'Assegnato a ' + names.join(', ') : 'Non assegnato';
   }
   protected setSection(value: 'sheet' | 'assignments' | 'inventory' | 'manage'): void {
     if (this.hasChanges() || this.mediaBusy()) return;
