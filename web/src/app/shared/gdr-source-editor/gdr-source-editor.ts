@@ -17,6 +17,7 @@ export class GdrSourceEditor {
   readonly source = input.required<string>();
   readonly sourceChange = output<string>();
   readonly editingChange = output<boolean>();
+  readonly modeChange = output<'split' | 'source' | 'preview'>();
   readonly label = input('Il tuo turno');
   readonly document = input(false);
   readonly allowGeneric = input(true);
@@ -36,8 +37,15 @@ export class GdrSourceEditor {
 
   constructor() {
     effect(() => {
+      if (this.mode() === 'preview' && !this.source().trim() && !this.inlineEditing()) this.mode.set('source');
+      this.modeChange.emit(this.mode());
+    });
+    effect(() => {
       if (this.characterIndex() >= this.characters().length) this.characterIndex.set(0);
     });
+  }
+  public openPreview(): void {
+    if (this.source().trim() && !this.inlineEditing()) this.mode.set('preview');
   }
   protected changeVoice(area: HTMLTextAreaElement): void {
     if (this.inlineEditing()) {

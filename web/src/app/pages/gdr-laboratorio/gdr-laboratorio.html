@@ -259,6 +259,8 @@
           </div>
           <section class="lab-composer" aria-label="Scrivi un messaggio">
             <app-gdr-source-editor
+              #turnComposer
+              (modeChange)="turnPreview.set($event === 'preview')"
               [source]="local().draft"
               (sourceChange)="updateDraft($event)"
               [characters]="characters()"
@@ -271,9 +273,9 @@
               <button
                 class="btn btn-submit"
                 [disabled]="invalidTurn() || turnEdit() || sendingTurn()"
-                (click)="publish()"
+                (click)="turnPreview() ? publish() : turnComposer.openPreview()"
               >
-                {{ sendingTurn() ? 'Invio…' : liveGame ? 'Invia turno' : 'Invia turno di prova' }}</button
+                {{ sendingTurn() ? 'Pubblicazione…' : !turnPreview() ? 'Anteprima' : liveGame ? 'Pubblica turno' : 'Pubblica turno di prova' }}</button
               >
             </div>
           </section>

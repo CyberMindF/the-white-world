@@ -11,6 +11,8 @@ import { GdrLaboratorio } from './gdr-laboratorio';
 
 class TurnPage extends GdrLaboratorio {
   draft(text: string) { this.updateDraft(text); }
+  preview() { this.turnPreview.set(true); }
+  leavePreview() { this.turnPreview.set(false); }
   send() { return this.publish(); }
   state() { return { local: this.local(), turns: this.turns(), status: this.status(), error: this.turnsError() }; }
 }
@@ -22,13 +24,21 @@ function create(live = true) {
     {provide: GdrWorkspaceService, useValue: {}},
     {provide: ActivatedRoute, useValue: {snapshot: {paramMap: convertToParamMap(live ? {adventureId: 'il-prezzo-della-verita'} : {})}}},
   ]});
-  return TestBed.runInInjectionContext(() => new TurnPage());
+  const page = TestBed.runInInjectionContext(() => new TurnPage());
+  page.preview();
+  return page;
 }
 const reply = (value: unknown, status = 200) => new Response(JSON.stringify(value), {status});
 const saved = {saved: true, turnId: 42, author: 'Rory', createdAt: '2026-10-31T22:00:00Z'};
 describe('invio dei turni della partita reale', () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => { vi.unstubAllGlobals(); TestBed.resetTestingModule(); });
+  it('non pubblica prima di passare dall’anteprima', async () => {
+    const fetchMock=vi.fn(); vi.stubGlobal('fetch',fetchMock);
+    const page=create(); page.draft('Una risposta'); page.leavePreview(); await page.send();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(page.state().local.draft).toBe('Una risposta');
+  });
   it('invia il testo completo al server e rilegge la cronologia condivisa', async () => {
     const body = 'Mi avvicino.\n\n::: dialogo Ada\nCiao!\n:::';
     const fetchMock = vi.fn().mockResolvedValueOnce(reply(saved, 201)).mockResolvedValueOnce(reply({turns:[{id:42, author:'Rory', createdAt:saved.createdAt, body, isMine:true}]}));

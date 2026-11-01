@@ -107,7 +107,12 @@
     </div>
     @if (mode() !== 'source') {
       <section class="preview-pane avventura-body" [attr.aria-label]="'Anteprima: ' + label()">
-        <p class="preview-label">Anteprima</p>
+        <div class="preview-heading">
+          <p class="preview-label">Anteprima</p>
+          @if (mode() === 'preview') {
+            <button class="btn" type="button" [disabled]="inlineEditing()" (click)="mode.set('source')">Torna al testo</button>
+          }
+        </div>
         @if (source().trim()) {
           <app-gdr-turn
             [source]="source()"

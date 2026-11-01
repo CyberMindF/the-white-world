@@ -121,6 +121,7 @@ export class GdrLaboratorio implements OnInit {
   protected readonly readingEdit = signal(false);
   protected readonly documentEdit = signal(false);
   protected readonly turnEdit = signal(false);
+  protected readonly turnPreview = signal(false);
   protected readonly sendingTurn = signal(false);
   private readonly realtime = inject(RealtimeService);
   private readonly destroyRef = inject(DestroyRef);
@@ -445,7 +446,7 @@ export class GdrLaboratorio implements OnInit {
     }
   }
   protected async publish(): Promise<void> {
-    if (this.invalidTurn() || this.sendingTurn() || this.turnEdit()) return;
+    if (this.invalidTurn() || this.sendingTurn() || this.turnEdit() || !this.turnPreview()) return;
     if (!this.liveGame) {
       this.publishLocal();
       return;
