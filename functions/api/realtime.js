@@ -19,6 +19,7 @@ export async function onRequestGet(context) {
     return json({ error: "Sessione non valida o scaduta." }, 401);
   }
 
+  if(session.impersonation) return json({error:"Impersonazione in sola lettura: presenza realtime disattivata."},403);
   const headers = new Headers(request.headers);
   headers.set("X-Realtime-User-Id", String(session.user.id));
   headers.set("X-Realtime-Identity", session.user.identity);

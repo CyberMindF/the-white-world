@@ -14,7 +14,13 @@ export interface AuthUser {
   safeMode?: boolean;
 }
 
+export interface Impersonation {
+  actorId: number;
+  actorNickname: string;
+  readOnly: true;
+}
 export interface AuthSessionResponse {
+  impersonation?: Impersonation | null;
   authenticated: boolean;
   user?: AuthUser;
   expiresAt?: string;
@@ -61,6 +67,7 @@ export class AuthService {
   // Dura per la sessione (documentazione/cms/planning-editor-contenuti.md, Fase 2): la sorgente di verità resta
   // il backend, questo signal riflette solo l'ultima risposta nota per pilotare la UI.
   readonly adminModeEnabled = signal(false);
+  readonly impersonation = signal<Impersonation | null>(null);
   readonly isAdmin = computed(() => this.currentUser()?.role === 'admin');
 
   // Chiede al backend se il cookie HttpOnly identifica ancora una sessione valida.
@@ -69,14 +76,19 @@ export class AuthService {
       const response = await fetch('/api/auth/session', {
         method: 'GET',
         credentials: 'same-origin',
-        headers: { Accept: 'application/json' }
+        headers: { Accept: 'application/json' },
       });
 
       if (!response.ok) {
+        this.impersonation.set(null);
         return { authenticated: false };
       }
 
-      return (await this.api.readApiResponse<AuthSessionResponse>(response)) as AuthSessionResponse;
+      const data = (await this.api.readApiResponse<AuthSessionResponse>(
+        response,
+      )) as AuthSessionResponse;
+      this.impersonation.set(data.impersonation ?? null);
+      return data;
     } catch (error) {
       console.warn('Impossibile verificare la sessione:', error);
       return { authenticated: false };
@@ -86,69 +98,107 @@ export class AuthService {
   // Invia registrazione, login o conferma della sola Chiave all'endpoint corretto.
   async submitAuthRequest(
     mode: AccessMode,
-    payload: Record<string, unknown>
+    payload: Record<string, unknown>,
   ): Promise<{ response: Response; result: AuthSessionResponse }> {
     const endpoint = mode === 'key' ? '/api/auth/session' : `/api/auth/${mode}`;
     const normalizedPayload = {
       ...payload,
       ...(typeof payload['email'] === 'string' ? { email: payload['email'].trim() } : {}),
       ...(typeof payload['password'] === 'string' ? { password: payload['password'].trim() } : {}),
-      ...(typeof payload['worldKey'] === 'string' ? { worldKey: payload['worldKey'].trim() } : {})
+      ...(typeof payload['worldKey'] === 'string' ? { worldKey: payload['worldKey'].trim() } : {}),
     };
     const response = await fetch(endpoint, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(normalizedPayload)
+      body: JSON.stringify(normalizedPayload),
     });
 
-    return { response, result: (await this.api.readApiResponse<AuthSessionResponse>(response)) as AuthSessionResponse };
+    return {
+      response,
+      result: (await this.api.readApiResponse<AuthSessionResponse>(
+        response,
+      )) as AuthSessionResponse,
+    };
   }
 
   // Aggiorna il nickname dell'utente autenticato.
-  async updateNickname(nickname: string): Promise<{ response: Response; result: ProfileNicknameResponse }> {
+  async updateNickname(
+    nickname: string,
+  ): Promise<{ response: Response; result: ProfileNicknameResponse }> {
     const response = await fetch('/api/auth/profile/nickname', {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nickname })
+      body: JSON.stringify({ nickname }),
     });
 
-    return { response, result: (await this.api.readApiResponse<ProfileNicknameResponse>(response)) as ProfileNicknameResponse };
+    return {
+      response,
+      result: (await this.api.readApiResponse<ProfileNicknameResponse>(
+        response,
+      )) as ProfileNicknameResponse,
+    };
   }
 
   // Cambia la password dell'utente autenticato, confermando quella attuale.
-  async updatePassword(currentPassword: string, newPassword: string): Promise<{ response: Response; result: ProfilePasswordResponse }> {
+  async updatePassword(
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<{ response: Response; result: ProfilePasswordResponse }> {
     const response = await fetch('/api/auth/profile/password', {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ currentPassword: currentPassword.trim(), newPassword: newPassword.trim() })
+      body: JSON.stringify({
+        currentPassword: currentPassword.trim(),
+        newPassword: newPassword.trim(),
+      }),
     });
 
-    return { response, result: (await this.api.readApiResponse<ProfilePasswordResponse>(response)) as ProfilePasswordResponse };
+    return {
+      response,
+      result: (await this.api.readApiResponse<ProfilePasswordResponse>(
+        response,
+      )) as ProfilePasswordResponse,
+    };
   }
 
-  async requestPasswordReset(email: string): Promise<{ response: Response; result: PasswordResetResponse }> {
+  async requestPasswordReset(
+    email: string,
+  ): Promise<{ response: Response; result: PasswordResetResponse }> {
     const response = await fetch('/api/auth/password-reset/request', {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.trim() })
+      body: JSON.stringify({ email: email.trim() }),
     });
 
-    return { response, result: (await this.api.readApiResponse<PasswordResetResponse>(response)) as PasswordResetResponse };
+    return {
+      response,
+      result: (await this.api.readApiResponse<PasswordResetResponse>(
+        response,
+      )) as PasswordResetResponse,
+    };
   }
 
-  async resetPassword(token: string, newPassword: string): Promise<{ response: Response; result: PasswordResetResponse }> {
+  async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<{ response: Response; result: PasswordResetResponse }> {
     const response = await fetch('/api/auth/password-reset/confirm', {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, newPassword: newPassword.trim() })
+      body: JSON.stringify({ token, newPassword: newPassword.trim() }),
     });
 
-    return { response, result: (await this.api.readApiResponse<PasswordResetResponse>(response)) as PasswordResetResponse };
+    return {
+      response,
+      result: (await this.api.readApiResponse<PasswordResetResponse>(
+        response,
+      )) as PasswordResetResponse,
+    };
   }
 
   // Accende/spegne la Modalità admin per la sessione corrente. Solo chi ha già role "admin"
@@ -159,9 +209,11 @@ export class AuthService {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled })
+      body: JSON.stringify({ enabled }),
     });
-    const result = (await this.api.readApiResponse<AdminModeResponse>(response)) as AdminModeResponse;
+    const result = (await this.api.readApiResponse<AdminModeResponse>(
+      response,
+    )) as AdminModeResponse;
     if (!response.ok || result.adminModeEnabled === undefined) {
       return false;
     }
@@ -173,10 +225,25 @@ export class AuthService {
   async revokeAuthSession(): Promise<Response> {
     return fetch('/api/auth/session', {
       method: 'DELETE',
-      credentials: 'same-origin'
+      credentials: 'same-origin',
     });
   }
 
+  async setImpersonation(userId: number | null): Promise<boolean> {
+    try {
+      const response = await fetch('/api/auth/impersonation', {
+        method: userId === null ? 'DELETE' : 'POST',
+        credentials: 'same-origin',
+        ...(userId === null
+          ? {}
+          : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) }),
+      });
+      if (response.ok) localStorage.setItem('world-impersonation-changed', String(Date.now()));
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
   // Restituisce la modalità iniziale più adatta in base alla presenza di un account già usato.
   getInitialAccessMode(): 'login' | 'register' {
     return localStorage.getItem(KNOWN_ACCOUNT_STORAGE_KEY) === 'true' ? 'login' : 'register';
@@ -188,6 +255,7 @@ export class AuthService {
   // quindi senza un limite di tempo la Chiave non verrebbe più richiesta (bug segnalato il
   // 09/08/2026).
   isAccessUnlocked(userId: number | string): boolean {
+    userId = this.impersonation()?.actorId ?? userId;
     if (sessionStorage.getItem(ACCESS_SESSION_KEY) !== String(userId)) {
       return false;
     }
@@ -207,6 +275,7 @@ export class AuthService {
   // Rinnova la finestra di inattività senza richiedere di nuovo la Chiave: va chiamato durante
   // l'uso normale (navigazione, interazione), mai per sbloccare un utente non ancora confermato.
   touchAccessUnlock(userId: number | string): void {
+    userId = this.impersonation()?.actorId ?? userId;
     if (sessionStorage.getItem(ACCESS_SESSION_KEY) === String(userId)) {
       sessionStorage.setItem(ACCESS_SESSION_TOUCHED_AT_KEY, String(Date.now()));
     }

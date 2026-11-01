@@ -86,6 +86,7 @@ export class GlobalChatService {
   }
 
   async markRead(): Promise<void> {
+    if(this.auth.impersonation()) return;
     const succeeded = await this.api.sendAuthenticatedJson('/api/ponti-chat/read', {}, 'POST');
     if (succeeded) {
       this.unreadCount.set(0);

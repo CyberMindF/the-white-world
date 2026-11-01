@@ -1,17 +1,56 @@
 <div class="place-userbar glass-surface" [class]="extraClass">
   <app-safe-mode-toggle />
   @if (userName()) {
-    <a routerLink="/profilo" class="user-greeting" title="Vai al tuo profilo">Ciao, {{ userName() }}</a>
+    <a routerLink="/profilo" class="user-greeting" title="Vai al tuo profilo"
+      >Ciao, {{ userName() }}</a
+    >
   } @else {
     <span class="user-greeting"></span>
   }
   @if (authService.isAdmin() && !safe.enabled()) {
     @if (authService.adminModeEnabled()) {
-      <a routerLink="/amministrazione" class="admin-shortcut-link" aria-label="Amministrazione" title="Amministrazione">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 3v6c0 4-4 7-8 9-4-2-8-5-8-9V6l8-3Z"/><path d="m8.5 12 2.5 2.5 4.5-5" /></svg>
+      <button
+        class="impersonate-button"
+        type="button"
+        [disabled]="impersonationBusy()"
+        (click)="openImpersonation()"
+      >
+        Impersona
+      </button>
+      @if (impersonationUsers(); as users) {
+        <div class="impersonation-picker" role="dialog" aria-label="Impersona un account">
+          <strong>Vedi il sito come…</strong>
+          <p>Sola lettura: nessuna modifica al suo account.</p>
+          @for (user of users; track user.id) {
+            <button type="button" [disabled]="impersonationBusy()" (click)="impersonate(user.id)">
+              {{ user.nickname }}
+            </button>
+          } @empty {
+            <p>Nessun account disponibile.</p>
+          }
+          <button type="button" (click)="impersonationUsers.set(null)">Annulla</button>
+        </div>
+      }
+      @if (impersonationError()) {
+        <span role="alert">{{ impersonationError() }}</span>
+      }
+      <a
+        routerLink="/amministrazione"
+        class="admin-shortcut-link"
+        aria-label="Amministrazione"
+        title="Amministrazione"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m12 3 8 3v6c0 4-4 7-8 9-4-2-8-5-8-9V6l8-3Z" />
+          <path d="m8.5 12 2.5 2.5 4.5-5" />
+        </svg>
       </a>
     }
-    <label class="userbar-admin-toggle" [class.is-active]="authService.adminModeEnabled()" title="Modalità admin">
+    <label
+      class="userbar-admin-toggle"
+      [class.is-active]="authService.adminModeEnabled()"
+      title="Modalità admin"
+    >
       <span>Admin</span>
       <input
         type="checkbox"
@@ -25,16 +64,42 @@
     </label>
   }
   @if (showHomeShortcut) {
-    <a routerLink="/" class="home-shortcut-link" aria-label="Vai a Il Mondo Bianco" title="Il Mondo Bianco">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 4l8 7.5M6 10v9a1 1 0 0 0 1 1h4v-6h2v6h4a1 1 0 0 0 1-1v-9" /></svg>
+    <a
+      routerLink="/"
+      class="home-shortcut-link"
+      aria-label="Vai a Il Mondo Bianco"
+      title="Il Mondo Bianco"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 11.5 12 4l8 7.5M6 10v9a1 1 0 0 0 1 1h4v-6h2v6h4a1 1 0 0 0 1-1v-9" />
+      </svg>
     </a>
   }
   @if (showSuggestLink && !safe.enabled()) {
-    <a routerLink="/suggerimenti" class="suggest-link" aria-label="Manda un suggerimento" title="Suggerisci">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-6 6c0 2.5 1.4 3.8 2.2 4.6.5.5.8 1.1.8 1.4h6c0-.3.3-.9.8-1.4.8-.8 2.2-2.1 2.2-4.6a6 6 0 0 0-6-6Z" /></svg>
+    <a
+      routerLink="/suggerimenti"
+      class="suggest-link"
+      aria-label="Manda un suggerimento"
+      title="Suggerisci"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M9 18h6M10 21h4M12 3a6 6 0 0 0-6 6c0 2.5 1.4 3.8 2.2 4.6.5.5.8 1.1.8 1.4h6c0-.3.3-.9.8-1.4.8-.8 2.2-2.1 2.2-4.6a6 6 0 0 0-6-6Z"
+        />
+      </svg>
     </a>
   }
-  <button id="logout-button" class="logout-button" type="button" aria-label="Esci dall'account" title="Esci" [disabled]="loggingOut()" (click)="onLogoutClick()">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4M14 8l4 4-4 4M18 12H9" /></svg>
+  <button
+    id="logout-button"
+    class="logout-button"
+    type="button"
+    aria-label="Esci dall'account"
+    title="Esci"
+    [disabled]="loggingOut()"
+    (click)="onLogoutClick()"
+  >
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4M14 8l4 4-4 4M18 12H9" />
+    </svg>
   </button>
 </div>

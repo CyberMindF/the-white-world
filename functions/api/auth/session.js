@@ -21,6 +21,7 @@ export async function onRequestGet({ request, env }) {
     return json({
       authenticated: true,
       user: session.user,
+      impersonation: session.impersonation,
       expiresAt: session.expiresAt,
       adminModeEnabled: session.adminModeEnabled
     });
@@ -59,6 +60,7 @@ export async function onRequestPost(context) {
       {
         authenticated: true,
         user: session.user,
+      impersonation: session.impersonation,
         expiresAt: session.expiresAt,
         adminModeEnabled: session.adminModeEnabled
       },
@@ -74,7 +76,7 @@ export async function onRequestPost(context) {
 // Esegue il logout revocando logicamente la sessione e facendo scadere il cookie.
 export async function onRequestDelete({ request, env }) {
   try {
-    const session = await getAuthenticatedSession(request, env);
+    const session = await getAuthenticatedSession(request, env, {ignoreImpersonation:true});
     if (session) {
       // L'evento viene scritto prima della revoca, quando la sessione è ancora verificabile.
       await recordEvent(env, { userId: session.user.id, sessionId: session.sessionId }, {

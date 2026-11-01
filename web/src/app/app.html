@@ -1,3 +1,22 @@
+@if (authService.impersonation()) {
+  <aside class="impersonation-banner" aria-label="Impersonazione attiva">
+    <div>
+      <strong>Stai impersonando {{ authService.currentUser()?.nickname }}</strong
+      ><span>Sola lettura · salvataggi e invii bloccati</span>
+    </div>
+    <button
+      class="btn"
+      type="button"
+      [disabled]="stoppingImpersonation()"
+      (click)="stopImpersonation()"
+    >
+      Torna al tuo account
+    </button>
+    @if (impersonationError()) {
+      <p role="alert">{{ impersonationError() }}</p>
+    }
+  </aside>
+}
 @if (!studyFocus.active() && !safe.enabled()) {
   <app-world-silk />
   <app-world-stars />

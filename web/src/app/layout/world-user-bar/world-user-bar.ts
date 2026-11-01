@@ -9,7 +9,40 @@ import { NavigationService } from '../../core/navigation.service';
   selector: 'app-world-user-bar',
   standalone: true,
   imports: [SafeModeToggle, RouterLink],
-  templateUrl: './world-user-bar.html'
+  templateUrl: './world-user-bar.html',
+  styles: [
+    `
+      .impersonate-button,
+      .impersonation-picker button {
+        padding: 0.45rem 0.7rem;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        background: var(--button-bg);
+        color: var(--text-color);
+        font: inherit;
+        cursor: pointer;
+      }
+      .impersonation-picker {
+        position: fixed;
+        z-index: 500;
+        top: 5rem;
+        right: 1rem;
+        max-width: calc(100vw - 2rem);
+        box-sizing: border-box;
+        padding: 1.2rem;
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        background: var(--bg-color);
+        box-shadow: var(--shadow);
+        display: grid;
+        gap: 0.7rem;
+      }
+      .impersonation-picker p {
+        margin: 0;
+        font-size: 0.85rem;
+      }
+    `,
+  ],
 })
 export class WorldUserBar {
   @Input() extraClass = '';
@@ -23,6 +56,32 @@ export class WorldUserBar {
   protected readonly safe = inject(SafeModeService);
   protected readonly loggingOut = signal(false);
   protected readonly changingAdminMode = signal(false);
+  protected readonly impersonationUsers = signal<{ id: number; nickname: string }[] | null>(null);
+  protected readonly impersonationBusy = signal(false);
+  protected readonly impersonationError = signal('');
+  protected async openImpersonation(): Promise<void> {
+    this.impersonationBusy.set(true);
+    this.impersonationError.set('');
+    try {
+      const response = await fetch('/api/auth/impersonation', { credentials: 'same-origin' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      this.impersonationUsers.set(data.users);
+    } catch {
+      this.impersonationError.set('Impossibile caricare gli account. Riprova.');
+    } finally {
+      this.impersonationBusy.set(false);
+    }
+  }
+  protected async impersonate(id: number): Promise<void> {
+    this.impersonationBusy.set(true);
+    if (await this.authService.setImpersonation(id)) {
+      window.location.reload();
+      return;
+    }
+    this.impersonationBusy.set(false);
+    this.impersonationError.set('Impossibile attivare l’impersonazione.');
+  }
 
   protected readonly authService = inject(AuthService);
 

@@ -88,9 +88,19 @@ export class App {
   private bustinePresenceTimer: number | null = null;
   private bustinePresenceUserId: number | null = null;
   protected readonly updateAvailable = signal(false);
+  protected readonly stoppingImpersonation = signal(false);
+  protected readonly impersonationError = signal('');
+  protected async stopImpersonation():Promise<void>{
+    this.stoppingImpersonation.set(true);this.impersonationError.set('');
+    if(await this.authService.setImpersonation(null)){window.location.reload();return;}
+    this.stoppingImpersonation.set(false);this.impersonationError.set('Impossibile uscire dall’impersonazione. Riprova.');
+  }
   protected readonly showGlobalChat = signal(!['/ponti-chat', '/login'].includes(this.router.url.split('?')[0]));
 
   constructor() {
+    const refreshIdentity=(event:StorageEvent)=>{if(event.key==='world-impersonation-changed')window.location.reload();};
+    window.addEventListener('storage',refreshIdentity);
+    this.destroyRef.onDestroy(()=>window.removeEventListener('storage',refreshIdentity));
     this.safe.apply(true);
     document.body.classList.add('world-atmosphere');
     this.themeService.applySavedTheme();
@@ -160,7 +170,7 @@ export class App {
         return;
       }
       this.restartBustinePresenceTimer();
-      this.realtimeService.connect();
+      if(this.authService.impersonation()) this.realtimeService.disconnect(); else this.realtimeService.connect();
       void this.globalChat.startForCurrentUser();
       if (!this.safe.enabled()) void this.carteBustineService.load(userId).catch((error) => {
         console.warn('Impossibile aggiornare la streak di accesso:', error);
@@ -177,7 +187,7 @@ export class App {
   // server, cosi due schede aperte non raddoppiano le bustine.
   private restartBustinePresenceTimer(): void {
     const userId = this.authService.currentUser()?.id;
-    if (this.safe.enabled() || userId === undefined || document.visibilityState !== 'visible' || this.router.url.split('?')[0] === '/login') {
+    if (this.authService.impersonation() || this.safe.enabled() || userId === undefined || document.visibilityState !== 'visible' || this.router.url.split('?')[0] === '/login') {
       this.stopBustinePresenceTimer();
       return;
     }

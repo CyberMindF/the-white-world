@@ -32,3 +32,5 @@
     flex-direction: column;
   }
 }
+
+.impersonation-banner {position:sticky;top:0;z-index:900;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.8rem 1.2rem;border-bottom:2px solid var(--accent-color);background:var(--bg-color);color:var(--text-color);box-shadow:var(--shadow);flex-wrap:wrap;} .impersonation-banner span {display:block;font-size:.85rem;color:var(--muted-color);margin-top:.3rem;} .impersonation-banner .btn {justify-content:center;margin:0;font-size:.85rem;}

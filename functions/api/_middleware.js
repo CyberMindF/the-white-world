@@ -18,22 +18,42 @@ const SAFE_TEST_MUTATIONS = [
   { method: "POST", pattern: /^\/api\/carte-bustine\/apri$/ },
   { method: "POST", pattern: /^\/api\/carte-bustine\/presenza$/ },
   { method: "POST", pattern: /^\/api\/telemetry\/(events|word-attempts)$/ },
-  { method: "PUT", pattern: /^\/api\/crossword\/answers\/[^/]+$/ }
+  { method: "PUT", pattern: /^\/api\/crossword\/answers\/[^/]+$/ },
 ];
 
 export async function onRequest(context) {
   const method = context.request.method.toUpperCase();
   if (["GET", "HEAD", "OPTIONS"].includes(method)) return context.next();
-
   const path = new URL(context.request.url).pathname;
-  if (path.startsWith("/api/auth/")) return context.next();
-
   const session = await getAuthenticatedSession(context.request, context.env);
+  if (
+    session?.impersonation &&
+    !["GET", "HEAD", "OPTIONS"].includes(method) &&
+    path !== "/api/auth/impersonation" &&
+    !(path === "/api/auth/session" && method === "DELETE")
+  ) {
+    return json(
+      {
+        error:
+          "Stai impersonando un account in sola lettura. Torna al tuo account per salvare modifiche.",
+      },
+      403,
+    );
+  }
+  if (path.startsWith("/api/auth/")) return context.next();
   if (!session?.user.isTest) return context.next();
 
-  const allowed = SAFE_TEST_MUTATIONS.some((entry) => entry.method === method && entry.pattern.test(path));
+  const allowed = SAFE_TEST_MUTATIONS.some(
+    (entry) => entry.method === method && entry.pattern.test(path),
+  );
   if (!allowed) {
-    return json({ error: "Questa azione è disattivata per gli account di prova, così il rollback resta completo." }, 403);
+    return json(
+      {
+        error:
+          "Questa azione è disattivata per gli account di prova, così il rollback resta completo.",
+      },
+      403,
+    );
   }
 
   return context.next();

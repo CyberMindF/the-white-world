@@ -9,8 +9,8 @@ export function json(body, status = 200, headers = {}) {
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store",
-      ...headers
-    }
+      ...headers,
+    },
   });
 }
 
@@ -54,18 +54,24 @@ export function isWorldKeyValid(value, expectedValue) {
     return false;
   }
 
-  return value.trim().toLocaleLowerCase("it") === expectedValue.trim().toLocaleLowerCase("it");
+  return (
+    value.trim().toLocaleLowerCase("it") ===
+    expectedValue.trim().toLocaleLowerCase("it")
+  );
 }
 
 // Genera una sessione, ne salva l'hash in D1 e restituisce il cookie con il token originale.
 export async function createSession(request, env, userId) {
   const token = createRandomToken();
   const tokenHash = await hashToken(token);
-  const expiresAt = new Date(Date.now() + SESSION_DURATION_SECONDS * 1000).toISOString();
+  const expiresAt = new Date(
+    Date.now() + SESSION_DURATION_SECONDS * 1000,
+  ).toISOString();
 
   // Anche le sessioni scadute restano nello storico: qui inseriamo soltanto quella nuova.
-  const result = await env.DB
-    .prepare("INSERT INTO sessions (user_id, token_hash, expires_at, last_seen_at) VALUES (?, ?, ?, ?)")
+  const result = await env.DB.prepare(
+    "INSERT INTO sessions (user_id, token_hash, expires_at, last_seen_at) VALUES (?, ?, ?, ?)",
+  )
     .bind(userId, tokenHash, expiresAt, new Date().toISOString())
     .run();
 
@@ -79,7 +85,7 @@ export function getAuthEventMetadata(request, extra = {}) {
   return {
     ip: getConnectionIp(request),
     userAgent: request.headers.get("User-Agent")?.slice(0, 512) || null,
-    ...extra
+    ...extra,
   };
 }
 
@@ -89,8 +95,9 @@ export async function revokeCurrentSession(request, env) {
   if (token) {
     // deleted_at conserva la sessione nello storico ma impedisce di riutilizzarla.
     const tokenHash = await hashToken(token);
-    await env.DB
-      .prepare("UPDATE sessions SET deleted_at = ? WHERE token_hash = ? AND deleted_at IS NULL")
+    await env.DB.prepare(
+      "UPDATE sessions SET deleted_at = ? WHERE token_hash = ? AND deleted_at IS NULL",
+    )
       .bind(new Date().toISOString(), tokenHash)
       .run();
   }
@@ -109,18 +116,19 @@ export async function getAuthenticatedSession(request, env, options = {}) {
   // Il token ricevuto viene trasformato nello stesso hash conservato nel database.
   const tokenHash = await hashToken(token);
   const now = new Date().toISOString();
-  const session = await env.DB
-    .prepare(`
+  const session = await env.DB.prepare(
+    `
       SELECT
         users.id, users.email, users.nickname, users.identity, users.role, users.is_test, users.safe_mode,
-        sessions.id AS session_id, sessions.expires_at, sessions.admin_mode_enabled
+        sessions.id AS session_id, sessions.expires_at, sessions.admin_mode_enabled, sessions.impersonated_user_id, sessions.impersonation_active
       FROM sessions
       INNER JOIN users ON users.id = sessions.user_id
       WHERE sessions.token_hash = ?
         AND sessions.expires_at > ?
         AND sessions.deleted_at IS NULL
         AND users.is_activated = 1
-    `)
+    `,
+  )
     .bind(tokenHash, now)
     .first();
 
@@ -132,29 +140,63 @@ export async function getAuthenticatedSession(request, env, options = {}) {
   let cookie = null;
 
   if (options.refresh) {
-    expiresAt = new Date(Date.now() + SESSION_DURATION_SECONDS * 1000).toISOString();
+    expiresAt = new Date(
+      Date.now() + SESSION_DURATION_SECONDS * 1000,
+    ).toISOString();
     // Solo l'invio corretto della chiave aggiorna ultima attività e scadenza.
-    await env.DB
-      .prepare("UPDATE sessions SET last_seen_at = ?, expires_at = ? WHERE id = ?")
+    await env.DB.prepare(
+      "UPDATE sessions SET last_seen_at = ?, expires_at = ? WHERE id = ?",
+    )
       .bind(now, expiresAt, session.session_id)
       .run();
     cookie = buildSessionCookie(request, token);
   }
 
+  const actor = {
+    id: session.id,
+    email: session.email,
+    nickname: session.nickname,
+    identity: session.identity,
+    role: session.role,
+    isTest: session.is_test === 1,
+    safeMode: session.safe_mode === 1,
+  };
+  let user = actor,
+    impersonation = null;
+  if (!options.ignoreImpersonation && session.impersonation_active) {
+    if (actor.role !== "admin" || actor.isTest || !session.impersonated_user_id)
+      return null;
+    const target = await env.DB.prepare(
+      "SELECT id,email,nickname,identity,role,is_test,safe_mode FROM users WHERE id=? AND role='member' AND is_test=0 AND is_activated=1",
+    )
+      .bind(session.impersonated_user_id)
+      .first();
+    if (!target) return null;
+    if (target) {
+      user = {
+        id: target.id,
+        email: target.email,
+        nickname: target.nickname,
+        identity: target.identity,
+        role: target.role,
+        isTest: false,
+        safeMode: target.safe_mode === 1,
+      };
+      impersonation = {
+        actorId: actor.id,
+        actorNickname: actor.nickname,
+        readOnly: true,
+      };
+    }
+  }
   return {
-    user: {
-      id: session.id,
-      email: session.email,
-      nickname: session.nickname,
-      identity: session.identity,
-      role: session.role,
-      isTest: session.is_test === 1,
-      safeMode: session.safe_mode === 1
-    },
+    user,
+    impersonation,
     sessionId: session.session_id,
-    adminModeEnabled: session.admin_mode_enabled === 1 && session.safe_mode !== 1,
+    adminModeEnabled:
+      !impersonation && session.admin_mode_enabled === 1 && !actor.safeMode,
     cookie,
-    expiresAt
+    expiresAt,
   };
 }
 
@@ -186,7 +228,10 @@ function bytesToBase64Url(bytes) {
     binary += String.fromCharCode(byte);
   }
 
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+  return btoa(binary)
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
 }
 
 // Cerca un cookie per nome all'interno dell'header Cookie della richiesta.
