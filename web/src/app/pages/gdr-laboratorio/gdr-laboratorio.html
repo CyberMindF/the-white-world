@@ -227,8 +227,10 @@
           }
         }
 
-        <section class="gdr-turn-section" aria-labelledby="turno-title">
-          <h2 id="turno-title">Il turno</h2>
+        <section class="gdr-turn-section" aria-label="Messaggi della partita">
+          @if (turns().length || local().turns.length) {
+            <h2>Il turno</h2>
+          }
           @if (turnsError()) {
             <p class="lab-error" role="alert">{{ turnsError() }}</p>
             <button class="btn" (click)="select(selected())">Riprova la cronologia</button>
@@ -243,9 +245,6 @@
                 <app-gdr-turn [source]="turn.body" />
               </article>
             }
-            @if (!turns().length && !turnsError()) {
-              <p class="gdr-thread-message">Nessun turno esistente in questo ambiente.</p>
-            }
             @for (turn of local().turns; track turn.id) {
               <article class="gdr-turn is-mine lab-local-turn">
                 <div class="gdr-turn-meta">
@@ -258,12 +257,7 @@
               </article>
             }
           </div>
-          <section class="lab-composer" aria-labelledby="write-title">
-            <h3 id="write-title">Scrivi il tuo turno</h3>
-            <p class="lab-help">
-              Un unico testo, un unico invio. Narrazione, gesti e voci dei personaggi restano
-              insieme.
-            </p>
+          <section class="lab-composer" aria-label="Scrivi un messaggio">
             <app-gdr-source-editor
               [source]="local().draft"
               (sourceChange)="updateDraft($event)"
@@ -271,7 +265,7 @@
               [allowGeneric]="!workspace.available()"
               editorId="lab-turn"
               (editingChange)="turnEdit.set($event)"
-              label="Il tuo turno"
+              label="Scrivi qualcosa"
             />
             <div class="gdr-turn-submit-row">
               <button

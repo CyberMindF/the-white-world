@@ -235,12 +235,6 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/giochi-due/giochi-due').then((m) => m.GiochiDue),
       },
       {
-        path: 'tavolo-da-gioco/gdr/prova-scheda',
-        canActivate: [adminGuard],
-        data: { bodyClasses: ['tavolo-page'] },
-        loadComponent: () => import('./pages/gdr-scheda-prova/gdr-scheda-prova').then((m) => m.GdrSchedaProva),
-      },
-      {
         path: 'tavolo-da-gioco/gdr/laboratorio',
         data: { bodyClasses: ['tavolo-page'] },
         loadComponent: () => import('./pages/gdr-laboratorio/gdr-laboratorio').then((m) => m.GdrLaboratorio),
