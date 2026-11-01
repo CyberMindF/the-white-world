@@ -67,8 +67,13 @@
     }
     <div class="gdr-panel-tabs" [class.is-workspace]="workspaceMode" role="tablist">
       <button type="button" role="tab" [disabled]="pendingChanges" [class.is-active]="activeTab() === 'personaggio'" (click)="setTab('personaggio')">
-        <span aria-hidden="true">{{ personaggioIcon }}</span> {{ workspaceMode && !legacyCharacterSheet ? 'Personaggi' : personaggioLabel }}
+        <span aria-hidden="true">{{ personaggioIcon }}</span> {{ workspaceMode && !legacyCharacterSheet ? 'Personaggio' : personaggioLabel }}
       </button>
+      @if (workspaceMode) {
+        <button type="button" role="tab" [disabled]="pendingChanges" [attr.aria-selected]="activeTab() === 'abilita'" [class.is-active]="activeTab() === 'abilita'" (click)="setTab('abilita')">
+          <span aria-hidden="true">✨</span> Abilità e incantesimi
+        </button>
+      }
       <button type="button" role="tab" [disabled]="pendingChanges" [class.is-active]="activeTab() === 'regole'" (click)="setTab('regole')">
         <span aria-hidden="true">📖</span> Regole
       </button>
@@ -85,6 +90,7 @@
       @if (workspaceMode) {
         @if(activeTab() === 'personaggio' && legacyCharacterSheet) { <ng-container [ngTemplateOutlet]="legacyCharacter" /> } @else if(activeTab() === 'personaggio' || activeTab() === 'inventario') { <ng-content select="[gdrCharacters]" /> } @else {
         @switch(activeTab()) {
+          @case('abilita'){<ng-content select="[gdrPowers]" />}
           @case('regole'){<ng-content select="[gdrRules]" />}
           @case('appunti'){<ng-content select="[gdrNotes]" />}
           @case('dadi'){<app-gdr-dice-roller />}

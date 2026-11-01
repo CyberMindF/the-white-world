@@ -1,0 +1,40 @@
+@if (!workspace.available()) {
+  <p>Non è stato possibile caricare il personaggio. Riapri la scheda per riprovare.</p>
+} @else if (workspace.active(); as c) {
+  @if (workspace.characters().length > 1) {
+    <label for="powers-character">Personaggio</label>
+    <select id="powers-character" [disabled]="workspace.pendingChanges() || workspace.saving()"
+      [ngModel]="c.id" (ngModelChange)="workspace.activeId.set($event)">
+      @for (character of workspace.characters(); track character.id) {
+        <option [value]="character.id">{{ character.name }} {{ character.profile?.surname }}</option>
+      }
+    </select>
+  }
+  <header><h3>Abilità e incantesimi</h3><p>{{ c.name }} {{ c.profile?.surname }}</p></header>
+  @if (c.profile.abilities) {
+    <app-gdr-turn [source]="c.profile.abilities" />
+  }
+  @for (block of blocks(); track block.id) {
+    @switch (block.type) {
+      @case ('heading') { <h4>{{ heading(block) }}</h4> }
+      @case ('list') {
+        <div class="power-list">
+          @for (entry of entries(block); track $index) {
+            @if (entry.text) {
+              <details><summary>{{ entry.title }}</summary><p>{{ entry.text }}</p></details>
+            } @else { <p>{{ entry.title }}</p> }
+          }
+        </div>
+      }
+      @case ('table') {
+        <details class="power-table"><summary>Tabella degli effetti</summary><app-gdr-blocks [blocks]="[block]" /></details>
+      }
+      @default { <app-gdr-blocks [blocks]="[block]" /> }
+    }
+  }
+  @if (!c.profile.abilities && !blocks().length) {
+    <p class="hint">Il master non ha ancora aggiunto abilità o incantesimi a questo personaggio.</p>
+  }
+} @else {
+  <p>Il master non ti ha ancora assegnato un personaggio.</p>
+}

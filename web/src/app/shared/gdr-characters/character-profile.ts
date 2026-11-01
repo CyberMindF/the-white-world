@@ -11,7 +11,7 @@ export const PROFILE_FIELDS: { key: keyof CharacterProfile; label: string; rows:
   { key: 'personality', label: 'Carattere', rows: 3 },
   { key: 'history', label: 'Storia', rows: 5 },
   { key: 'goal', label: 'Obiettivo attuale', rows: 3 },
-  { key: 'abilities', label: 'Abilità', rows: 4 },
+  { key: 'abilities', label: 'Abilità e incantesimi', rows: 4 },
 ];
 export const emptyProfile = (): CharacterProfile => ({
   surname: '',

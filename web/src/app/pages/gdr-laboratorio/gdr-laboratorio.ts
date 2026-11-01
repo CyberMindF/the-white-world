@@ -17,6 +17,8 @@ import {
 import { serializeGdrBlocks } from '../../shared/gdr-blocks/gdr-markdown.serializer';
 import { GdrWorkspaceService } from '../../core/gdr-workspace.service';
 import { GdrCharacters } from '../../shared/gdr-characters/gdr-characters';
+import { GdrPowers } from '../../shared/gdr-characters/gdr-powers';
+import { splitCharacterPowers } from '../../shared/gdr-characters/character-powers';
 import { GdrNotesEditor } from '../../shared/gdr-notes/gdr-notes-editor';
 import { GdrPanel } from '../../shared/gdr-panel/gdr-panel';
 import { GdrTurn } from '../../shared/gdr-turn/gdr-turn';
@@ -113,6 +115,7 @@ const dateFormatter = new Intl.DateTimeFormat('it-IT', {
     GdrSourceEditor,
     GdrPanel,
     GdrCharacters,
+    GdrPowers,
     GdrNotesEditor,
   ],
   providers: [GdrWorkspaceService],
@@ -197,7 +200,9 @@ export class GdrLaboratorio implements OnInit {
         )
       : this.rulesBlocks();
   });
-  protected readonly rulesBlocks = computed(() => this.forDocument(this.adventure().rules));
+  protected readonly referenceBlocks = computed(() => splitCharacterPowers(this.forDocument(this.adventure().rules)));
+  protected readonly rulesBlocks = computed(() => this.referenceBlocks().rules);
+  protected readonly powersBlocks = computed(() => this.referenceBlocks().powers);
   protected readonly characterBlocks = computed(() => this.forDocument(this.adventure().character));
   protected readonly documentSource = computed(
     () =>

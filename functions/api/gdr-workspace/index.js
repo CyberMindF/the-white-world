@@ -25,7 +25,8 @@ export async function onRequestGet(context) {
         return json({ error: "Avventura non trovata." }, 404);
       const result = await db
         .prepare(
-          `SELECT c.*, g.can_speak,g.can_edit_sheet,g.can_inventory
+          `SELECT c.*, g.can_speak,g.can_edit_sheet,g.can_inventory,
+        EXISTS(SELECT 1 FROM gdr_workspace_story_links l WHERE l.adventure_id=c.adventure_id AND l.source_key='pg' AND l.character_id=c.id) AS legacy_protagonist
         FROM gdr_workspace_characters c LEFT JOIN gdr_workspace_grants g ON g.character_id=c.id AND g.user_id=?
         WHERE c.adventure_id=? AND (?=1 OR (g.user_id IS NOT NULL AND c.archived=0 AND (g.can_speak=1 OR g.can_edit_sheet=1 OR g.can_inventory=1))) ORDER BY c.created_at,c.id`,
         )

@@ -41,6 +41,7 @@ export interface WorkspaceCharacter {
   statsBudget?: number;
   canEditStats?: boolean;
   canAdjustResources?: boolean;
+  legacyProtagonist?: boolean;
 }
 export interface CharacterGrant {
   characterId: string;

@@ -113,6 +113,7 @@ export function characterView(row, user) {
     portrait: row.portrait,
     sheet: row.sheet,
     characterFields: JSON.parse(row.fields_json ?? '{}'),
+    legacyProtagonist: row.legacy_protagonist === 1,
     photo: row.photo ?? "",
     profile: JSON.parse(row.profile_json ?? "{}"),
     inventory: JSON.parse(row.inventory_json),

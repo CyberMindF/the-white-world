@@ -1,0 +1,14 @@
+:host { display: block; }
+header { margin: .3rem 0 1.2rem; }
+h3 { margin: 0; }
+header p, .hint { color: var(--muted-text-color, var(--text-color)); opacity: .8; }
+header p { margin: .3rem 0 0; }
+h4 { margin: 1.3rem 0 .6rem; }
+label { display: block; margin-bottom: .4rem; }
+select { width: 100%; margin-bottom: 1rem; padding: .6rem; color: var(--text-color); background: var(--input-bg); border: 1px solid var(--panel-border-color); border-radius: .6rem; font: inherit; }
+.power-list { display: grid; gap: .5rem; }
+details { border: 1px solid var(--panel-border-color); border-radius: .7rem; background: var(--input-bg); }
+summary { padding: .75rem .85rem; cursor: pointer; font-weight: 600; overflow-wrap: anywhere; }
+summary:focus-visible { outline: 2px solid var(--focus-color); outline-offset: 2px; border-radius: .6rem; }
+details p { margin: 0; padding: 0 .85rem .85rem; line-height: 1.6; white-space: pre-line; }
+.power-table { margin: .8rem 0; overflow: auto; }

@@ -291,7 +291,7 @@
 .gdr-panel-tabs button:disabled { opacity:.5; cursor:default; }
 @media(max-width:640px) { .gdr-panel-sheet.is-wide { width:auto; } }
 
-/* Con cinque strumenti, rendi visibile anche Zaino senza uno scorrimento nascosto. */
+/* Tutti gli strumenti restano visibili anche nel pannello compatto. */
 .gdr-panel-tabs.is-workspace { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); overflow:visible; }
 .gdr-panel-tabs.is-workspace button { min-width:0; white-space:normal; }
 @media(min-width:641px) { .is-wide .gdr-panel-tabs.is-workspace { grid-template-columns:repeat(5,minmax(0,1fr)); } }

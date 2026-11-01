@@ -76,6 +76,17 @@ test('API: autenticazione, bozze riservate e visibilità dei soli personaggi ass
   h.sqlite.close();
 });
 
+test('i poteri storici restano collegati al solo protagonista assegnato, anche dopo la sua eliminazione',async()=>{
+  const h=apiHarness();await character(h.db,'protagonist');await character(h.db,'another');
+  await grant(h.db,h.sqlite,'protagonist');await grant(h.db,h.sqlite,'another');
+  h.sqlite.prepare("INSERT INTO gdr_workspace_story_links(adventure_id,source_key,character_id) VALUES(?,'pg',?)").run(adventureId,'protagonist');
+  let data=await (await h.call(2)).json();
+  assert.equal(data.characters.find(c=>c.id==='protagonist').legacyProtagonist,true);
+  assert.equal(data.characters.find(c=>c.id==='another').legacyProtagonist,false);
+  await mutate(h.db,master,{action:'deleteCharacter',characterId:'protagonist',revision:revision(h.sqlite,'protagonist')});
+  data=await (await h.call(2)).json();assert.deepEqual(data.characters.map(c=>c.legacyProtagonist),[false]);h.sqlite.close();
+});
+
 test('profilo strutturato e inventario importato: campi validati, scheda PNG protetta',async()=>{
   const h=apiHarness();
   await mutate(h.db,master,{action:'createCharacter',id:'profile-npc',adventureId,kind:'png',name:'Ada',profile:{surname:'Neri',appearance:'Alta',personality:'Riservata',history:'Una lunga storia',goal:'Ritrovare un amico',abilities:'Osservazione'},items:[{id:'item-a',name:'Chiave',quantity:2,notes:''}]});
