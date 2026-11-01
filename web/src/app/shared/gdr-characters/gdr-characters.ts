@@ -1,4 +1,14 @@
-import { Component, computed, effect, inject, input, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   GdrWorkspaceService,
@@ -12,6 +22,8 @@ import {
   parseCharacterBundle,
   exportCharacter,
   prepareCharacterImage,
+  cropCharacterPortrait,
+  portraitCropRect,
 } from './character-profile';
 import { GdrTurn } from '../gdr-turn/gdr-turn';
 
@@ -28,6 +40,21 @@ export class GdrCharacters {
   readonly fields = input<
     { key: string; label: string; type: string; min?: number; max?: number; long?: boolean }[]
   >([]);
+  protected readonly resourceKeys = ['stressCurrent', 'spellSlotsCurrent'];
+  protected readonly resources = computed(() =>
+    this.extraFields().filter((f) => this.resourceKeys.includes(f.key)),
+  );
+  protected async adjustResource(fieldKey: string, delta: number): Promise<void> {
+    const c = this.workspace.active();
+    if (!c || this.hasChanges()) return;
+    await this.workspace.save({
+      action: 'adjustResource',
+      characterId: c.id,
+      revision: c.revision,
+      fieldKey,
+      delta,
+    });
+  }
   protected readonly statKeys = ['statMente', 'statCuore', 'statCorpo', 'statMagia'];
   protected readonly statDraft = signal<Record<string, string>>({});
   protected readonly statsDirty = signal(false);
@@ -118,7 +145,10 @@ export class GdrCharacters {
     ),
   );
   protected readonly numericFields = computed(() =>
-    this.extraFields().filter((f) => f.type === 'number' && !this.statKeys.includes(f.key)),
+    this.extraFields().filter(
+      (f) =>
+        f.type === 'number' && !this.statKeys.includes(f.key) && !this.resourceKeys.includes(f.key),
+    ),
   );
   protected readonly textFields = computed(() =>
     this.extraFields().filter((f) => f.type !== 'number'),
@@ -126,6 +156,118 @@ export class GdrCharacters {
 
   protected readonly profile = signal<CharacterProfile>(emptyProfile());
   protected readonly photo = signal('');
+  protected readonly cropSource = signal('');
+  protected readonly cropZoom = signal(1);
+  protected readonly cropX = signal(0.5);
+  protected readonly cropY = signal(0.5);
+  protected readonly cropWidth = signal(1);
+  protected readonly cropHeight = signal(1);
+  protected readonly cropError = signal('');
+  private readonly cropDialog = viewChild<ElementRef<HTMLDialogElement>>('portraitDialog');
+  private readonly destroyRef = inject(DestroyRef);
+  private cropBlob: Blob | null = null;
+  private cropSlot: 'photo' | 'avatar' = 'photo';
+  private drag: { x: number; y: number; startX: number; startY: number } | null = null;
+  protected readonly cropPreview = computed(() => {
+    const r = portraitCropRect(
+        this.cropWidth(),
+        this.cropHeight(),
+        this.cropZoom(),
+        this.cropX(),
+        this.cropY(),
+      ),
+      scale = 240 / r.size;
+    return {
+      width: this.cropWidth() * scale,
+      height: this.cropHeight() * scale,
+      left: -r.x * scale,
+      top: -r.y * scale,
+    };
+  });
+  protected cancelCrop(): void {
+    if (this.mediaBusy()) return;
+    if (this.cropSource()) URL.revokeObjectURL(this.cropSource());
+    this.cropSource.set('');
+    this.cropBlob = null;
+    this.cropError.set('');
+    this.drag = null;
+  }
+  private async openCrop(blob: Blob, slot: 'photo' | 'avatar'): Promise<void> {
+    const prepared = await prepareCharacterImage(blob, false);
+    const bitmap = await createImageBitmap(prepared);
+    this.cropWidth.set(bitmap.width);
+    this.cropHeight.set(bitmap.height);
+    bitmap.close();
+    this.cropBlob = prepared;
+    this.cropSlot = slot;
+    this.cropZoom.set(1);
+    this.cropX.set(0.5);
+    this.cropY.set(0.5);
+    this.cropError.set('');
+    if (this.cropSource()) URL.revokeObjectURL(this.cropSource());
+    this.cropSource.set(URL.createObjectURL(prepared));
+  }
+  protected startCropDrag(event: PointerEvent): void {
+    event.preventDefault();
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    this.drag = { x: event.clientX, y: event.clientY, startX: this.cropX(), startY: this.cropY() };
+  }
+  protected moveCropDrag(event: PointerEvent): void {
+    if (!this.drag) return;
+    const side = Math.min(this.cropWidth(), this.cropHeight()) / this.cropZoom(),
+      scale = 240 / side;
+    this.cropX.set(
+      Math.max(
+        0,
+        Math.min(
+          1,
+          this.drag.startX -
+            (event.clientX - this.drag.x) / scale / Math.max(1, this.cropWidth() - side),
+        ),
+      ),
+    );
+    this.cropY.set(
+      Math.max(
+        0,
+        Math.min(
+          1,
+          this.drag.startY -
+            (event.clientY - this.drag.y) / scale / Math.max(1, this.cropHeight() - side),
+        ),
+      ),
+    );
+  }
+  protected endCropDrag(): void {
+    this.drag = null;
+  }
+  protected async confirmCrop(): Promise<void> {
+    const c = this.workspace.active();
+    if (!c || !this.cropBlob || this.mediaBusy()) return;
+    this.mediaBusy.set(true);
+    this.cropError.set('');
+    try {
+      const avatar = await cropCharacterPortrait(
+        this.cropBlob,
+        this.cropZoom(),
+        this.cropX(),
+        this.cropY(),
+      );
+      const photo =
+        this.cropSlot === 'photo'
+          ? await this.workspace.upload(c.id, 'photo', this.cropBlob)
+          : this.photo();
+      const portrait = await this.workspace.upload(c.id, 'avatar', avatar);
+      this.photo.set(photo);
+      this.portrait.set(portrait);
+      this.dirty.set(true);
+      this.mediaBusy.set(false);
+      this.cancelCrop();
+    } catch (error) {
+      this.cropError.set(error instanceof Error ? error.message : 'Caricamento non riuscito.');
+    } finally {
+      this.mediaBusy.set(false);
+    }
+  }
   protected readonly mediaBusy = signal(false);
   protected readonly filter = signal<'all' | 'pg' | 'png'>('all');
   protected readonly search = signal('');
@@ -163,7 +305,7 @@ export class GdrCharacters {
     return names.length ? 'Assegnato a ' + names.join(', ') : 'Non assegnato';
   }
   protected setSection(value: 'sheet' | 'assignments' | 'inventory' | 'manage'): void {
-    if (this.hasChanges() || this.mediaBusy()) return;
+    if (this.hasChanges() || this.mediaBusy() || !!this.cropSource()) return;
     this.section.set(value);
     this.deleteOpen.set(false);
     this.deleteName.set('');
@@ -201,7 +343,19 @@ export class GdrCharacters {
   private currentId = '';
   private createId = crypto.randomUUID();
   constructor() {
-    effect(() => this.workspace.pendingChanges.set(this.hasChanges() || this.mediaBusy()));
+    this.destroyRef.onDestroy(() => {
+      if (this.cropSource()) URL.revokeObjectURL(this.cropSource());
+    });
+    effect(() => {
+      const dialog = this.cropDialog()?.nativeElement;
+      if (this.cropSource() && dialog && !dialog.open) dialog.showModal();
+    });
+
+    effect(() =>
+      this.workspace.pendingChanges.set(
+        this.hasChanges() || this.mediaBusy() || !!this.cropSource(),
+      ),
+    );
     effect(() => {
       const c = this.workspace.active();
       if (
@@ -238,7 +392,7 @@ export class GdrCharacters {
     this.editing.set(false);
   }
   protected choose(id: string): void {
-    if (this.hasChanges() || this.mediaBusy()) {
+    if (this.hasChanges() || this.mediaBusy() || !!this.cropSource()) {
       this.localError.set('Salva o annulla le modifiche prima di cambiare personaggio.');
       return;
     }
@@ -311,7 +465,7 @@ export class GdrCharacters {
   }
   protected async create(copy = false): Promise<void> {
     const id = this.createId;
-    if (this.hasChanges() || this.mediaBusy()) return;
+    if (this.hasChanges() || this.mediaBusy() || !!this.cropSource()) return;
     if (
       await this.workspace.save({
         action: 'createCharacter',
@@ -345,51 +499,30 @@ export class GdrCharacters {
     this.dirty.set(true);
   }
   protected async upload(event: Event, slot: 'photo' | 'avatar'): Promise<void> {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
+    const input = event.target as HTMLInputElement,
+      file = input.files?.[0];
     input.value = '';
-    const c = this.workspace.active();
-    if (!file || !c) return;
+    if (!file || !this.workspace.active()) return;
     this.mediaBusy.set(true);
     this.localError.set('');
     try {
-      const data = await prepareCharacterImage(file, slot === 'avatar');
-      const path = await this.workspace.upload(c.id, slot, data);
-      if (slot === 'photo') {
-        this.photo.set(path);
-        this.dirty.set(true);
-        if (!this.portrait())
-          this.portrait.set(
-            await this.workspace.upload(c.id, 'avatar', await prepareCharacterImage(file, true)),
-          );
-      } else {
-        this.portrait.set(path);
-        this.dirty.set(true);
-      }
+      await this.openCrop(file, slot);
     } catch (error) {
-      this.localError.set(error instanceof Error ? error.message : 'Caricamento non riuscito.');
+      this.localError.set(error instanceof Error ? error.message : 'Foto non valida.');
     } finally {
       this.mediaBusy.set(false);
     }
   }
   protected async avatarFromPhoto(): Promise<void> {
-    const c = this.workspace.active();
-    if (!c || !this.photo()) return;
+    if (!this.photo()) return;
     this.mediaBusy.set(true);
     this.localError.set('');
     try {
       const response = await fetch(this.photo(), { credentials: 'same-origin' });
       if (!response.ok) throw new Error('Foto non disponibile.');
-      this.portrait.set(
-        await this.workspace.upload(
-          c.id,
-          'avatar',
-          await prepareCharacterImage(await response.blob(), true),
-        ),
-      );
-      this.dirty.set(true);
+      await this.openCrop(await response.blob(), 'avatar');
     } catch (error) {
-      this.localError.set(error instanceof Error ? error.message : 'Avatar non riuscito.');
+      this.localError.set(error instanceof Error ? error.message : 'Foto non disponibile.');
     } finally {
       this.mediaBusy.set(false);
     }

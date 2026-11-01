@@ -40,6 +40,7 @@ export interface WorkspaceCharacter {
   statsEditable?: boolean;
   statsBudget?: number;
   canEditStats?: boolean;
+  canAdjustResources?: boolean;
 }
 export interface CharacterGrant {
   characterId: string;

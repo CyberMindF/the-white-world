@@ -180,6 +180,54 @@ export async function mutate(db, user, payload) {
     changed(result);
     return { saved: true };
   }
+  if (p.action === "adjustResource") {
+    if (
+      character.kind !== "pg" ||
+      !["stressCurrent", "spellSlotsCurrent"].includes(p.fieldKey) ||
+      ![-1, 1].includes(p.delta)
+    )
+      throw new WorkspaceError("Risorsa non valida.", 400);
+    const grant = master
+      ? null
+      : await db
+          .prepare(
+            "SELECT can_speak,can_edit_sheet FROM gdr_workspace_grants WHERE character_id=? AND user_id=?",
+          )
+          .bind(character.id, user.id)
+          .first();
+    if (
+      !master &&
+      (character.archived || !(grant?.can_speak || grant?.can_edit_sheet))
+    )
+      throw new WorkspaceError("Non puoi modificare questa risorsa.", 403);
+    const schema = await db
+      .prepare("SELECT fields_json FROM gdr_character_schema WHERE adventure=?")
+      .bind(character.adventure_id)
+      .first();
+    const field = schema
+      ? JSON.parse(schema.fields_json).find(
+          (f) => f.key === p.fieldKey && f.type === "number",
+        )
+      : null;
+    if (!field) throw new WorkspaceError("Risorsa non disponibile.", 400);
+    const fields = JSON.parse(character.fields_json);
+    const value =
+      Number(fields[p.fieldKey] ?? field.default ?? field.min) + p.delta;
+    if (!Number.isInteger(value) || value < field.min || value > field.max)
+      throw new WorkspaceError(
+        "Hai raggiunto il limite di questa risorsa.",
+        400,
+      );
+    fields[p.fieldKey] = String(value);
+    const result = await db
+      .prepare(
+        `UPDATE gdr_workspace_characters SET fields_json=?,revision=revision+1 WHERE id=? AND revision=? AND (?=1 OR (archived=0 AND EXISTS(SELECT 1 FROM gdr_workspace_grants g WHERE g.character_id=gdr_workspace_characters.id AND g.user_id=? AND (g.can_speak=1 OR g.can_edit_sheet=1))))`,
+      )
+      .bind(JSON.stringify(fields), character.id, p.revision, +master, user.id)
+      .run();
+    changed(result);
+    return { saved: true };
+  }
   const statKeys = ["statMente", "statCuore", "statCorpo", "statMagia"];
   if (p.action === "setStatAccess") {
     requireMaster(user);

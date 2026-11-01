@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptyProfile, parseCharacterBundle } from './character-profile';
+import { emptyProfile, parseCharacterBundle, portraitCropRect } from './character-profile';
 const file = () => ({
   format: 'mondobianco.character',
   version: 1,
@@ -41,4 +41,16 @@ describe('file personaggio portabile', () => {
       ),
     ).toThrow();
   });
+});
+
+describe('inquadratura del ritratto',()=>{
+ it('centra un’immagine orizzontale e mantiene il ritaglio quadrato entro la foto',()=>{
+  expect(portraitCropRect(1200,800,1,.5,.5)).toEqual({x:200,y:0,size:800});
+  expect(portraitCropRect(800,1200,1,.5,.5)).toEqual({x:0,y:200,size:800});
+ });
+ it('permette zoom e spostamento fino ai bordi senza introdurre zone vuote',()=>{
+  expect(portraitCropRect(1200,800,2,.5,.5)).toEqual({x:400,y:200,size:400});
+  const crop=portraitCropRect(1200,800,2,2,-1);expect(crop).toEqual({x:800,y:0,size:400});
+  expect(crop.x+crop.size).toBeLessThanOrEqual(1200);expect(crop.y+crop.size).toBeLessThanOrEqual(800);
+ });
 });

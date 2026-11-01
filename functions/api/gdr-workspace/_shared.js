@@ -121,6 +121,7 @@ export function characterView(row, user) {
     canSpeak: !row.archived && (master || row.can_speak === 1),
     canEditSheet: master || (row.kind === "pg" && row.can_edit_sheet === 1),
     canInventory: master || row.can_inventory === 1,
+    canAdjustResources: row.kind==='pg' && !row.archived && (master || row.can_speak===1 || row.can_edit_sheet===1),
     statsEditable: row.stats_editable === 1,
     statsBudget: row.stats_budget ?? 12,
     canEditStats: row.kind === 'pg' && row.adventure_id === 'il-prezzo-della-verita' && !row.archived && row.stats_editable === 1 && (master || row.can_edit_sheet === 1),

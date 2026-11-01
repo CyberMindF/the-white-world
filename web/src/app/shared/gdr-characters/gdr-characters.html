@@ -274,12 +274,48 @@
                         Salva zaino
                       </button>
                       @if (dirty()) {
-                        <button class="btn" (click)="discard()">Annulla modifiche</button>
+                        <button class="btn" (click)="discard()">Annulla</button>
                       }
                     </div>
                   }
                 } @else {
                   @if (!canManage() || section() === 'sheet') {
+                    @if (resources().length && !editing()) {
+                      <section class="resource-controls" aria-label="Risorse del personaggio">
+                        @for (field of resources(); track field.key) {
+                          <div class="resource">
+                            <span>{{ field.label }}</span>
+                            <div>
+                              <button
+                                class="btn"
+                                [disabled]="
+                                  !c.canAdjustResources ||
+                                  hasChanges() ||
+                                  +(c.characterFields?.[field.key] ?? field.min ?? 0) <=
+                                    (field.min ?? 0)
+                                "
+                                [attr.aria-label]="'Riduci ' + field.label"
+                                (click)="adjustResource(field.key, -1)"
+                              >
+                                −</button
+                              ><strong>{{ c.characterFields?.[field.key] ?? field.min }}</strong
+                              ><button
+                                class="btn"
+                                [disabled]="
+                                  !c.canAdjustResources ||
+                                  hasChanges() ||
+                                  +(c.characterFields?.[field.key] ?? 0) >= (field.max ?? 99999)
+                                "
+                                [attr.aria-label]="'Aumenta ' + field.label"
+                                (click)="adjustResource(field.key, 1)"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        }
+                      </section>
+                    }
                     @if (baseStats().length === 4 && (!editing() || canManage())) {
                       <section class="base-stats-card">
                         <div class="base-stats-heading">
@@ -484,6 +520,11 @@
                                 /></label>
                               </figure>
                             </div>
+                            @if (photo()) {
+                              <button class="btn" (click)="avatarFromPhoto()">
+                                Ritaglia il ritratto dalla foto
+                              </button>
+                            }
                           </details>
                           <div class="player-save-bar">
                             <button class="btn" (click)="discard()">Annulla</button
@@ -509,9 +550,8 @@
                           <details class="form-group">
                             <summary>Foto e avatar</summary>
                             <p class="hint">
-                              La foto conserva l’inquadratura completa. Alla prima foto viene creato
-                              anche un avatar quadrato, con ritaglio centrale. Puoi caricare un
-                              avatar diverso.
+                              La foto resta intera nella scheda. Dopo il caricamento puoi scegliere
+                              l’inquadratura del ritratto usato nei dialoghi.
                             </p>
                             <div class="image-tools">
                               <figure>
@@ -553,7 +593,7 @@
                             </div>
                             @if (photo()) {
                               <button class="btn" (click)="avatarFromPhoto()">
-                                Usa la foto per l’avatar
+                                Ritaglia il ritratto dalla foto
                               </button>
                             }
                             <details>
@@ -627,8 +667,8 @@
                             }
                           }
                           <div class="actions save-profile">
-                            <button class="btn" (click)="saveSheet()">Salva scheda</button
-                            ><button class="btn" (click)="discard()">Annulla modifiche</button>
+                            <button class="btn" (click)="discard()">Annulla</button>
+                            <button class="btn player-save" [disabled]="!dirty()" (click)="saveSheet()">Salva modifiche</button>
                           </div>
                         </div>
                       }
@@ -675,7 +715,10 @@
                       @if (extraFields().length) {
                         <dl class="profile-details adventure-fields">
                           @for (field of extraFields(); track field.key) {
-                            @if (baseStats().length !== 4 || !statKeys.includes(field.key)) {
+                            @if (
+                              (baseStats().length !== 4 || !statKeys.includes(field.key)) &&
+                              !resourceKeys.includes(field.key)
+                            ) {
                               <div>
                                 <dt>{{ field.label }}</dt>
                                 <dd>{{ c.characterFields?.[field.key] || '—' }}</dd>
@@ -921,4 +964,76 @@
   <p class="hint" role="status" aria-live="polite">
     {{ mediaBusy() ? 'Preparazione delle immagini…' : workspace.message() }}
   </p>
+  @if (cropSource()) {
+    <dialog
+      #portraitDialog
+      class="portrait-dialog"
+      aria-labelledby="portrait-title"
+      (cancel)="$event.preventDefault(); cancelCrop()"
+      (keydown.escape)="$event.stopPropagation()"
+    >
+      <h3 id="portrait-title">Scegli il ritratto</h3>
+      <p>Trascina la foto e regola lo zoom. La foto nella scheda resterà intera.</p>
+      <fieldset [disabled]="mediaBusy()">
+        <div
+          class="portrait-crop"
+          (pointerdown)="startCropDrag($event)"
+          (pointermove)="moveCropDrag($event)"
+          (pointerup)="endCropDrag()"
+          (pointercancel)="endCropDrag()"
+        >
+          <img
+            [src]="cropSource()"
+            alt="Anteprima del ritratto"
+            draggable="false"
+            [style.width.px]="cropPreview().width"
+            [style.height.px]="cropPreview().height"
+            [style.left.px]="cropPreview().left"
+            [style.top.px]="cropPreview().top"
+          />
+        </div>
+        <label for="portrait-zoom"
+          >Zoom<input
+            id="portrait-zoom"
+            type="range"
+            min="1"
+            max="3"
+            step="0.01"
+            [ngModel]="cropZoom()"
+            (ngModelChange)="cropZoom.set(+$event)"
+        /></label>
+        <details>
+          <summary>Regola la posizione con i cursori</summary>
+          <label for="portrait-x"
+            >Sinistra / destra<input
+              id="portrait-x"
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              [ngModel]="cropX()"
+              (ngModelChange)="cropX.set(+$event)" /></label
+          ><label for="portrait-y"
+            >Alto / basso<input
+              id="portrait-y"
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              [ngModel]="cropY()"
+              (ngModelChange)="cropY.set(+$event)"
+          /></label>
+        </details>
+        <div class="actions">
+          <button class="btn" (click)="cancelCrop()">Annulla</button
+          ><button class="btn" (click)="confirmCrop()">
+            {{ mediaBusy() ? 'Caricamento…' : 'Usa questo ritratto' }}
+          </button>
+        </div>
+      </fieldset>
+      @if (cropError()) {
+        <p class="error" role="alert">{{ cropError() }}</p>
+      }
+    </dialog>
+  }
 </div>

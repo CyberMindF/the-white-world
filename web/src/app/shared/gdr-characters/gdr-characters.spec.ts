@@ -130,6 +130,15 @@ describe('gestione personaggi del master', () => {
     workspace.characters.update(cs=>cs.map(c=>({...c,revision:3,statsEditable:false,canEditStats:false,characterFields:Object.fromEntries(fields.map(f=>[f.key,'3']))})));fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('#base-statMente')).toBeNull();expect(button('Conferma caratteristiche')).toBeUndefined();expect(button('Modifica personaggio').disabled).toBe(false);
   });
+  it('offre i comandi immediati delle risorse anche senza entrare nella modifica del personaggio',async()=>{
+    const {workspace,fixture}=setup();workspace.characters.set([{...character('ada','Ada'),revision:2,canAdjustResources:true,characterFields:{stressCurrent:'10',spellSlotsCurrent:'3'}}]);
+    fixture.componentRef.setInput('managementMode',false);fixture.componentRef.setInput('fields',[{key:'stressCurrent',label:'Stress',type:'number',min:0,max:10},{key:'spellSlotsCurrent',label:'Spell slot',type:'number',min:0,max:3}]);fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.player-edit-form')).toBeNull();
+    const minus=fixture.nativeElement.querySelector('button[aria-label="Riduci Spell slot"]') as HTMLButtonElement;
+    expect(minus.disabled).toBe(false);expect((fixture.nativeElement.querySelector('button[aria-label="Aumenta Stress"]') as HTMLButtonElement).disabled).toBe(true);
+    const save=vi.spyOn(workspace,'save').mockResolvedValue(false);minus.click();await fixture.whenStable();
+    expect(save).toHaveBeenCalledWith({action:'adjustResource',characterId:'ada',revision:2,fieldKey:'spellSlotsCurrent',delta:-1});
+  });
   it('mostra anche un personaggio archiviato se non rimangono attivi', () => {
     const { workspace, fixture } = setup();
     workspace.characters.set([character('old', 'Vecchio', true)]);

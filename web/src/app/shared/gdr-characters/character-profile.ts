@@ -174,3 +174,44 @@ export async function prepareCharacterImage(blob: Blob, avatar: boolean): Promis
     bitmap.close();
   }
 }
+
+export function portraitCropRect(
+  width: number,
+  height: number,
+  zoom: number,
+  x: number,
+  y: number,
+) {
+  const size = Math.min(width, height) / Math.max(1, Math.min(3, zoom));
+  return {
+    x: (width - size) * Math.max(0, Math.min(1, x)),
+    y: (height - size) * Math.max(0, Math.min(1, y)),
+    size,
+  };
+}
+export async function cropCharacterPortrait(
+  blob: Blob,
+  zoom: number,
+  x: number,
+  y: number,
+): Promise<Blob> {
+  const bitmap = await createImageBitmap(blob);
+  try {
+    const crop = portraitCropRect(bitmap.width, bitmap.height, zoom, x, y),
+      canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Impossibile preparare il ritratto.');
+    ctx.drawImage(bitmap, crop.x, crop.y, crop.size, crop.size, 0, 0, 256, 256);
+    return await new Promise((resolve, reject) =>
+      canvas.toBlob(
+        (value) => (value ? resolve(value) : reject(new Error('Ritaglio non riuscito.'))),
+        'image/webp',
+        0.86,
+      ),
+    );
+  } finally {
+    bitmap.close();
+  }
+}

@@ -686,3 +686,105 @@ summary:focus-visible {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+.resource-controls {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.2rem;
+}
+.resource {
+  flex: 1;
+  min-width: 160px;
+  padding: 0.85rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.resource > span {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted-color);
+  margin-bottom: 0.5rem;
+}
+.resource > div {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.resource .btn {
+  min-height: 36px;
+  padding: 0.3rem 0.7rem;
+  margin: 0;
+  justify-content: center;
+}
+.resource strong {
+  font-size: 1.3rem;
+  min-width: 1.5rem;
+  text-align: center;
+}
+.save-profile,
+.player-save-bar {
+  position: static;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 1rem 0 0;
+  margin: 0;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+.save-profile .btn,
+.player-save-bar .btn {
+  margin: 0;
+  justify-content: center;
+}
+.portrait-dialog {
+  box-sizing: border-box;
+  width: min(440px, calc(100vw - 2rem));
+  max-height: 85vh;
+  overflow: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 1.3rem;
+  background: var(--bg-color);
+  color: var(--text-color);
+  box-shadow: var(--shadow);
+}
+.portrait-dialog::backdrop {
+  background: rgb(0 0 0 / 65%);
+}
+.portrait-dialog h3 {
+  margin: 0;
+  font-family: Georgia, serif;
+  font-size: 1.4rem;
+}
+.portrait-dialog p {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--muted-color);
+}
+.portrait-crop {
+  position: relative;
+  width: 240px;
+  height: 240px;
+  overflow: hidden;
+  border-radius: 50%;
+  margin: 1rem auto;
+  background: var(--input-bg);
+  cursor: grab;
+  touch-action: none;
+}
+.portrait-crop:active {
+  cursor: grabbing;
+}
+.portrait-crop img {
+  position: absolute;
+  max-width: none;
+  user-select: none;
+  pointer-events: none;
+}
+.portrait-dialog .actions {
+  justify-content: flex-end;
+}
+.portrait-dialog input[type='range'] {
+  padding: 0.3rem 0;
+}

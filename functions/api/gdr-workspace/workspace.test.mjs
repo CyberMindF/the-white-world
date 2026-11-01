@@ -201,3 +201,16 @@ test('solo il master riapre la distribuzione, anche con un nuovo totale; la nuov
  await mutate(h.db,member,{action:'confirmStats',characterId:c.id,revision:c.revision,values:{statMente:'4',statCuore:'4',statCorpo:'3',statMagia:'3'}});
  c=(await (await h.call(2)).json()).characters[0];assert.equal(c.canEditStats,false);assert.equal(c.statsEditable,false);h.sqlite.close();
 });
+test('Stress e slot: aggiornamento immediato anche con caratteristiche bloccate e senza modifica della scheda',async()=>{
+ const h=apiHarness();h.sqlite.prepare('INSERT INTO gdr_character_schema VALUES(?,?)').run(adventureId,JSON.stringify([{key:'stressCurrent',type:'number',min:0,max:10,default:10},{key:'spellSlotsCurrent',type:'number',min:0,max:3,default:3}]));
+ await character(h.db,'resources');await grant(h.db,h.sqlite,'resources',{canEditSheet:false});
+ await mutate(h.db,master,{action:'setStatAccess',characterId:'resources',revision:revision(h.sqlite,'resources'),editable:false,budget:12});
+ const old=revision(h.sqlite,'resources');await mutate(h.db,member,{action:'adjustResource',characterId:'resources',revision:old,fieldKey:'spellSlotsCurrent',delta:-1});
+ await assert.rejects(()=>mutate(h.db,member,{action:'adjustResource',characterId:'resources',revision:old,fieldKey:'spellSlotsCurrent',delta:-1}),e=>e.status===409);
+ await mutate(h.db,member,{action:'adjustResource',characterId:'resources',revision:revision(h.sqlite,'resources'),fieldKey:'stressCurrent',delta:-1});
+ const c=(await (await h.call(2)).json()).characters[0];assert.equal(c.characterFields.spellSlotsCurrent,'2');assert.equal(c.characterFields.stressCurrent,'9');assert.equal(c.statsEditable,false);assert.equal(c.canEditSheet,false);assert.equal(c.canAdjustResources,true);
+ await denied(()=>mutate(h.db,other,{action:'adjustResource',characterId:c.id,revision:c.revision,fieldKey:'stressCurrent',delta:-1}));
+ await assert.rejects(()=>mutate(h.db,member,{action:'adjustResource',characterId:c.id,revision:c.revision,fieldKey:'statMente',delta:1}),e=>e.status===400);
+ h.sqlite.prepare("UPDATE gdr_workspace_characters SET fields_json=json_set(fields_json,'$.spellSlotsCurrent','0') WHERE id=?").run(c.id);
+ await assert.rejects(()=>mutate(h.db,member,{action:'adjustResource',characterId:c.id,revision:c.revision,fieldKey:'spellSlotsCurrent',delta:-1}),e=>e.status===400);h.sqlite.close();
+});
