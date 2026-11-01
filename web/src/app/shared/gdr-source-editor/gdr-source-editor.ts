@@ -1,7 +1,7 @@
 import { Component, computed, effect, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { GdrTurn } from '../gdr-turn/gdr-turn';
-import { parseNarrative, safeNarrativeImage } from '../gdr-turn/gdr-turn.parser';
+import { parseNarrative } from '../gdr-turn/gdr-turn.parser';
 import { BLOCK_TYPES, SNIPPET_LABELS } from '../gdr-blocks/gdr-snippets';
 
 import { NarrativeCharacter, narrativeSnippet } from '../gdr-turn/gdr-writing';
@@ -21,6 +21,7 @@ export class GdrSourceEditor {
   readonly label = input('Il tuo turno');
   readonly document = input(false);
   readonly allowGeneric = input(true);
+  readonly allowImages = input(false);
   readonly characters = input<NarrativeCharacter[]>([]);
   readonly editorId = input('gdr-source');
   protected readonly inlineEditing = signal(false);
@@ -47,41 +48,8 @@ export class GdrSourceEditor {
   public openPreview(): void {
     if (this.source().trim() && !this.inlineEditing()) this.mode.set('preview');
   }
-  protected changeVoice(area: HTMLTextAreaElement): void {
-    if (this.inlineEditing()) {
-      this.voiceMessage.set('Applica prima la modifica rapida.');
-      return;
-    }
-    const text = this.source();
-    const cursor = area.selectionStart;
-    const before = text.slice(0, cursor);
-    const start = before.lastIndexOf('::: dialogo ');
-    if (
-      start < 0 ||
-      before
-        .slice(start)
-        .split('\n')
-        .slice(1)
-        .some((line) => line.trim() === ':::')
-    ) {
-      this.voiceMessage.set('Posiziona il cursore dentro il dialogo da modificare.');
-      return;
-    }
-    const end = text.indexOf('\n', start);
-    if (end < 0) return;
-    const c = this.characters()[this.characterIndex()] ?? this.characters()[0];
-    if (!c) return;
-    const name = c.name.replace(/[|\r\n]/g, ' ').trim();
-    const portrait = safeNarrativeImage(c.portrait);
-    const header = `::: dialogo ${name}${portrait ? ' | ' + portrait : ''}`;
-    this.sourceChange.emit(text.slice(0, start) + header + text.slice(end));
-    this.voiceMessage.set('Voce del dialogo aggiornata.');
-    requestAnimationFrame(() => {
-      area.focus();
-      area.setSelectionRange(start + header.length + 1, start + header.length + 1);
-    });
-  }
   protected insert(type: string, area: HTMLTextAreaElement): void {
+    if (type === 'image' && !this.allowImages()) return;
     if (this.inlineEditing()) {
       this.voiceMessage.set('Applica prima la modifica rapida.');
       return;

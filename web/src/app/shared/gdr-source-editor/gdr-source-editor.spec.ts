@@ -33,4 +33,28 @@ describe('anteprima prima della pubblicazione', () => {
     expect(fixture.debugElement.query(By.directive(GdrTurn))).toBeNull();
     expect(button('Solo anteprima').disabled).toBe(true);
   });
+  it('mostra strumenti brevi senza immagini o comandi di sintassi nella vista giocatrice', () => {
+    const {fixture,button}=setup('Ciao');
+    expect(button('Dialogo')).toBeTruthy();
+    expect(button('Azione')).toBeTruthy();
+    expect(button('Nota')).toBeTruthy();
+    expect(button('Immagine')).toBeUndefined();
+    expect(button('Cambia voce nel dialogo')).toBeUndefined();
+    expect(fixture.nativeElement.querySelector('pre, code')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Personaggio');
+    fixture.componentRef.setInput('allowImages',true); fixture.detectChanges();
+    expect(button('Immagine')).toBeTruthy();
+  });
+  it('trasforma la frase selezionata in un dialogo del personaggio scelto', async () => {
+    const {fixture,button}=setup('Ciao');
+    fixture.componentRef.setInput('characters',[{name:'Ada',portrait:''}]); fixture.detectChanges();
+    await fixture.whenStable();
+    let updated='';
+    fixture.componentInstance.sourceChange.subscribe(value=>updated=value);
+    const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
+    area.setSelectionRange(0,4);
+    button('Dialogo').click(); fixture.detectChanges();
+    expect(updated).toContain('::: dialogo Ada\nCiao\n:::');
+  });
+
 });

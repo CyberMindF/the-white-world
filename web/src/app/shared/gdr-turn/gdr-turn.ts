@@ -98,7 +98,7 @@ import { parseNarrative } from './gdr-turn.parser';
             <option value="nota">Fuori personaggio</option>
           </select>
           @if (characters().length) {
-            <label [for]="fieldId + '-voice'">Voce</label>
+            <label [for]="fieldId + '-voice'">Personaggio</label>
             <select
               [id]="fieldId + '-voice'"
               [ngModel]="voice()"

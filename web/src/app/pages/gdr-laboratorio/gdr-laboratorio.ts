@@ -228,6 +228,9 @@ export class GdrLaboratorio implements OnInit {
       .join('\n\n'),
   );
   protected readonly characters = computed<NarrativeCharacter[]>(() => {
+    if (this.adventure().legacy && !this.canPrepare()) {
+      return [{ name: this.legacyName(), portrait: this.legacyPortrait() }];
+    }
     if (
       this.workspace.available() &&
       (this.workspace.characters().length || !this.adventure().legacy || !this.canPrepare())

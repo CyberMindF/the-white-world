@@ -1,14 +1,12 @@
 <div class="editor">
-  <p class="hint">Scrivi liberamente cosa fai o dici. Puoi aggiungere dialoghi, azioni e immagini dagli strumenti facoltativi.</p>
-  <details class="writing-tools">
-    <summary>Strumenti di scrittura e anteprima</summary>
+
   <div class="toolbar" role="group" aria-label="Inserisci nel testo">
-    <label [for]="editorId() + '-voice'">Voce</label>
+    <label [for]="editorId() + '-voice'">Personaggio</label>
     @if (characters()[characterIndex()]?.portrait) {
       <img
         class="voice-avatar"
         [src]="characters()[characterIndex()].portrait"
-        alt="Avatar della voce selezionata"
+        alt="Ritratto del personaggio selezionato"
       />
     }
     <select
@@ -34,27 +32,21 @@
       [disabled]="!characters().length && !allowGeneric()"
       (click)="insert('dialogo', sourceArea)"
     >
-      Parla il personaggio
-    </button>
-    <button
-      class="btn"
-      type="button"
-      [disabled]="!characters().length"
-      (click)="changeVoice(sourceArea)"
-    >
-      Cambia voce nel dialogo
+      Dialogo
     </button>
     <button class="btn" type="button" (click)="insert('azione', sourceArea)">Azione</button>
     <button class="btn" type="button" (click)="insert('nota', sourceArea)">
-      Fuori personaggio
+      Nota
     </button>
     @if (document()) {
       @for (type of blockTypes; track type) {
+        @if (type !== 'image' || allowImages()) {
         <button class="btn" type="button" (click)="insert(type, sourceArea)">
           {{ snippetLabels[type] }}
         </button>
+        }
       }
-    } @else {
+    } @else if (allowImages()) {
       <button class="btn" type="button" (click)="insert('image', sourceArea)">Immagine</button>
     }
   </div>
@@ -87,7 +79,6 @@
       Solo anteprima
     </button>
   </div>
-  </details>
   @if (voiceMessage()) {
     <p class="hint editor-status" role="status">{{ voiceMessage() }}</p>
   }
@@ -141,25 +132,13 @@
     }
     <details>
       <summary>Come funziona la scrittura</summary>
-      <p>
-        Il testo normale è narrazione. Usa <code>## Titolo</code> per un titolo,
-        <code>*testo*</code> per un paragrafo in corsivo,
-        <code>![descrizione](/assets/immagine.webp)</code> per un’immagine.
-      </p>
-      <pre>
-Il racconto prosegue qui.
-
-::: dialogo Nome personaggio
-Le sue parole, anche su più righe.
-:::
-
-::: azione
-Si avvicina alla porta.
-:::</pre>
-      <p>
-        Il ritratto è facoltativo: aggiungi <code> | /assets/percorso.webp</code> dopo il nome. Ogni
-        comando aperto con <code>:::</code> si chiude con una riga <code>:::</code>.
-      </p>
+      <ul>
+        <li><strong>Dialogo</strong>: scegli il personaggio e inserisci le sue parole.</li>
+        <li><strong>Azione</strong>: racconta cosa fa.</li>
+        <li><strong>Nota</strong>: scrivi al master fuori dalla storia.</li>
+        <li>Puoi selezionare una frase e premere un tasto per trasformarla.</li>
+        <li>Con <strong>Anteprima</strong> controlli il risultato, poi scegli <strong>Pubblica turno</strong>.</li>
+      </ul>
     </details>
   </footer>
 </div>

@@ -11,17 +11,18 @@ import { GdrLaboratorio } from './gdr-laboratorio';
 
 class TurnPage extends GdrLaboratorio {
   draft(text: string) { this.updateDraft(text); }
+  voices() { return this.characters(); }
   preview() { this.turnPreview.set(true); }
   leavePreview() { this.turnPreview.set(false); }
   send() { return this.publish(); }
   state() { return { local: this.local(), turns: this.turns(), status: this.status(), error: this.turnsError() }; }
 }
-function create(live = true) {
+function create(live = true, player = false) {
   TestBed.configureTestingModule({providers: [
-    {provide: AuthService, useValue: {currentUser: signal({id: 7, nickname: 'Rory'}), isAdmin: signal(true)}},
+    {provide: AuthService, useValue: {currentUser: signal({id: 7, nickname: 'Rory'}), isAdmin: signal(!player)}},
     {provide: SafeModeService, useValue: {enabled: signal(false)}},
     {provide: RealtimeService, useValue: {on: () => EMPTY}},
-    {provide: GdrWorkspaceService, useValue: {}},
+    {provide: GdrWorkspaceService, useValue: {adventures: signal([])}},
     {provide: ActivatedRoute, useValue: {snapshot: {paramMap: convertToParamMap(live ? {adventureId: 'il-prezzo-della-verita'} : {})}}},
   ]});
   const page = TestBed.runInInjectionContext(() => new TurnPage());
@@ -33,6 +34,10 @@ const saved = {saved: true, turnId: 42, author: 'Rory', createdAt: '2026-10-31T2
 describe('invio dei turni della partita reale', () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => { vi.unstubAllGlobals(); TestBed.resetTestingModule(); });
+  it('usa il personaggio della scheda classica per il dialogo della giocatrice', () => {
+    const page=create(true,true);
+    expect(page.voices()).toEqual([{name:'Il mio personaggio',portrait:''}]);
+  });
   it('non pubblica prima di passare dall’anteprima', async () => {
     const fetchMock=vi.fn(); vi.stubGlobal('fetch',fetchMock);
     const page=create(); page.draft('Una risposta'); page.leavePreview(); await page.send();

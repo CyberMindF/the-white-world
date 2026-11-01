@@ -149,6 +149,7 @@
                   (editingChange)="documentEdit.set($event)"
                   label="Testo completo dell’avventura"
                   [document]="true"
+                  [allowImages]="canPrepare()"
                   [source]="documentSource()"
                   (sourceChange)="updateDocument($event)"
                   [characters]="characters()"
@@ -259,6 +260,7 @@
           </div>
           <section class="lab-composer" aria-label="Scrivi un messaggio">
             <app-gdr-source-editor
+              [allowImages]="canPrepare()"
               #turnComposer
               (modeChange)="turnPreview.set($event === 'preview')"
               [source]="local().draft"
