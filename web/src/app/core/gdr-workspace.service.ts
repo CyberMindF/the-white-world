@@ -69,6 +69,7 @@ export class GdrWorkspaceService {
     () =>
       this.characters().find((c) => c.id === this.activeId()) ??
       this.characters().find((c) => !c.archived) ??
+      this.characters()[0] ??
       null,
   );
   readonly voices = computed(() => this.characters().filter((c) => c.canSpeak && !c.archived));
@@ -137,7 +138,7 @@ export class GdrWorkspaceService {
         throw new Error(
           'Il salvataggio è riuscito, ma non è stato possibile rileggere i dati. Ricarica prima di modificarli ancora.',
         );
-      this.message.set('Salvato nel laboratorio.');
+      this.message.set('Modifiche salvate.');
       return true;
     } catch (error) {
       this.message.set('');

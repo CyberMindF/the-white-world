@@ -9,6 +9,7 @@ import { RealtimeService } from '../../core/realtime.service';
 import { GdrWorkspaceService } from '../../core/gdr-workspace.service';
 import { GdrLaboratorio } from './gdr-laboratorio';
 
+const assignedVoices = signal<{id:string;name:string;profile:{surname:string};portrait:string;kind:'pg'|'png'}[]>([]);
 class TurnPage extends GdrLaboratorio {
   draft(text: string) { this.updateDraft(text); }
   voices() { return this.characters(); }
@@ -22,7 +23,7 @@ function create(live = true, player = false) {
     {provide: AuthService, useValue: {currentUser: signal({id: 7, nickname: 'Rory'}), isAdmin: signal(!player)}},
     {provide: SafeModeService, useValue: {enabled: signal(false)}},
     {provide: RealtimeService, useValue: {on: () => EMPTY}},
-    {provide: GdrWorkspaceService, useValue: {adventures: signal([])}},
+    {provide: GdrWorkspaceService, useValue: {adventures: signal([]), voices: assignedVoices}},
     {provide: ActivatedRoute, useValue: {snapshot: {paramMap: convertToParamMap(live ? {adventureId: 'il-prezzo-della-verita'} : {})}}},
   ]});
   const page = TestBed.runInInjectionContext(() => new TurnPage());
@@ -32,11 +33,16 @@ function create(live = true, player = false) {
 const reply = (value: unknown, status = 200) => new Response(JSON.stringify(value), {status});
 const saved = {saved: true, turnId: 42, author: 'Rory', createdAt: '2026-10-31T22:00:00Z'};
 describe('invio dei turni della partita reale', () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {localStorage.clear(); assignedVoices.set([]);});
   afterEach(() => { vi.unstubAllGlobals(); TestBed.resetTestingModule(); });
   it('usa il personaggio della scheda classica per il dialogo della giocatrice', () => {
     const page=create(true,true);
     expect(page.voices()).toEqual([{name:'Il mio personaggio',portrait:''}]);
+  });
+  it('rende disponibili alla giocatrice anche i personaggi che il master le ha assegnato',()=>{
+    const page=create(true,true);
+    assignedVoices.set([{id:'npc',name:'Shivay',profile:{surname:'Lorenne'},portrait:'',kind:'png'}]);
+    expect(page.voices().map(c=>c.name)).toEqual(['Il mio personaggio','Shivay Lorenne']);
   });
   it('non pubblica prima di passare dall’anteprima', async () => {
     const fetchMock=vi.fn(); vi.stubGlobal('fetch',fetchMock);

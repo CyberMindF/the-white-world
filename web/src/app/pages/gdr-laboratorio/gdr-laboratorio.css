@@ -96,3 +96,5 @@ textarea:focus-visible {
   opacity: 0.5;
   cursor: default;
 }
+
+.avventura-body.character-management { width: min(100%, 76rem); }

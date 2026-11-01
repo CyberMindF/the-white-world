@@ -27,7 +27,7 @@ export async function onRequestGet(context) {
         .prepare(
           `SELECT c.*, g.can_speak,g.can_edit_sheet,g.can_inventory
         FROM gdr_workspace_characters c LEFT JOIN gdr_workspace_grants g ON g.character_id=c.id AND g.user_id=?
-        WHERE c.adventure_id=? AND (?=1 OR (g.user_id IS NOT NULL AND c.archived=0)) ORDER BY c.created_at,c.id`,
+        WHERE c.adventure_id=? AND (?=1 OR (g.user_id IS NOT NULL AND c.archived=0 AND (g.can_speak=1 OR g.can_edit_sheet=1 OR g.can_inventory=1))) ORDER BY c.created_at,c.id`,
         )
         .bind(user.id, adventure, isMaster(user) ? 1 : 0)
         .all();
@@ -58,13 +58,15 @@ export async function onRequestGet(context) {
         published: a.published === 1,
       })),
       characters,
-      grants: grants.map((g) => ({
-        characterId: g.character_id,
-        userId: g.user_id,
-        canSpeak: g.can_speak === 1,
-        canEditSheet: g.can_edit_sheet === 1,
-        canInventory: g.can_inventory === 1,
-      })),
+      grants: grants
+        .filter((g) => g.can_speak || g.can_edit_sheet || g.can_inventory)
+        .map((g) => ({
+          characterId: g.character_id,
+          userId: g.user_id,
+          canSpeak: g.can_speak === 1,
+          canEditSheet: g.can_edit_sheet === 1,
+          canInventory: g.can_inventory === 1,
+        })),
       users,
       isMaster: isMaster(user),
     });

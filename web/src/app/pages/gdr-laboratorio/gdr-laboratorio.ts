@@ -135,7 +135,6 @@ export class GdrLaboratorio implements OnInit {
   protected readonly workspace = inject(GdrWorkspaceService);
   protected readonly panelTab = signal('personaggio');
   protected readonly masterCharactersOpen = signal(false);
-  protected readonly masterInventory = signal(false);
   protected setMasterCharacters(open: boolean): void {
     if (
       !this.canPrepare() ||
@@ -144,7 +143,6 @@ export class GdrLaboratorio implements OnInit {
       this.inlineBusy()
     )
       return;
-    this.masterInventory.set(false);
     this.masterCharactersOpen.set(open);
   }
 
@@ -229,7 +227,10 @@ export class GdrLaboratorio implements OnInit {
   );
   protected readonly characters = computed<NarrativeCharacter[]>(() => {
     if (this.adventure().legacy && !this.canPrepare()) {
-      return [{ name: this.legacyName(), portrait: this.legacyPortrait() }];
+      return [
+        { name: this.legacyName(), portrait: this.legacyPortrait() },
+        ...this.workspace.voices().map(c => ({id:c.id, name:c.name + (c.profile?.surname ? ' ' + c.profile.surname : ''), portrait:c.portrait, kind:c.kind})),
+      ];
     }
     if (
       this.workspace.available() &&

@@ -37,6 +37,45 @@ export class GdrCharacters {
   protected readonly mediaBusy = signal(false);
   protected readonly filter = signal<'all' | 'pg' | 'png'>('all');
   protected readonly search = signal('');
+  protected readonly statusFilter = signal<'active' | 'archived' | 'all'>('active');
+  protected readonly section = signal<'sheet' | 'assignments' | 'inventory' | 'manage'>('sheet');
+  protected readonly grantDirty = signal(false);
+  protected readonly deleteOpen = signal(false);
+  protected readonly deleteName = signal('');
+  protected readonly hasChanges = computed(() => this.dirty() || this.grantDirty());
+  protected readonly assignments = computed(() => {
+    const id = this.workspace.active()?.id;
+    return this.workspace
+      .grants()
+      .filter((g) => g.characterId === id && (g.canSpeak || g.canEditSheet || g.canInventory))
+      .map((g) => ({
+        ...g,
+        nickname: this.workspace.users().find((u) => u.id === g.userId)?.nickname ?? 'Giocatore',
+        permissions: [
+          g.canSpeak ? 'Interpreta' : '',
+          g.canEditSheet ? 'Modifica scheda' : '',
+          g.canInventory ? 'Gestisce zaino' : '',
+        ].filter(Boolean),
+      }));
+  });
+  protected readonly activeCount = computed(
+    () => this.workspace.characters().filter((c) => !c.archived).length,
+  );
+  protected assignmentLabel(id: string): string {
+    const names = this.workspace
+      .grants()
+      .filter((g) => g.characterId === id && (g.canSpeak || g.canEditSheet || g.canInventory))
+      .map((g) => this.workspace.users().find((u) => u.id === g.userId)?.nickname ?? 'Giocatore');
+    return names.length ? names.join(', ') : 'Non assegnato';
+  }
+  protected setSection(value: 'sheet' | 'assignments' | 'inventory' | 'manage'): void {
+    if (this.hasChanges() || this.mediaBusy()) return;
+    this.section.set(value);
+    this.deleteOpen.set(false);
+    this.deleteName.set('');
+    this.localError.set('');
+  }
+
   protected readonly createOpen = signal(false);
   protected readonly importPreview = signal<ReturnType<typeof parseCharacterBundle> | null>(null);
   protected readonly roster = computed(() =>
@@ -45,7 +84,8 @@ export class GdrCharacters {
       .filter(
         (c) =>
           (this.filter() === 'all' || c.kind === this.filter()) &&
-          (c.name + ' ' + (c.profile?.surname ?? ''))
+          (this.statusFilter() === 'all' || (this.statusFilter() === 'archived') === c.archived) &&
+          (c.name + ' ' + (c.profile?.surname ?? '') + ' ' + this.assignmentLabel(c.id))
             .toLocaleLowerCase('it')
             .includes(this.search().toLocaleLowerCase('it')),
       ),
@@ -66,21 +106,22 @@ export class GdrCharacters {
   private editingRevision = 0;
   private currentId = '';
   private createId = crypto.randomUUID();
-  private editAfterCreateId = '';
   constructor() {
-    effect(() => this.workspace.pendingChanges.set(this.dirty() || this.mediaBusy()));
+    effect(() => this.workspace.pendingChanges.set(this.hasChanges() || this.mediaBusy()));
     effect(() => {
       const c = this.workspace.active();
       if (
         c &&
-        (c.id !== this.currentId || (!this.dirty() && c.revision !== this.editingRevision))
+        (c.id !== this.currentId || (!this.hasChanges() && c.revision !== this.editingRevision))
       ) {
+        if (c.id !== this.currentId) {
+          this.userId.set(0);
+          this.grantDirty.set(false);
+          this.deleteOpen.set(false);
+          this.deleteName.set('');
+        }
         this.currentId = c.id;
         this.populate(c);
-        if (this.editAfterCreateId === c.id) {
-          this.editing.set(true);
-          this.editAfterCreateId = '';
-        }
       }
       if (!c) this.currentId = '';
     });
@@ -97,13 +138,17 @@ export class GdrCharacters {
     this.editing.set(false);
   }
   protected choose(id: string): void {
-    if (this.dirty() || this.mediaBusy()) {
+    if (this.hasChanges() || this.mediaBusy()) {
       this.localError.set('Salva o annulla le modifiche prima di cambiare personaggio.');
       return;
     }
     this.localError.set('');
     this.workspace.activeId.set(id);
     this.userId.set(0);
+    this.grantDirty.set(false);
+    this.deleteOpen.set(false);
+    this.deleteName.set('');
+    this.editing.set(false);
   }
   protected discard(): void {
     const c = this.workspace.active();
@@ -165,14 +210,16 @@ export class GdrCharacters {
   }
   protected async create(copy = false): Promise<void> {
     const id = this.createId;
-    this.editAfterCreateId = id;
+    if (this.hasChanges() || this.mediaBusy()) return;
     if (
       await this.workspace.save({
         action: 'createCharacter',
         id,
         adventureId: this.workspace.selectedId(),
         kind: copy ? 'pg' : this.newKind(),
-        name: copy ? this.legacyName() : this.newName(),
+        name: copy
+          ? this.legacyName()
+          : this.newName().trim() || (this.newKind() === 'pg' ? 'Personaggio da completare' : ''),
         portrait: copy ? this.legacyPortrait() : '',
         sheet: copy ? this.legacySheet() : '',
       })
@@ -181,6 +228,15 @@ export class GdrCharacters {
       this.workspace.activeId.set(id);
       this.newName.set('');
       this.createOpen.set(false);
+      this.statusFilter.set('active');
+      this.filter.set('all');
+      this.search.set('');
+      this.section.set(copy || this.newKind() === 'pg' ? 'assignments' : 'sheet');
+      this.workspace.message.set(
+        copy || this.newKind() === 'pg'
+          ? 'PG creato. Scegli a chi assegnarlo.'
+          : 'PNG creato. Puoi completare la scheda.',
+      );
     }
   }
   protected changeProfile(key: keyof CharacterProfile, value: string): void {
@@ -291,6 +347,10 @@ export class GdrCharacters {
       return;
     this.createId = crypto.randomUUID();
     this.workspace.activeId.set(id);
+    this.statusFilter.set('active');
+    this.filter.set('all');
+    this.search.set('');
+    this.section.set('sheet');
     this.importPreview.set(null);
     this.mediaBusy.set(true);
     this.localError.set('');
@@ -347,6 +407,10 @@ export class GdrCharacters {
     ) {
       this.createId = crypto.randomUUID();
       this.workspace.activeId.set(id);
+      this.statusFilter.set('active');
+      this.filter.set('all');
+      this.search.set('');
+      this.section.set('sheet');
     }
   }
   protected setUser(id: number): void {
@@ -354,8 +418,9 @@ export class GdrCharacters {
     const c = this.workspace.active();
     const grant = this.workspace.grants().find((g) => g.characterId === c?.id && g.userId === id);
     this.speak.set(grant?.canSpeak ?? true);
-    this.editSheet.set(grant?.canEditSheet ?? false);
-    this.editInventory.set(grant?.canInventory ?? false);
+    this.editSheet.set(grant?.canEditSheet ?? c?.kind === 'pg');
+    this.editInventory.set(grant?.canInventory ?? c?.kind === 'pg');
+    this.grantDirty.set(false);
   }
   protected async grant(): Promise<void> {
     const c = this.workspace.active();
@@ -372,17 +437,69 @@ export class GdrCharacters {
       })
     ) {
       const next = this.workspace.active();
+      this.grantDirty.set(false);
+      this.workspace.message.set('Assegnazione salvata.');
       if (next && !this.dirty()) this.populate(next);
+    }
+  }
+  protected async revoke(userId: number): Promise<void> {
+    const c = this.workspace.active();
+    if (!c || !this.canManage() || this.hasChanges()) return;
+    if (
+      await this.workspace.save({
+        action: 'grant',
+        characterId: c.id,
+        revision: c.revision,
+        userId,
+        canSpeak: false,
+        canEditSheet: false,
+        canInventory: false,
+      })
+    ) {
+      this.userId.set(0);
+      this.grantDirty.set(false);
+      this.workspace.message.set('Assegnazione revocata.');
+    }
+  }
+  protected async deleteCharacter(): Promise<void> {
+    const c = this.workspace.active();
+    if (!c || !this.canManage() || this.hasChanges() || this.deleteName() !== c.name) return;
+    if (
+      await this.workspace.save({
+        action: 'deleteCharacter',
+        characterId: c.id,
+        revision: c.revision,
+      })
+    ) {
+      this.deleteOpen.set(false);
+      this.deleteName.set('');
+      this.userId.set(0);
+      this.workspace.activeId.set('');
+      this.section.set('sheet');
+      this.statusFilter.set(
+        this.workspace.characters().length && this.workspace.characters().every((c) => c.archived)
+          ? 'archived'
+          : 'active',
+      );
+      this.filter.set('all');
+      this.search.set('');
+      this.workspace.message.set('Personaggio eliminato.');
     }
   }
   protected async archive(): Promise<void> {
     const c = this.workspace.active();
     if (!c) return;
-    await this.workspace.save({
+    const saved = await this.workspace.save({
       action: 'archive',
       characterId: c.id,
       revision: c.revision,
       archived: !c.archived,
     });
+    if (saved) {
+      this.statusFilter.set(c.archived ? 'active' : 'archived');
+      this.workspace.message.set(
+        c.archived ? 'Personaggio riattivato.' : 'Personaggio archiviato.',
+      );
+    }
   }
 }

@@ -120,6 +120,15 @@ export async function mutate(db, user, payload) {
   if (!Number.isSafeInteger(p.revision))
     throw new WorkspaceError("Revisione mancante.", 400);
   const master = isMaster(user);
+  if (p.action === "deleteCharacter") {
+    requireMaster(user);
+    const result = await db
+      .prepare("DELETE FROM gdr_workspace_characters WHERE id=? AND revision=?")
+      .bind(character.id, p.revision)
+      .run();
+    changed(result);
+    return { saved: true };
+  }
   if (p.action === "grant") {
     requireMaster(user);
     if (

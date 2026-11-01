@@ -18,7 +18,10 @@
       <p class="tavolo-eyebrow">{{ adventure().title }} · strumenti del master</p>
       <h1 id="master-characters-title">PG e PNG</h1>
     </section>
-    <div class="avventura-body">
+    <div class="avventura-body character-management">
+      @if (adventure().legacy) {
+        <p class="lab-help">La scheda classica della giocatrice resta separata dai personaggi gestiti qui. Assegnare un personaggio non sostituisce quella scheda.</p>
+      }
       <div class="lab-document-controls">
         <button
           class="btn"
@@ -27,29 +30,13 @@
         >
           Torna all’avventura
         </button>
-        <button
-          class="btn"
-          [attr.aria-pressed]="!masterInventory()"
-          [disabled]="workspace.pendingChanges() || workspace.saving()"
-          (click)="masterInventory.set(false)"
-        >
-          Personaggi
-        </button>
-        <button
-          class="btn"
-          [attr.aria-pressed]="masterInventory()"
-          [disabled]="workspace.pendingChanges() || workspace.saving()"
-          (click)="masterInventory.set(true)"
-        >
-          Inventari
-        </button>
         @if (workspace.pendingChanges()) {
           <span>Salva o annulla le modifiche prima di cambiare sezione.</span>
         }
       </div>
       <ng-container
         [ngTemplateOutlet]="characterView"
-        [ngTemplateOutletContext]="{ management: true, inventoryOnly: masterInventory() }"
+        [ngTemplateOutletContext]="{ management: true, inventoryOnly: false }"
       />
     </div>
   } @else {

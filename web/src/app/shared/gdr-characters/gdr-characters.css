@@ -297,3 +297,243 @@ summary:focus-visible {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* La gestione del master mantiene elenco e dettaglio separati. */
+.management-layout {
+  display: grid;
+  grid-template-columns: minmax(230px, 290px) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+.manager-sidebar,
+.character-detail.is-management {
+  min-width: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  background: var(--panel-color);
+}
+.manager-sidebar {
+  padding: 1.2rem;
+}
+.manager-heading h3 {
+  font-size: 1.4rem;
+}
+.manager-heading .hint {
+  margin-bottom: 0;
+}
+.manager-sidebar .manager-actions {
+  gap: 0.4rem;
+}
+.manager-sidebar .btn,
+.manager-sidebar .file-button {
+  padding: 0.5rem 0.7rem;
+  margin: 0;
+  justify-content: center;
+}
+.manager-sidebar .roster-filters {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.35rem;
+}
+.manager-sidebar .roster-filters label {
+  grid-column: auto;
+  margin-top: 0.5rem;
+}
+.manager-sidebar .roster {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.65rem;
+  max-height: 65vh;
+  overflow-y: auto;
+  padding: 2px;
+}
+.manager-sidebar .roster-entry {
+  padding: 0.8rem;
+  background: var(--input-bg);
+}
+.manager-sidebar .roster-entry.is-active {
+  border-color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 10%, var(--input-bg));
+}
+.assignment-caption {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--accent-color);
+  overflow-wrap: anywhere;
+}
+.is-management > .identity {
+  padding: 1.4rem;
+  margin: 0;
+  border-bottom: 1px solid var(--border-color);
+}
+.identity-assignment {
+  margin: 0.35rem 0 0;
+  color: var(--accent-color);
+  font-size: 0.85rem;
+}
+.manager-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.85rem 1.2rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.manager-tabs button {
+  font: inherit;
+  font-size: 0.85rem;
+  min-height: 42px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-color);
+  background: var(--input-bg);
+  padding: 0.5rem 0.8rem;
+  cursor: pointer;
+}
+.manager-tabs button.is-active {
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 10%, var(--input-bg));
+}
+.manager-tabs button:disabled,
+.roster-entry:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.is-management > .detail-body {
+  padding: 1.4rem;
+}
+.detail-body > h4,
+.permissions > h4,
+.management-card > h4,
+.creation > h4 {
+  margin-top: 0;
+}
+.pending-notice {
+  padding: 0.8rem 1.4rem;
+  margin: 0;
+  background: var(--input-bg);
+  font-size: 0.85rem;
+  color: var(--accent-color);
+}
+.empty-state {
+  padding: 1.4rem;
+  border: 1px dashed var(--border-color);
+  border-radius: 12px;
+  color: var(--muted-color);
+  line-height: 1.7;
+}
+.empty-state h3,
+.empty-state h4 {
+  margin-top: 0;
+  color: var(--text-color);
+}
+.empty-state p {
+  margin-bottom: 0;
+}
+.permissions {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.assignment-list {
+  display: grid;
+  gap: 1rem;
+  margin: 1.2rem 0;
+}
+.assignment-card,
+.assignment-editor,
+.management-card {
+  padding: 1.2rem;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--input-bg);
+}
+.assignment-card p {
+  font-size: 0.85rem;
+  color: var(--muted-color);
+  margin-bottom: 0;
+  line-height: 1.6;
+}
+.assignment-editor {
+  margin-top: 1.5rem;
+}
+.assignment-editor h4 {
+  margin-top: 0;
+}
+.check {
+  align-items: flex-start;
+  padding: 0.6rem 0;
+}
+.check input {
+  margin-top: 0.25rem;
+}
+.check strong {
+  font-weight: 500;
+  color: var(--text-color);
+}
+.check small {
+  display: block;
+}
+.management-card + .management-card {
+  margin-top: 1.2rem;
+}
+.danger-zone {
+  border-color: color-mix(in srgb, var(--danger-text-color) 45%, var(--border-color));
+}
+.danger-zone > p {
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+.btn.danger {
+  color: var(--danger-text-color);
+  border-color: var(--danger-text-color);
+}
+.profile-form > h4 {
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.form-group {
+  border: 1px solid var(--border-color);
+  padding: 1rem;
+  border-radius: 10px;
+  margin: 1rem 0;
+}
+.legacy-tools {
+  border-top: 1px solid var(--border-color);
+}
+.legacy-tools summary {
+  font-size: 0.85rem;
+}
+.legacy-npc .btn {
+  font-size: 0.75rem;
+}
+.save-profile {
+  position: sticky;
+  bottom: 0;
+  background: var(--panel-color);
+  padding: 0.85rem 0;
+  margin-bottom: 0;
+}
+@media (max-width: 850px) {
+  .management-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .manager-sidebar .roster {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: 320px;
+  }
+}
+@media (max-width: 480px) {
+  .manager-sidebar .roster {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .is-management > .identity,
+  .is-management > .detail-body {
+    padding: 1rem;
+  }
+  .manager-tabs {
+    padding: 0.75rem;
+  }
+  .manager-tabs button {
+    flex: 1 1 auto;
+  }
+}

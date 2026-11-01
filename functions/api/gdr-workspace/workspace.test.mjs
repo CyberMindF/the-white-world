@@ -98,3 +98,32 @@ test('upload immagini: autenticazione, permessi PG/PNG, formato e dimensione pri
   const response=await h.upload(2,'avatar-pg','avatar',image);assert.equal(response.status,201);assert.match((await response.json()).path,/^\/api\/media\/gdr-workspace\/avatar-pg\/avatar\//);assert.equal(h.media.size,1);
   h.sqlite.close();
 });
+
+test('eliminazione: solo master, revisione corrente, rimozione delle assegnazioni e storia intatta',async()=>{
+  const h=apiHarness(); await character(h.db,'remove-me'); await character(h.db,'keep-me');
+  await grant(h.db,h.sqlite,'remove-me',{canEditSheet:true,canInventory:true});
+  const rev=revision(h.sqlite,'remove-me');
+  await denied(()=>mutate(h.db,member,{action:'deleteCharacter',characterId:'remove-me',revision:rev}));
+  await assert.rejects(()=>mutate(h.db,master,{action:'deleteCharacter',characterId:'remove-me',revision:rev-1}),e=>e.status===409);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM gdr_workspace_grants WHERE character_id=?').get('remove-me').n,1);
+  const response=await h.call(1,'POST',{action:'deleteCharacter',characterId:'remove-me',revision:rev});
+  assert.equal(response.status,200);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM gdr_workspace_characters WHERE id=?').get('remove-me').n,0);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM gdr_workspace_grants WHERE character_id=?').get('remove-me').n,0);
+  assert.equal(h.sqlite.prepare('SELECT name FROM gdr_workspace_characters WHERE id=?').get('keep-me').name,'keep-me');
+  assert.equal(h.sqlite.prepare('SELECT body FROM gdr_turns').get().body,'Turno originale');
+  assert.equal((await h.call(1,'POST',{action:'deleteCharacter',characterId:'keep-me',revision:1},adventureId,{'x-test':'1'})).status,403);
+  h.sqlite.close();
+});
+test('revoca completa: il personaggio scompare alla giocatrice e gli editor aperti perdono accesso',async()=>{
+  const h=apiHarness();await character(h.db,'revoked');await grant(h.db,h.sqlite,'revoked',{canEditSheet:true,canInventory:true});
+  const oldRevision=revision(h.sqlite,'revoked');
+  await grant(h.db,h.sqlite,'revoked',{canSpeak:false,canEditSheet:false,canInventory:false});
+  assert.equal((await (await h.call(2)).json()).characters.length,0);
+  const masterView=await (await h.call(1)).json();
+  assert.equal(masterView.characters.length,1);assert.equal(masterView.grants.length,0);
+  await denied(()=>mutate(h.db,member,{action:'saveCharacter',characterId:'revoked',revision:oldRevision,name:'No',portrait:'',sheet:'No'}));
+  await grant(h.db,h.sqlite,'revoked',{canSpeak:true});
+  assert.equal((await (await h.call(2)).json()).characters[0].id,'revoked');
+  h.sqlite.close();
+});
