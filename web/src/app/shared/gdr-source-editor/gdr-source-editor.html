@@ -111,7 +111,7 @@
         @if (source().trim()) {
           <app-gdr-turn
             [source]="source()"
-            [editable]="true"
+            [editable]="mode() === 'preview'"
             [characters]="characters()"
             [allowGeneric]="allowGeneric()"
             (sourceChange)="sourceChange.emit($event)"
@@ -131,10 +131,9 @@
     </ul>
   }
   <footer class="editor-footer">
-    <p class="hint">
-      {{ recognized() }} parti riconosciute automaticamente. Clicca un titolo o ✎: quel punto
-      diventa modificabile direttamente nell’anteprima.
-    </p>
+    @if (mode() === 'preview') {
+      <p class="hint">Clicca un titolo o ✎ per modificare quel punto direttamente nell’anteprima.</p>
+    }
     <details>
       <summary>Come funziona la scrittura</summary>
       <p>
