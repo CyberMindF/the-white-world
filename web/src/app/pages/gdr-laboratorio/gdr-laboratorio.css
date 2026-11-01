@@ -71,19 +71,11 @@ textarea:focus-visible {
 }
 .lab-composer .btn-submit {
   margin: 0;
-  min-width: 160px;
-  padding: 0.75rem 1.5rem;
-}
-.turn-submit-hint {
-  color: var(--muted-color);
-  font-size: 0.75rem;
-  line-height: 1.5;
-  text-align: right;
-}
-@media (max-width: 480px) {
-  .lab-composer .gdr-turn-submit-row { align-items: stretch; }
-  .lab-composer .btn-submit { width: 100%; }
-  .turn-submit-hint { text-align: center; }
+  width: fit-content;
+  min-width: 0;
+  justify-content: center;
+  text-align: center;
+  padding: 0.7rem 1.1rem;
 }
 
 .lab-text-command {
