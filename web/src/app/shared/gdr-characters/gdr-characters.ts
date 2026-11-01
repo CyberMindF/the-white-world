@@ -28,6 +28,65 @@ export class GdrCharacters {
   readonly fields = input<
     { key: string; label: string; type: string; min?: number; max?: number; long?: boolean }[]
   >([]);
+  protected readonly statKeys = ['statMente', 'statCuore', 'statCorpo', 'statMagia'];
+  protected readonly statDraft = signal<Record<string, string>>({});
+  protected readonly statsDirty = signal(false);
+  protected readonly statsBudget = signal(12);
+  protected readonly baseStats = computed(() =>
+    this.extraFields().filter((f) => this.statKeys.includes(f.key)),
+  );
+  protected readonly statTotal = computed(() =>
+    this.baseStats().reduce((sum, f) => sum + Number(this.statDraft()[f.key] ?? 1), 0),
+  );
+  protected readonly validStats = computed(
+    () =>
+      this.baseStats().length === 4 &&
+      this.baseStats().every(
+        (f) =>
+          Number.isInteger(Number(this.statDraft()[f.key])) &&
+          Number(this.statDraft()[f.key]) >= 1 &&
+          Number(this.statDraft()[f.key]) <= 5,
+      ) &&
+      this.statTotal() === (this.workspace.active()?.statsBudget ?? 12),
+  );
+  protected changeStat(key: string, value: string): void {
+    this.statDraft.update((s) => ({ ...s, [key]: String(value) }));
+    this.statsDirty.set(true);
+  }
+  protected discardStats(): void {
+    const c = this.workspace.active();
+    this.statDraft.set(
+      Object.fromEntries(this.statKeys.map((k) => [k, c?.characterFields?.[k] ?? '1'])),
+    );
+    this.statsDirty.set(false);
+  }
+  protected async confirmStats(): Promise<void> {
+    const c = this.workspace.active();
+    if (!c || !this.validStats()) return;
+    if (
+      await this.workspace.save({
+        action: 'confirmStats',
+        characterId: c.id,
+        revision: c.revision,
+        values: this.statDraft(),
+      })
+    ) {
+      this.statsDirty.set(false);
+      const next = this.workspace.active();
+      if (next) this.populate(next);
+    }
+  }
+  protected async setStatAccess(editable: boolean): Promise<void> {
+    const c = this.workspace.active();
+    if (!c || !this.canManage()) return;
+    await this.workspace.save({
+      action: 'setStatAccess',
+      characterId: c.id,
+      revision: c.revision,
+      editable,
+      budget: Number(this.statsBudget()),
+    });
+  }
   protected readonly sheetFields = signal<Record<string, string>>({});
   protected readonly extraFields = computed(() =>
     this.workspace.active()?.kind === 'pg'
@@ -59,7 +118,7 @@ export class GdrCharacters {
     ),
   );
   protected readonly numericFields = computed(() =>
-    this.extraFields().filter((f) => f.type === 'number'),
+    this.extraFields().filter((f) => f.type === 'number' && !this.statKeys.includes(f.key)),
   );
   protected readonly textFields = computed(() =>
     this.extraFields().filter((f) => f.type !== 'number'),
@@ -75,7 +134,9 @@ export class GdrCharacters {
   protected readonly grantDirty = signal(false);
   protected readonly deleteOpen = signal(false);
   protected readonly deleteName = signal('');
-  protected readonly hasChanges = computed(() => this.dirty() || this.grantDirty());
+  protected readonly hasChanges = computed(
+    () => this.dirty() || this.grantDirty() || this.statsDirty(),
+  );
   protected readonly assignments = computed(() => {
     const id = this.workspace.active()?.id;
     return this.workspace
@@ -166,6 +227,11 @@ export class GdrCharacters {
     this.portrait.set(c.portrait);
     this.sheet.set(c.sheet);
     this.sheetFields.set({ ...c.characterFields });
+    this.statDraft.set(
+      Object.fromEntries(this.statKeys.map((k) => [k, c.characterFields?.[k] ?? '1'])),
+    );
+    this.statsDirty.set(false);
+    this.statsBudget.set(c.statsBudget ?? 12);
     this.items.set(structuredClone(c.inventory));
     this.editingRevision = c.revision;
     this.dirty.set(false);

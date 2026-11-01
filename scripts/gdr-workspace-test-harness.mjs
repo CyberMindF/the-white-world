@@ -15,6 +15,7 @@ export function fixture() {
   sqlite.exec(readFileSync(new URL('../migrations/0134_add_gdr_character_profiles.sql',import.meta.url),'utf8'));
   sqlite.exec("CREATE TABLE gdr_character_schema(adventure TEXT PRIMARY KEY,fields_json TEXT); CREATE TABLE gdr_character_fields(adventure TEXT,field_key TEXT,value TEXT); CREATE TABLE gdr_blocks(id INTEGER PRIMARY KEY,document_key TEXT,type TEXT,data TEXT,position INTEGER);");
   sqlite.exec(readFileSync(new URL('../migrations/0145_unify_gdr_character_sheets.sql',import.meta.url),'utf8'));
+  sqlite.exec(readFileSync(new URL('../migrations/0147_lock_gdr_base_stats.sql',import.meta.url),'utf8'));
   const db={async batch(statements){sqlite.exec('BEGIN');try{const results=[];for(const statement of statements)results.push(await statement.run());sqlite.exec('COMMIT');return results;}catch(error){sqlite.exec('ROLLBACK');throw error;}},withSession(){return this;},prepare(sql){return{bind(...values){return{async run(){const r=sqlite.prepare(sql).run(...values);return{meta:{changes:Number(r.changes)}};},async first(){return sqlite.prepare(sql).get(...values) ?? null;},async all(){return{results:sqlite.prepare(sql).all(...values)};}};},async all(){return{results:sqlite.prepare(sql).all()};}};}};
   return {sqlite,db};
 }

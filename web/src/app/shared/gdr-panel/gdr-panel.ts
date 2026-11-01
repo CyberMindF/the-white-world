@@ -99,11 +99,12 @@ export class GdrPanel implements OnInit {
 
   public openCharacters():void {if(this.pendingChanges)return;this.open.set(true);this.wide.set(true);this.setTab('personaggio');}
   protected togglePanel(): void {
-    this.open.update((value) => !value);
-    if(this.open()) this.opened.emit();
+    if(this.open()) { this.closePanel(); return; }
+    this.open.set(true); this.opened.emit();
   }
 
   protected closePanel(): void {
+    if(this.pendingChanges) return;
     this.open.set(false);
   }
 

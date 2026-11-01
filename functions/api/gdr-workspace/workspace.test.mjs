@@ -135,9 +135,9 @@ test('unificazione: conserva PG assegnato, statistiche e gatto; il nome modifica
  await mutate(h.db,master,{action:'syncLegacy',adventureId});
  let c=(await (await h.call(2)).json()).characters[0];
  assert.equal(c.id,'original');assert.equal(c.characterFields.catName,'Luna');assert.equal(c.characterFields.statMente,'4');assert.equal(c.characterFields.name,undefined);assert.deepEqual(c.inventory.map(i=>i.name),['Bacchetta','Taccuino']);assert.equal(c.characterFields.inventory,undefined);
- await mutate(h.db,member,{action:'saveCharacter',characterId:c.id,revision:c.revision,name:'Nuovo nome',portrait:'',sheet:c.sheet,profile:{surname:'Alba'},characterFields:{catName:'Stella',statMente:'5'}});
+ await mutate(h.db,member,{action:'saveCharacter',characterId:c.id,revision:c.revision,name:'Nuovo nome',portrait:'',sheet:c.sheet,profile:{surname:'Alba'},characterFields:{catName:'Stella',statMente:'4'}});
  await mutate(h.db,master,{action:'syncLegacy',adventureId});
- c=(await (await h.call(1)).json()).characters[0];assert.equal(c.name,'Nuovo nome');assert.equal(c.profile.surname,'Alba');assert.equal(c.characterFields.catName,'Stella');assert.equal(c.characterFields.statMente,'5');
+ c=(await (await h.call(1)).json()).characters[0];assert.equal(c.name,'Nuovo nome');assert.equal(c.profile.surname,'Alba');assert.equal(c.characterFields.catName,'Stella');assert.equal(c.characterFields.statMente,'4');
  assert.equal(h.sqlite.prepare("SELECT COUNT(*) n FROM gdr_workspace_characters WHERE kind='pg'").get().n,1);h.sqlite.close();
 });
 test('PNG del racconto: una sola identità, rinomina visibile nella storia e nessuna ricreazione dopo eliminazione',async()=>{
@@ -177,4 +177,27 @@ test('la giocatrice modifica i dati personali senza sovrascrivere il testo e le 
  await mutate(h.db,member,{action:'saveCharacter',characterId:'restricted-sheet',revision:revision(h.sqlite,'restricted-sheet'),name:'Alba',sheet:'Testo sostituito',portrait:'',profile:{surname:'Neri',appearance:'Capelli chiari',abilities:'Nuovi poteri'}});
  const c=(await (await h.call(1)).json()).characters[0];assert.equal(c.name,'Alba');assert.equal(c.profile.surname,'Neri');assert.equal(c.profile.appearance,'Capelli chiari');assert.equal(c.sheet,'Regole del master');assert.equal(c.profile.abilities,'Abilità del master');
  h.sqlite.close();
+});
+
+test('distribuzione iniziale: totale obbligatorio, conferma atomica e blocco delle modifiche successive',async()=>{
+ const h=apiHarness();await character(h.db,'points');await grant(h.db,h.sqlite,'points',{canEditSheet:true});
+ h.sqlite.prepare('INSERT INTO gdr_character_schema VALUES(?,?)').run(adventureId,JSON.stringify(['statMente','statCuore','statCorpo','statMagia'].map(key=>({key,label:key,type:'number',min:1,max:5,default:1}))));
+ const values={statMente:'3',statCuore:'3',statCorpo:'3',statMagia:'3'};
+ await assert.rejects(()=>mutate(h.db,member,{action:'confirmStats',characterId:'points',revision:revision(h.sqlite,'points'),values:{...values,statMagia:'2'}}),e=>e.status===400);
+ await mutate(h.db,member,{action:'confirmStats',characterId:'points',revision:revision(h.sqlite,'points'),values});
+ let c=(await (await h.call(2)).json()).characters[0];assert.equal(c.statsEditable,false);assert.equal(c.canEditStats,false);assert.equal(c.characterFields.statMente,'3');
+ await denied(()=>mutate(h.db,member,{action:'confirmStats',characterId:c.id,revision:c.revision,values}));
+ await denied(()=>mutate(h.db,member,{action:'saveCharacter',characterId:c.id,revision:c.revision,name:'Alba',sheet:'',portrait:'',characterFields:{...values,statMente:'4'}}));
+ await mutate(h.db,member,{action:'saveCharacter',characterId:c.id,revision:c.revision,name:'Alba',sheet:'',portrait:'',characterFields:{catName:'Luna'}});
+ c=(await (await h.call(1)).json()).characters[0];assert.equal(c.name,'Alba');assert.equal(c.characterFields.statMente,'3');assert.equal(c.statsEditable,false);
+h.sqlite.close();
+});
+test('solo il master riapre la distribuzione, anche con un nuovo totale; la nuova conferma richiude il permesso',async()=>{
+ const h=apiHarness();await character(h.db,'level-up');await grant(h.db,h.sqlite,'level-up',{canEditSheet:true});
+ await mutate(h.db,master,{action:'setStatAccess',characterId:'level-up',revision:revision(h.sqlite,'level-up'),editable:false,budget:12});
+ await denied(()=>mutate(h.db,member,{action:'setStatAccess',characterId:'level-up',revision:revision(h.sqlite,'level-up'),editable:true,budget:14}));
+ await mutate(h.db,master,{action:'setStatAccess',characterId:'level-up',revision:revision(h.sqlite,'level-up'),editable:true,budget:14});
+ let c=(await (await h.call(2)).json()).characters[0];assert.equal(c.canEditStats,true);assert.equal(c.statsBudget,14);
+ await mutate(h.db,member,{action:'confirmStats',characterId:c.id,revision:c.revision,values:{statMente:'4',statCuore:'4',statCorpo:'3',statMagia:'3'}});
+ c=(await (await h.call(2)).json()).characters[0];assert.equal(c.canEditStats,false);assert.equal(c.statsEditable,false);h.sqlite.close();
 });

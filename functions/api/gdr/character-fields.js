@@ -111,6 +111,7 @@ export async function onRequestPost(context) {
         (!linked.can_edit_sheet || linked.archived)
       )
         return json({ error: "Non puoi modificare questa scheda." }, 403);
+      if(!isMaster(session.user) && ['statMente','statCuore','statCorpo','statMagia'].includes(fieldKey)) return json({error:'Distribuisci e conferma i punti dal pannello del personaggio.'},403);
       const result = isName(fieldKey)
         ? await context.env.DB.prepare(
             "UPDATE gdr_workspace_characters SET name=?,revision=revision+1 WHERE id=? AND revision=?",

@@ -180,7 +180,96 @@ export async function mutate(db, user, payload) {
     changed(result);
     return { saved: true };
   }
+  const statKeys = ["statMente", "statCuore", "statCorpo", "statMagia"];
+  if (p.action === "setStatAccess") {
+    requireMaster(user);
+    if (
+      character.kind !== "pg" ||
+      character.adventure_id !== "il-prezzo-della-verita" ||
+      typeof p.editable !== "boolean" ||
+      !Number.isInteger(p.budget) ||
+      p.budget < 4 ||
+      p.budget > 20
+    )
+      throw new WorkspaceError("Configurazione dei punti non valida.", 400);
+    const result = await db
+      .prepare(
+        "UPDATE gdr_workspace_characters SET stats_editable=?,stats_budget=?,revision=revision+1 WHERE id=? AND revision=?",
+      )
+      .bind(+p.editable, p.budget, character.id, p.revision)
+      .run();
+    changed(result);
+    return { saved: true };
+  }
+  if (p.action === "confirmStats") {
+    if (
+      character.kind !== "pg" ||
+      character.adventure_id !== "il-prezzo-della-verita"
+    )
+      throw new WorkspaceError(
+        "Queste caratteristiche non sono disponibili.",
+        400,
+      );
+    const grant = master
+      ? null
+      : await db
+          .prepare(
+            "SELECT can_edit_sheet FROM gdr_workspace_grants WHERE character_id=? AND user_id=?",
+          )
+          .bind(character.id, user.id)
+          .first();
+    if (
+      !master &&
+      (character.archived ||
+        !character.stats_editable ||
+        !grant?.can_edit_sheet)
+    )
+      throw new WorkspaceError(
+        "Le caratteristiche sono bloccate. Chiedi al master di riaprire la distribuzione.",
+        403,
+      );
+    const values = statKeys.map((key) => Number(p.values?.[key]));
+    if (
+      values.some((n) => !Number.isInteger(n) || n < 1 || n > 5) ||
+      values.reduce((a, b) => a + b, 0) !== character.stats_budget
+    )
+      throw new WorkspaceError(
+        `Distribuisci esattamente ${character.stats_budget} punti, da 1 a 5 per caratteristica.`,
+        400,
+      );
+    const fields = {
+      ...JSON.parse(character.fields_json),
+      ...Object.fromEntries(statKeys.map((key, i) => [key, String(values[i])])),
+    };
+    const result = await db
+      .prepare(
+        `UPDATE gdr_workspace_characters SET fields_json=?,stats_editable=0,revision=revision+1 WHERE id=? AND revision=? AND (?=1 OR (stats_editable=1 AND archived=0 AND EXISTS(SELECT 1 FROM gdr_workspace_grants g WHERE g.character_id=gdr_workspace_characters.id AND g.user_id=? AND g.can_edit_sheet=1)))`,
+      )
+      .bind(JSON.stringify(fields), character.id, p.revision, +master, user.id)
+      .run();
+    changed(result);
+    return { saved: true };
+  }
   if (p.action === "saveCharacter") {
+    if (
+      !master &&
+      character.adventure_id === "il-prezzo-della-verita" &&
+      p.characterFields
+    ) {
+      const current = JSON.parse(character.fields_json);
+      if (
+        statKeys.some(
+          (key) =>
+            p.characterFields[key] !== undefined &&
+            String(p.characterFields[key]) !== String(current[key] ?? "1"),
+        )
+      )
+        throw new WorkspaceError(
+          "Usa Conferma caratteristiche per distribuire i punti. Il normale salvataggio non modifica le caratteristiche di base.",
+          403,
+        );
+    }
+
     const result = await db
       .prepare(
         `UPDATE gdr_workspace_characters SET name=?,portrait=?,sheet=?,profile_json=?,photo=?,fields_json=?,revision=revision+1
@@ -206,7 +295,17 @@ export async function mutate(db, user, payload) {
           await validateCharacterFields(
             db,
             character.adventure_id,
-            p.characterFields ?? JSON.parse(character.fields_json),
+            !master && character.adventure_id === "il-prezzo-della-verita"
+              ? {
+                  ...(p.characterFields ?? JSON.parse(character.fields_json)),
+                  ...Object.fromEntries(
+                    statKeys.map((k) => [
+                      k,
+                      JSON.parse(character.fields_json)[k] ?? "1",
+                    ]),
+                  ),
+                }
+              : (p.characterFields ?? JSON.parse(character.fields_json)),
           ),
         ),
         character.id,

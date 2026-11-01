@@ -280,6 +280,101 @@
                   }
                 } @else {
                   @if (!canManage() || section() === 'sheet') {
+                    @if (baseStats().length === 4 && (!editing() || canManage())) {
+                      <section class="base-stats-card">
+                        <div class="base-stats-heading">
+                          <h4>Caratteristiche di base</h4>
+                          <span>{{
+                            c.statsEditable
+                              ? 'Distribuzione aperta'
+                              : 'Confermate · modifica bloccata'
+                          }}</span>
+                        </div>
+                        @if (!canManage() && c.canEditStats) {
+                          <p class="hint">
+                            Distribuisci {{ c.statsBudget || 12 }} punti, da 1 a 5 per
+                            caratteristica. Dopo la conferma potrà riaprirle solo il master.
+                          </p>
+                          <div class="player-stats">
+                            @for (field of baseStats(); track field.key) {
+                              <label [for]="'base-' + field.key"
+                                >{{ field.label
+                                }}<input
+                                  [id]="'base-' + field.key"
+                                  type="number"
+                                  min="1"
+                                  max="5"
+                                  [ngModel]="statDraft()[field.key]"
+                                  (ngModelChange)="changeStat(field.key, $event)"
+                              /></label>
+                            }
+                          </div>
+                          <p class="points-status">
+                            {{ statTotal() }} / {{ c.statsBudget || 12 }} punti
+                          </p>
+                          <div class="actions">
+                            <button class="btn" [disabled]="!validStats()" (click)="confirmStats()">
+                              Conferma caratteristiche
+                            </button>
+                            @if (statsDirty()) {
+                              <button class="btn" (click)="discardStats()">
+                                Annulla distribuzione
+                              </button>
+                            }
+                          </div>
+                        } @else {
+                          <dl class="base-stat-values">
+                            @for (field of baseStats(); track field.key) {
+                              <div>
+                                <dt>{{ field.label }}</dt>
+                                <dd>{{ c.characterFields?.[field.key] || '1' }}</dd>
+                              </div>
+                            }
+                          </dl>
+                          @if (!canManage()) {
+                            <p class="hint">
+                              Per cambiare questi valori, chiedi al master di riaprire la
+                              distribuzione.
+                            </p>
+                          }
+                        }
+                        @if (canManage()) {
+                          <div class="stat-permission">
+                            <label for="stats-budget"
+                              >Punti totali consentiti<input
+                                id="stats-budget"
+                                type="number"
+                                min="4"
+                                max="20"
+                                [ngModel]="statsBudget()"
+                                (ngModelChange)="statsBudget.set(+$event)"
+                            /></label>
+                            <div class="actions">
+                              <button
+                                class="btn"
+                                [disabled]="statsBudget() < 4 || statsBudget() > 20"
+                                (click)="setStatAccess(true)"
+                              >
+                                {{
+                                  c.statsEditable
+                                    ? 'Aggiorna punti consentiti'
+                                    : 'Consenti nuova distribuzione'
+                                }}
+                              </button>
+                              @if (c.statsEditable) {
+                                <button class="btn" (click)="setStatAccess(false)">
+                                  Blocca caratteristiche
+                                </button>
+                              }
+                            </div>
+                            <p class="hint">
+                              L’autorizzazione si chiude automaticamente quando la giocatrice
+                              conferma i punti.
+                            </p>
+                          </div>
+                        }
+                      </section>
+                    }
                     @if (editing() && c.canEditSheet) {
                       @if (!canManage()) {
                         <div class="player-edit-form">
@@ -540,7 +635,7 @@
                     } @else {
                       <div class="character-actions">
                         @if (c.canEditSheet) {
-                          <button class="btn" (click)="editing.set(true)">
+                          <button class="btn" [disabled]="statsDirty()" (click)="editing.set(true)">
                             {{ canManage() ? 'Modifica scheda' : 'Modifica personaggio' }}
                           </button>
                         }
@@ -580,10 +675,12 @@
                       @if (extraFields().length) {
                         <dl class="profile-details adventure-fields">
                           @for (field of extraFields(); track field.key) {
-                            <div>
-                              <dt>{{ field.label }}</dt>
-                              <dd>{{ c.characterFields?.[field.key] || '—' }}</dd>
-                            </div>
+                            @if (baseStats().length !== 4 || !statKeys.includes(field.key)) {
+                              <div>
+                                <dt>{{ field.label }}</dt>
+                                <dd>{{ c.characterFields?.[field.key] || '—' }}</dd>
+                              </div>
+                            }
                           }
                         </dl>
                       }

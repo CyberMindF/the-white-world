@@ -37,6 +37,9 @@ export interface WorkspaceCharacter {
   canSpeak: boolean;
   canEditSheet: boolean;
   canInventory: boolean;
+  statsEditable?: boolean;
+  statsBudget?: number;
+  canEditStats?: boolean;
 }
 export interface CharacterGrant {
   characterId: string;

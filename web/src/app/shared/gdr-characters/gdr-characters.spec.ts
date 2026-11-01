@@ -118,6 +118,18 @@ describe('gestione personaggi del master', () => {
       }),
     );
   });
+  it('richiede il totale dei punti e nasconde la modifica quando le caratteristiche sono confermate',async()=>{
+    const {workspace,fixture,button}=setup();
+    const fields=['statMente','statCuore','statCorpo','statMagia'].map(key=>({key,label:key,type:'number',min:1,max:5}));
+    workspace.characters.set([{...character('ada','Ada'),revision:2,statsEditable:true,statsBudget:12,canEditStats:true,characterFields:Object.fromEntries(fields.map(f=>[f.key,'1']))}]);
+    fixture.componentRef.setInput('managementMode',false);fixture.componentRef.setInput('fields',fields);fixture.detectChanges();await fixture.whenStable();
+    expect(button('Conferma caratteristiche').disabled).toBe(true);
+    for(const field of fields){const input=fixture.nativeElement.querySelector('#base-'+field.key) as HTMLInputElement;input.value='3';input.dispatchEvent(new Event('input'));}
+    fixture.detectChanges();await fixture.whenStable();expect(button('Conferma caratteristiche').disabled).toBe(false);expect(button('Modifica personaggio').disabled).toBe(true);
+    button('Annulla distribuzione').click();fixture.detectChanges();
+    workspace.characters.update(cs=>cs.map(c=>({...c,revision:3,statsEditable:false,canEditStats:false,characterFields:Object.fromEntries(fields.map(f=>[f.key,'3']))})));fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('#base-statMente')).toBeNull();expect(button('Conferma caratteristiche')).toBeUndefined();expect(button('Modifica personaggio').disabled).toBe(false);
+  });
   it('mostra anche un personaggio archiviato se non rimangono attivi', () => {
     const { workspace, fixture } = setup();
     workspace.characters.set([character('old', 'Vecchio', true)]);

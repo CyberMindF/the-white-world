@@ -625,3 +625,64 @@ summary:focus-visible {
     padding: 0.85rem;
   }
 }
+.base-stats-card {
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--input-bg);
+  margin: 0 0 1rem;
+}
+.base-stats-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.8rem;
+}
+.base-stats-heading h4 {
+  margin: 0;
+}
+.base-stats-heading span {
+  font-size: 0.75rem;
+  color: var(--muted-color);
+}
+.base-stat-values {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin: 0;
+}
+.base-stat-values div {
+  padding: 0.6rem;
+  text-align: center;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+.base-stat-values dt {
+  font-size: 0.8rem;
+  color: var(--muted-color);
+}
+.base-stat-values dd {
+  font-size: 1.3rem;
+  margin: 0.4rem 0 0;
+}
+.points-status {
+  font-size: 0.9rem;
+  color: var(--accent-color);
+}
+.stat-permission {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border-color);
+  padding-top: 0.7rem;
+}
+.stat-permission input {
+  max-width: 8rem;
+  display: block;
+  margin-top: 0.4rem;
+}
+@media (max-width: 480px) {
+  .base-stat-values {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

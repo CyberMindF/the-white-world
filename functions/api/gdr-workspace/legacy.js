@@ -73,10 +73,20 @@ export async function syncLegacy(db, user, adventureId) {
       .map((f) => `${f.label}: ${values[f.key] ?? ""}`)
       .join("\n\n");
     if (nameField) delete values[nameField.key];
-    const items=JSON.parse(c?.inventory_json ?? '[]');
-    if(values.inventory) for(const line of values.inventory.split('\n').map(v=>v.trim()).filter(Boolean)) {
-      if(!items.some(item=>item.name===line)) items.push({id:crypto.randomUUID(),name:line.slice(0,160),quantity:1,notes:line.length>160 ? line.slice(0,2000) : ''});
-    }
+    const items = JSON.parse(c?.inventory_json ?? "[]");
+    if (values.inventory)
+      for (const line of values.inventory
+        .split("\n")
+        .map((v) => v.trim())
+        .filter(Boolean)) {
+        if (!items.some((item) => item.name === line))
+          items.push({
+            id: crypto.randomUUID(),
+            name: line.slice(0, 160),
+            quantity: 1,
+            notes: line.length > 160 ? line.slice(0, 2000) : "",
+          });
+      }
     delete values.inventory;
     const now = new Date().toISOString();
     await db.batch([
@@ -87,9 +97,22 @@ export async function syncLegacy(db, user, adventureId) {
         .bind(id, adventureId, name, user.id, now),
       db
         .prepare(
-          "UPDATE gdr_workspace_characters SET name=?,fields_json=?,inventory_json=?,sheet=CASE WHEN sheet=? THEN '' ELSE sheet END,revision=revision+1 WHERE id=? AND NOT EXISTS(SELECT 1 FROM gdr_workspace_story_links WHERE adventure_id=? AND source_key='pg')",
+          "UPDATE gdr_workspace_characters SET name=?,fields_json=?,inventory_json=?,stats_editable=?,sheet=CASE WHEN sheet=? THEN '' ELSE sheet END,revision=revision+1 WHERE id=? AND NOT EXISTS(SELECT 1 FROM gdr_workspace_story_links WHERE adventure_id=? AND source_key='pg')",
         )
-        .bind(name, JSON.stringify(values), JSON.stringify(items), copiedSheet, id, adventureId),
+        .bind(
+          name,
+          JSON.stringify(values),
+          JSON.stringify(items),
+          ["statMente", "statCuore", "statCorpo", "statMagia"].reduce(
+            (sum, k) => sum + Number(values[k] ?? 1),
+            0,
+          ) === 12
+            ? 0
+            : 1,
+          copiedSheet,
+          id,
+          adventureId,
+        ),
       db
         .prepare(
           "INSERT INTO gdr_workspace_story_links(adventure_id,source_key,character_id) VALUES(?,'pg',?) ON CONFLICT DO NOTHING",
@@ -187,7 +210,10 @@ export async function validateCharacterFields(db, adventureId, value) {
     .bind(adventureId)
     .first();
   for (const field of row ? JSON.parse(row.fields_json) : []) {
-    if(result[field.key] === undefined && field.key !== 'inventory') result[field.key]=String(field.default ?? (field.type === 'number' ? field.min : '') ?? '');
+    if (result[field.key] === undefined && field.key !== "inventory")
+      result[field.key] = String(
+        field.default ?? (field.type === "number" ? field.min : "") ?? "",
+      );
     if (field.type === "number" && result[field.key] !== undefined) {
       const number = Number(result[field.key]);
       if (
