@@ -1,5 +1,6 @@
 import { Component, computed, effect, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { updateGdrTextarea } from '../gdr-textarea';
 import { GdrTurn } from '../gdr-turn/gdr-turn';
 import { parseNarrative, safeNarrativeImage } from '../gdr-turn/gdr-turn.parser';
 import { BLOCK_TYPES, SNIPPET_LABELS } from '../gdr-blocks/gdr-snippets';
@@ -97,19 +98,13 @@ export class GdrSourceEditor {
           : '\n\n'
         : '\n\n';
     const insertion = prefix + snippet + suffix;
-    this.sourceChange.emit(text.slice(0, start) + insertion + text.slice(end));
-    this.mode.set(this.mode() === 'preview' ? 'split' : this.mode());
-    // Angular applica il nuovo valore prima di ripristinare focus e selezione.
-    requestAnimationFrame(() => {
-      area.focus();
-      const fenced = ['dialogo', 'azione', 'nota', 'callout'].includes(type);
-      const heading = type === 'heading' || type === 'subtitle';
-      const contentOffset = fenced ? snippet.indexOf('\n') + 1 : heading ? snippet.indexOf(' ') + 1 : type === 'emphasis' ? 1 : 0;
-      const contentLength = fenced ? snippet.lastIndexOf('\n') - contentOffset : type === 'emphasis' ? snippet.length - 2 : snippet.length - contentOffset;
-      area.setSelectionRange(
-        start + prefix.length + contentOffset,
-        start + prefix.length + contentOffset + contentLength,
-      );
-    });
+    const fenced = ['dialogo', 'azione', 'nota', 'callout'].includes(type);
+    const heading = type === 'heading' || type === 'subtitle';
+    const contentOffset = fenced ? snippet.indexOf('\n') + 1 : heading ? snippet.indexOf(' ') + 1 : type === 'emphasis' ? 1 : 0;
+    const contentLength = fenced ? snippet.lastIndexOf('\n') - contentOffset : type === 'emphasis' ? snippet.length - 2 : snippet.length - contentOffset;
+    updateGdrTextarea(area, () => {
+      this.sourceChange.emit(text.slice(0, start) + insertion + text.slice(end));
+      this.mode.set(this.mode() === 'preview' ? 'split' : this.mode());
+    }, start + prefix.length + contentOffset, start + prefix.length + contentOffset + contentLength);
   }
 }

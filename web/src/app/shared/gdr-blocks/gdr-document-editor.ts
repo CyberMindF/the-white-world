@@ -1,5 +1,6 @@
 import { Component, Input, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { updateGdrTextarea } from '../gdr-textarea';
 import { AuthService } from '../../core/auth.service';
 import { GdrBlocksService } from '../../core/gdr-blocks.service';
 import { GdrBlocks } from './gdr-blocks';
@@ -104,14 +105,11 @@ export class GdrDocumentEditor implements OnInit {
     const prefix = needsLeadingBreak ? '\n\n' : '';
     const insertion = `${prefix}${snippet}`;
     const next = current.slice(0, start) + insertion + current.slice(end);
-    this.sourceText.set(next);
-    this.saveError.set('');
-
     const cursor = start + insertion.length;
-    queueMicrotask(() => {
-      textarea.focus();
-      textarea.setSelectionRange(cursor, cursor);
-    });
+    updateGdrTextarea(textarea, () => {
+      this.sourceText.set(next);
+      this.saveError.set('');
+    }, cursor, cursor);
   }
 
   protected async save(): Promise<void> {

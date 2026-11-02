@@ -1,6 +1,7 @@
 import { Component, ElementRef, ViewChild, computed, effect, input, output, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { updateGdrTextarea } from '../gdr-textarea';
 import { GdrBlocks } from '../gdr-blocks/gdr-blocks';
 import { BLOCK_TYPES, SNIPPET_LABELS } from '../gdr-blocks/gdr-snippets';
 import { NarrativeCharacter, insertNarrativeBlock, narrativeSnippet } from './gdr-writing';
@@ -575,15 +576,11 @@ export class GdrTurn {
       if (type === 'npc_grid') this.message.set('Scegli un PNG con una foto completa nel menu Personaggio.');
       return;
     }
-    this.draft.set(
-      insertNarrativeBlock(this.draft().slice(0, start) + this.draft().slice(end), start, snippet),
-    );
-    requestAnimationFrame(() => {
-      area.focus({ preventScroll: true });
-      const position = area.value.indexOf(snippet, start);
-      area.setSelectionRange(position, position + snippet.length);
-    });
+    const next = insertNarrativeBlock(this.draft().slice(0, start) + this.draft().slice(end), start, snippet);
+    const position = next.indexOf(snippet, start);
+    updateGdrTextarea(area, () => this.draft.set(next), position, position + snippet.length);
   }
+
   public startEditing(range: { start: number; end: number; ownerId?:string; ownerStart?:number; ownerEnd?:number }): void {
     if (!this.editable() || !this.editBlocks() || !range || this.deleting()) return;
     if (this.editing()) {
