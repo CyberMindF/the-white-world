@@ -6,7 +6,16 @@
   border: 1px solid var(--border-color);
   border-radius: 12px;
   background: var(--panel-color);
-  overflow: hidden;
+  overflow: clip;
+}
+.editor-controls {
+  position: sticky;
+  top: max(.5rem, env(safe-area-inset-top));
+  z-index: 3;
+  background: linear-gradient(var(--panel-color), var(--panel-color)), var(--bg-color);
+  border-radius: 11px 11px 0 0;
+  overflow: clip;
+  box-shadow: 0 3px 8px rgb(0 0 0 / 8%);
 }
 .toolbar {
   display: flex;
@@ -83,6 +92,7 @@ details {
 }
 .panes.split {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  height: clamp(20rem, 65svh, 40rem);
 }
 .source-pane,
 .preview-pane {
@@ -96,8 +106,29 @@ details {
   flex-direction: column;
 }
 .split .source-pane {
+  min-height: 0;
+  overflow: hidden;
   border-right: 1px solid var(--border-color);
 }
+.split textarea {
+  height: 100%;
+  min-height: 0;
+  resize: none;
+}
+.split .preview-pane {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.split .preview-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: linear-gradient(var(--panel-color), var(--panel-color)), var(--bg-color);
+}
+.view-tools .btn { flex: 1; min-width: 0; }
+.source-pane > label { flex: none; }
 label,
 .preview-label {
   display: block;
@@ -169,7 +200,15 @@ summary:focus-visible {
 @media (max-width: 760px) {
   .panes.split {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    height: clamp(32rem, 85svh, 48rem);
   }
+  .master-toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .master-toolbar > * { flex: none; }
   .split .source-pane {
     border-right: 0;
     border-bottom: 1px solid var(--border-color);

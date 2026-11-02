@@ -1,94 +1,95 @@
 <div class="editor">
-
-  <div class="toolbar" role="group" aria-label="Inserisci nel testo">
-    <label [for]="editorId() + '-voice'">Personaggio</label>
-    @if (characters()[characterIndex()]?.portrait) {
-      <img
-        class="voice-avatar"
-        [src]="characters()[characterIndex()].portrait"
-        alt="Ritratto del personaggio selezionato"
-      />
-    }
-    <select
-      [id]="editorId() + '-voice'"
-      [ngModel]="characterIndex()"
-      (ngModelChange)="characterIndex.set(+$event)"
-    >
-      @for (character of characters(); track $index) {
-        <option [ngValue]="$index">
-          {{ character.name
-          }}{{ character.kind ? (character.kind === 'pg' ? ' · PG' : ' · PNG') : '' }}
-        </option>
+  <div class="editor-controls">
+    <div class="toolbar" role="group" aria-label="Inserisci nel testo">
+      <label [for]="editorId() + '-voice'">Personaggio</label>
+      @if (characters()[characterIndex()]?.portrait) {
+        <img
+          class="voice-avatar"
+          [src]="characters()[characterIndex()].portrait"
+          alt="Ritratto del personaggio selezionato"
+        />
       }
-      @if (!characters().length) {
-        <option [ngValue]="0">
-          {{ allowGeneric() ? 'Il mio personaggio' : 'Nessun personaggio disponibile' }}
-        </option>
-      }
-    </select>
-    <button
-      class="btn"
-      type="button"
-      [disabled]="!characters().length && !allowGeneric()"
-      (click)="insert('dialogo', sourceArea)"
-    >
-      Dialogo
-    </button>
-    <button class="btn" type="button" (click)="insert('azione', sourceArea)">Azione</button>
-    <button class="btn" type="button" (click)="insert('nota', sourceArea)">
-      Nota
-    </button>
-    @if (!document() && !masterTools() && allowImages()) {
-      <button class="btn" type="button" (click)="insert('image', sourceArea)">Immagine</button>
-    }
-  </div>
-  @if (masterTools() || document()) {
-    <div class="toolbar master-toolbar" role="group" aria-label="Impaginazione della storia">
-      <span class="tools-label">Storia</span>
-      @for (type of blockTypes; track type) {
-        @if (type !== 'image' || allowImages()) {
-          <button class="btn" type="button" (click)="insert(type, sourceArea)">{{ type === 'callout' ? 'Riquadro' : type === 'npc_grid' ? 'Scheda PNG' : snippetLabels[type] }}</button>
+      <select
+        [id]="editorId() + '-voice'"
+        [ngModel]="characterIndex()"
+        (ngModelChange)="characterIndex.set(+$event)"
+      >
+        @for (character of characters(); track $index) {
+          <option [ngValue]="$index">
+            {{ character.name
+            }}{{ character.kind ? (character.kind === 'pg' ? ' · PG' : ' · PNG') : '' }}
+          </option>
         }
+        @if (!characters().length) {
+          <option [ngValue]="0">
+            {{ allowGeneric() ? 'Il mio personaggio' : 'Nessun personaggio disponibile' }}
+          </option>
+        }
+      </select>
+      <button
+        class="btn"
+        type="button"
+        [disabled]="!characters().length && !allowGeneric()"
+        (click)="insert('dialogo', sourceArea)"
+      >
+        Dialogo
+      </button>
+      <button class="btn" type="button" (click)="insert('azione', sourceArea)">Azione</button>
+      <button class="btn" type="button" (click)="insert('nota', sourceArea)">
+        Nota
+      </button>
+      @if (!document() && !masterTools() && allowImages()) {
+        <button class="btn" type="button" (click)="insert('image', sourceArea)">Immagine</button>
       }
-      <button class="btn" type="button" (click)="insert('subtitle', sourceArea)">Sottotitolo</button>
-      <button class="btn" type="button" (click)="insert('emphasis', sourceArea)">Corsivo</button>
     </div>
-  }
+    @if (masterTools() || document()) {
+      <div class="toolbar master-toolbar" role="group" aria-label="Impaginazione della storia">
+        <span class="tools-label">Storia</span>
+        @for (type of blockTypes; track type) {
+          @if (type !== 'image' || allowImages()) {
+            <button class="btn" type="button" (click)="insert(type, sourceArea)">{{ type === 'callout' ? 'Riquadro' : type === 'npc_grid' ? 'Scheda PNG' : snippetLabels[type] }}</button>
+          }
+        }
+        <button class="btn" type="button" (click)="insert('subtitle', sourceArea)">Sottotitolo</button>
+        <button class="btn" type="button" (click)="insert('emphasis', sourceArea)">Corsivo</button>
+      </div>
+    }
+    <div class="view-tools" role="group" aria-label="Visualizzazione editor">
+      <button
+        class="btn"
+        type="button"
+        [attr.aria-pressed]="mode() === 'source'"
+        [disabled]="inlineEditing()"
+        (click)="setMode('source')"
+      >
+        Solo testo
+      </button>
+      <button
+        class="btn"
+        type="button"
+        [attr.aria-pressed]="mode() === 'split'"
+        [disabled]="inlineEditing()"
+        (click)="setMode('split')"
+      >
+        Testo e anteprima
+      </button>
+      <button
+        class="btn"
+        type="button"
+        [attr.aria-pressed]="mode() === 'preview'"
+        [disabled]="inlineEditing() || !source().trim()"
+        (click)="setMode('preview')"
+      >
+        Solo anteprima
+      </button>
+    </div>
+  </div>
   @if (allowImages() && imagePickerOpen()) {
     <div class="image-picker">
       <app-gdr-image-library [images]="images()" [story]="true" (selected)="insertImage($event.src, sourceArea)" />
       <button type="button" class="btn" (click)="imagePickerOpen.set(false)">Chiudi immagini</button>
     </div>
   }
-  <div class="view-tools" role="group" aria-label="Visualizzazione editor">
-    <button
-      class="btn"
-      type="button"
-      [attr.aria-pressed]="mode() === 'source'"
-      [disabled]="inlineEditing()"
-      (click)="mode.set('source')"
-    >
-      Solo testo
-    </button>
-    <button
-      class="btn"
-      type="button"
-      [attr.aria-pressed]="mode() === 'split'"
-      [disabled]="inlineEditing()"
-      (click)="mode.set('split')"
-    >
-      Testo e anteprima
-    </button>
-    <button
-      class="btn"
-      type="button"
-      [attr.aria-pressed]="mode() === 'preview'"
-      [disabled]="inlineEditing() || !source().trim()"
-      (click)="mode.set('preview')"
-    >
-      Solo anteprima
-    </button>
-  </div>
   @if (voiceMessage()) {
     <p class="hint editor-status" role="status">{{ voiceMessage() }}</p>
   }
@@ -99,7 +100,10 @@
         #sourceArea
         [readOnly]="inlineEditing()"
         [id]="editorId()"
-            [rows]="document() || masterTools() ? 18 : 7"
+        [rows]="document() || masterTools() ? 18 : 7"
+        (focus)="setScrollDriver('source')" (pointerdown)="setScrollDriver('source')"
+        (wheel)="setScrollDriver('source')" (keydown)="setScrollDriver('source')"
+        (scroll)="syncScroll('source')"
         [ngModel]="source()"
         (ngModelChange)="sourceChange.emit($event)"
         spellcheck="true"
@@ -107,11 +111,15 @@
       ></textarea>
     </div>
     @if (mode() !== 'source') {
-      <section class="preview-pane avventura-body" [attr.aria-label]="'Anteprima: ' + label()">
+      <section #previewPane class="preview-pane avventura-body" [attr.aria-label]="'Anteprima: ' + label()"
+        [attr.tabindex]="mode() === 'split' ? 0 : null"
+        (focus)="setScrollDriver('preview')" (pointerdown)="setScrollDriver('preview')"
+        (wheel)="setScrollDriver('preview')" (keydown)="setScrollDriver('preview')"
+        (scroll)="syncScroll('preview')">
         <div class="preview-heading">
           <p class="preview-label">Anteprima</p>
           @if (mode() === 'preview') {
-            <button class="btn" type="button" [disabled]="inlineEditing()" (click)="mode.set('source')">Torna al testo</button>
+            <button class="btn" type="button" [disabled]="inlineEditing()" (click)="setMode('source')">Torna al testo</button>
           }
         </div>
         @if (source().trim()) {

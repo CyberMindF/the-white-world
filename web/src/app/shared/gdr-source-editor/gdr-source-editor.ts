@@ -1,4 +1,4 @@
-import { Component, computed, effect, input, output, signal } from '@angular/core';
+import { Component, ElementRef, computed, effect, input, output, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { updateGdrTextarea } from '../gdr-textarea';
 import { GdrTurn } from '../gdr-turn/gdr-turn';
@@ -33,6 +33,10 @@ export class GdrSourceEditor {
   protected readonly characterIndex = signal(0);
   protected readonly voiceMessage = signal('');
   protected readonly imagePickerOpen = signal(false);
+  private readonly sourceArea = viewChild<ElementRef<HTMLTextAreaElement>>('sourceArea');
+  private readonly previewPane = viewChild<ElementRef<HTMLElement>>('previewPane');
+  private scrollDriver: 'source' | 'preview' = 'source';
+  private readonly syncedPositions = new WeakMap<HTMLElement, number>();
   private readonly parsed = computed(() => parseNarrative(this.source()));
   protected readonly errors = computed(() => this.parsed().errors);
   protected readonly recognized = computed(() =>
@@ -49,9 +53,42 @@ export class GdrSourceEditor {
     effect(() => {
       if (this.characterIndex() >= this.characters().length) this.characterIndex.set(0);
     });
+    effect(() => {
+      this.source();
+      if (this.mode() === 'split' && this.previewPane())
+        requestAnimationFrame(() => this.syncScroll('source', true));
+    });
+  }
+  protected setMode(mode: 'split' | 'source' | 'preview'): void {
+    const area = this.sourceArea()?.nativeElement, preview = this.previewPane()?.nativeElement;
+    if (area) this.syncedPositions.delete(area);
+    if (preview) this.syncedPositions.delete(preview);
+    this.scrollDriver = 'source';
+    this.mode.set(mode);
+  }
+  protected setScrollDriver(origin: 'source' | 'preview'): void {
+    this.scrollDriver = origin;
+  }
+  protected syncScroll(origin: 'source' | 'preview', force = false): void {
+    if (this.mode() !== 'split' || (!force && origin !== this.scrollDriver)) return;
+    const area = this.sourceArea()?.nativeElement, preview = this.previewPane()?.nativeElement;
+    if (!area || !preview) return;
+    const from = origin === 'source' ? area : preview, to = origin === 'source' ? preview : area;
+    // Ignora l’evento generato dal pannello che abbiamo appena spostato: evita rimbalzi.
+    const programmed = this.syncedPositions.get(from);
+    if (programmed !== undefined) {
+      this.syncedPositions.delete(from);
+      if (!force && Math.abs(from.scrollTop - programmed) < 1) return;
+    }
+    const sourceRange = from.scrollHeight - from.clientHeight;
+    const targetRange = to.scrollHeight - to.clientHeight;
+    const top = sourceRange > 0 ? from.scrollTop / sourceRange * Math.max(0, targetRange) : 0;
+    if (Math.abs(to.scrollTop - top) < 1) return;
+    to.scrollTop = top;
+    this.syncedPositions.set(to, to.scrollTop);
   }
   public openPreview(): void {
-    if (this.source().trim() && !this.inlineEditing()) this.mode.set('preview');
+    if (this.source().trim() && !this.inlineEditing()) this.setMode('preview');
   }
   protected insertImage(src: string, area: HTMLTextAreaElement): void {
     if (!this.allowImages() || !safeNarrativeImage(src)) return;
@@ -92,7 +129,7 @@ export class GdrSourceEditor {
     const contentLength = fenced ? snippet.lastIndexOf('\n') - contentOffset : type === 'emphasis' ? snippet.length - 2 : snippet.length - contentOffset;
     updateGdrTextarea(area, () => {
       this.sourceChange.emit(replacement.source);
-      this.mode.set(this.mode() === 'preview' ? 'split' : this.mode());
+      this.setMode(this.mode() === 'preview' ? 'split' : this.mode());
     }, replacement.start + contentOffset, replacement.start + contentOffset + contentLength);
   }
 }
