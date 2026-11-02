@@ -57,6 +57,12 @@ export class GdrCharacters {
     });
   }
   protected readonly statKeys = ['statMente', 'statCuore', 'statCorpo', 'statMagia'];
+  private readonly statLabels: Record<string, string> = {
+    statMente: '🧠 Mente',
+    statCuore: '💛 Cuore',
+    statCorpo: '⚡ Corpo',
+    statMagia: '✨ Magia',
+  };
   protected readonly statDraft = signal<Record<string, string>>({});
   protected readonly statsDirty = signal(false);
   protected readonly statsBudget = signal(12);
@@ -121,7 +127,7 @@ export class GdrCharacters {
       ? this.fields().filter(
           (f) =>
             !/^(name|nome|surname|cognome|nome_personaggio|character_name|inventory)$/i.test(f.key),
-        )
+        ).map(f => this.statLabels[f.key] ? { ...f, label: this.statLabels[f.key] } : f)
       : [],
   );
   protected changeField(key: string, value: string): void {

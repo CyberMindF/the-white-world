@@ -124,6 +124,7 @@ describe('gestione personaggi del master', () => {
     workspace.characters.set([{...character('ada','Ada'),revision:2,statsEditable:true,statsBudget:12,canEditStats:true,characterFields:Object.fromEntries(fields.map(f=>[f.key,'1']))}]);
     fixture.componentRef.setInput('managementMode',false);fixture.componentRef.setInput('fields',fields);fixture.detectChanges();await fixture.whenStable();
     expect(button('Conferma caratteristiche').disabled).toBe(true);
+    for (const label of ['🧠 Mente', '💛 Cuore', '⚡ Corpo', '✨ Magia']) expect(fixture.nativeElement.textContent).toContain(label);
     for(const field of fields){const input=fixture.nativeElement.querySelector('#base-'+field.key) as HTMLInputElement;input.value='3';input.dispatchEvent(new Event('input'));}
     fixture.detectChanges();await fixture.whenStable();expect(button('Conferma caratteristiche').disabled).toBe(false);expect(button('Modifica personaggio').disabled).toBe(true);
     button('Annulla distribuzione').click();fixture.detectChanges();
