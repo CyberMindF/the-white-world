@@ -77,16 +77,13 @@ try {
     await editor.evaluate(el=>el.scrollIntoView({block:'start'}));
     await page.screenshot({path:join(screenshots,`split-${width}.png`)});
     await editor.getByRole('button',{name:'Solo testo',exact:true}).click();
-    // Simula l’allargamento manuale della casella: la toolbar deve seguire la pagina.
+    // La barra scorre normalmente con la pagina, anche con una casella allargata.
     await area.evaluate(el=>{el.style.height='1800px';el.style.flex='none';});
     await editor.evaluate(el=>window.scrollTo(0,window.scrollY+el.getBoundingClientRect().top+450));await settled();
     const tools=editor.locator('.editor-controls'),bounds=await tools.boundingBox();
-    assert.ok(bounds.y>=0 && bounds.y<20,`Barra fissa ${width}: ${JSON.stringify(bounds)}`);
-    const button=editor.getByRole('button',{name:'Titolo',exact:true});
-    assert.equal(await button.evaluate(el=>{const r=el.getBoundingClientRect();return el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));}),true,`Comando raggiungibile ${width}`);
-    await page.screenshot({path:join(screenshots,`toolbar-${width}.png`)});
+    assert.ok(bounds.y < -200,`La barra non deve restare fissa ${width}: ${JSON.stringify(bounds)}`);
     await area.evaluate(el=>{el.style.height='';el.style.flex='';});
   }
-  assert.deepEqual(errors,[]);console.log(`PASS: toolbar sempre raggiungibile, editor contenuto e scroll sincronizzato bidirezionale a 1280/390/320px. Screenshot: ${screenshots}`);
+  assert.deepEqual(errors,[]);console.log(`PASS: barra non fissa, editor contenuto e scroll sincronizzato bidirezionale a 1280/390/320px. Screenshot: ${screenshots}`);
 }catch(error){await page.screenshot({path:join(screenshots,'errore.png')});console.error('Screenshot:',screenshots);console.error('Browser errors:',errors);throw error;}
 finally{await browser.close();await new Promise(resolve=>server.close(resolve));harness.sqlite.close();}

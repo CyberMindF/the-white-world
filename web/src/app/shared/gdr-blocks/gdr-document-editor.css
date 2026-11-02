@@ -4,7 +4,7 @@
 .gdr-admin-section { width: min(100%, 72rem); margin: clamp(3rem, 6vw, 4rem) auto 0; display: grid; gap: 1rem; }
 .gdr-admin-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .8rem; }
 
-.gdr-admin-toolbar { position: sticky; top: max(.5rem, env(safe-area-inset-top)); z-index: 2; display: flex; flex-wrap: wrap; gap: .4rem; padding: .5rem; background: linear-gradient(var(--panel-color), var(--panel-color)), var(--bg-color); border-radius: .65rem; }
+.gdr-admin-toolbar { display: flex; flex-wrap: wrap; gap: .4rem; }
 .gdr-admin-toolbar .btn { padding: .4rem .7rem; font-size: .82rem; }
 
 .gdr-admin-split {
