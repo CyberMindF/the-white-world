@@ -19,7 +19,14 @@
   margin-top: 1.5rem;
 }
 .gdr-turn-section { border-top: 0; margin-top: 0; padding-top: 0; }
-.gdr-thread { gap: 2rem; }
+.gdr-thread { display: block; }
+.gdr-turn-divider {
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--accent-color) 45%, var(--border-color));
+  margin: 1.6rem 0;
+}
+.published-turn-editor { min-width: 0; padding: 0; margin: 0; border: 0; }
+.published-turn-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .6rem; margin-top: .8rem; }
 .gdr-turn.is-story { padding: 0; border: 0; border-radius: 0; background: transparent; }
 .gdr-turn.is-story .gdr-turn-meta { margin: 0 0 1.15rem; }
 .lab-composer > h3 {

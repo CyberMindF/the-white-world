@@ -96,24 +96,25 @@ async function changeTurn(context, deleting) {
   try {
     const session=await getAuthenticatedSession(context.request,context.env);
     if(!session) return json({error:'Sessione non valida o scaduta.'},401);
-    if(session.user.role!=='admin' || session.user.isTest) return json({error:'Solo il master può modificare il proprio racconto.'},403);
+    if(session.user.isTest || session.impersonation) return json({error:'Questa sessione non può modificare gli interventi.'},403);
+    if(deleting && session.user.role!=='admin') return json({error:'Solo il master può eliminare il proprio racconto.'},403);
     const payload=await readJson(context.request);
     if(!Number.isSafeInteger(payload?.id) || payload.id<=0 || typeof payload.expectedBody!=='string' || payload.expectedBody.length>MAX_BODY_LENGTH) return json({error:'Intervento non valido.'},400);
     const adventure=normalizeAdventure(payload.adventure);
     const turn=await context.env.DB.prepare('SELECT id,author_id,body FROM gdr_turns WHERE id=? AND adventure=?').bind(payload.id,adventure).first();
     if(!turn) return json({error:'Intervento non trovato.'},404);
-    if(turn.author_id!==session.user.id) return json({error:'Puoi modificare solo il tuo racconto.'},403);
+    if(turn.author_id!==session.user.id) return json({error:'Puoi modificare solo i tuoi interventi.'},403);
     const body=deleting?'':normalizeRequiredText(payload.body,MAX_BODY_LENGTH);
     if(!deleting && !body) return json({error:'Il testo è vuoto o troppo lungo.'},400);
-    const result=await context.env.DB.prepare(deleting?'DELETE FROM gdr_turns WHERE id=? AND adventure=? AND body=?':'UPDATE gdr_turns SET body=? WHERE id=? AND adventure=? AND body=?')
-      .bind(...(deleting?[turn.id,adventure,payload.expectedBody]:[body,turn.id,adventure,payload.expectedBody])).run();
-    if(!result.meta.changes) return json({error:'Il racconto è cambiato. Ricarica prima di modificarlo.'},409);
+    const result=await context.env.DB.prepare(deleting?'DELETE FROM gdr_turns WHERE id=? AND adventure=? AND author_id=? AND body=?':'UPDATE gdr_turns SET body=? WHERE id=? AND adventure=? AND author_id=? AND body=?')
+      .bind(...(deleting?[turn.id,adventure,session.user.id,payload.expectedBody]:[body,turn.id,adventure,session.user.id,payload.expectedBody])).run();
+    if(!result.meta.changes) return json({error:'Il turno è cambiato. Ricarica prima di modificarlo.'},409);
     context.waitUntil(recordEvent(context.env,{userId:session.user.id,sessionId:session.sessionId},{section:'gdr',eventType:deleting?'content_deleted':'content_updated',metadata:{turnId:turn.id,adventure}}));
     context.waitUntil(notifyRealtime(context.env,{type:'gdr-turns:changed',action:deleting?'deleted':'updated',actorUserId:session.user.id,adventure,turnId:turn.id}));
     return json({saved:true,deleted:deleting,id:turn.id});
   } catch(error) {
     console.error(JSON.stringify({event:'gdr_turn_change_error',message:error.message}));
-    return json({error:'Non è stato possibile aggiornare il racconto.'},500);
+    return json({error:'Non è stato possibile aggiornare il turno.'},500);
   }
 }
 

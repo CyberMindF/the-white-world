@@ -28,6 +28,13 @@ class TurnPage extends GdrLaboratorio {
   privateDraft(source:string){this.updateDocument(source);}
   seedTurn(turn:{id:number;author:string;isMine:boolean;isMaster:boolean;body:string;createdAt:string}) {this.turns.set([turn]);}
   removeTurnPart(body:string) {return this.savePublishedTurn(this.turns()[0],body);}
+  beginPlayerEdit(){this.editPlayerTurn(this.turns()[0]);}
+  changePlayerEdit(body:string){this.playerTurnDraft.set(body);}
+  previewPlayerEdit(){this.playerTurnPreview.set(true);}
+  savePlayerEdit(){return this.savePlayerTurnEdit();}
+  cancelPlayerEdit(){this.cancelPlayerTurnEdit();}
+  canChange(turn=this.turns()[0]){return this.canEditPublishedTurn(turn);}
+  editingPlayerState(){return {turn:this.playerTurnEdit(),draft:this.playerTurnDraft(),error:this.playerTurnEditError(),id:this.publishedEditId()};}
   state() { return { local: this.local(), turns: this.turns(), status: this.status(), error: this.turnsError() }; }
 }
 function create(live = true, player = false) {
@@ -72,6 +79,27 @@ describe('invio dei turni della partita reale', () => {
     const page=create();page.seedTurn({id:8,author:'Rory',isMine:true,isMaster:true,body:'Prima.\n\nDopo.',createdAt:'2026-11-02T00:00:00Z'});
     await page.removeTurnPart('Dopo.');expect(fetchMock.mock.calls[0][1].method).toBe('PUT');expect(page.state().turns[0].body).toBe('Dopo.');
     await page.removeTurnPart('');expect(fetchMock.mock.calls[1][1].method).toBe('DELETE');expect(page.state().turns).toHaveLength(0);
+  });
+  it('la giocatrice modifica il proprio turno dopo l’anteprima senza inviarne uno nuovo o perdere la bozza successiva',async()=>{
+    const fetchMock=vi.fn().mockResolvedValue(reply({saved:true}));vi.stubGlobal('fetch',fetchMock);
+    const page=create(true,true);page.seedTurn({id:8,author:'Desy',isMine:true,isMaster:false,body:'Prima risposta.',createdAt:'2026-11-01T12:00:00Z'});page.draft('Il prossimo turno.');
+    page.beginPlayerEdit();page.changePlayerEdit('Risposta corretta.');await page.savePlayerEdit();expect(fetchMock).not.toHaveBeenCalled();
+    page.previewPlayerEdit();await page.savePlayerEdit();
+    expect(fetchMock.mock.calls[0][1].method).toBe('PUT');expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({id:8,adventure:'il-prezzo-della-verita',expectedBody:'Prima risposta.',body:'Risposta corretta.'});
+    expect(page.state().turns).toHaveLength(1);expect(page.state().turns[0].body).toBe('Risposta corretta.');expect(page.state().turns[0].createdAt).toBe('2026-11-01T12:00:00Z');
+    expect(page.editingPlayerState().turn).toBeNull();expect(page.state().local.draft).toBe('Il prossimo turno.');
+  });
+  it('un errore conserva la modifica player; Annulla ripristina la lettura del testo pubblicato',async()=>{
+    vi.stubGlobal('fetch',vi.fn().mockResolvedValue(reply({error:'Il turno è cambiato.'},409)));
+    const page=create(true,true);page.seedTurn({id:8,author:'Desy',isMine:true,isMaster:false,body:'Testo pubblicato.',createdAt:'2026-11-01T12:00:00Z'});
+    page.beginPlayerEdit();page.changePlayerEdit('Da conservare.');page.previewPlayerEdit();await page.savePlayerEdit();
+    expect(page.editingPlayerState().draft).toBe('Da conservare.');expect(page.editingPlayerState().error).toContain('Il turno è cambiato.');expect(page.state().turns[0].body).toBe('Testo pubblicato.');
+    page.cancelPlayerEdit();expect(page.editingPlayerState().turn).toBeNull();expect(page.editingPlayerState().id).toBeNull();expect(page.state().turns[0].body).toBe('Testo pubblicato.');
+  });
+  it('i comandi di modifica restano personali e l’impersonificazione resta in sola lettura',()=>{
+    const page=create(true,true);page.seedTurn({id:8,author:'Rory',isMine:false,isMaster:true,body:'Racconto.',createdAt:'2026-11-01T12:00:00Z'});expect(page.canChange()).toBe(false);
+    page.seedTurn({id:9,author:'Desy',isMine:true,isMaster:false,body:'Risposta.',createdAt:'2026-11-01T12:00:00Z'});expect(page.canChange()).toBe(true);
+    TestBed.inject(AuthService).impersonation.set({actorId:1,actorNickname:'Rory',readOnly:true});expect(page.canChange()).toBe(false);
   });
   it('la giocatrice conserva gli strumenti semplici e i propri appunti modificabili',()=>{
     const page=create(true,true);expect(page.tools()).toEqual({master:false,notesReadOnly:false});

@@ -216,23 +216,50 @@
             <button class="btn" (click)="select(selected())">Riprova la cronologia</button>
           }
           <div class="gdr-thread">
-            @for (turn of turns(); track $index) {
+            @for (turn of turns(); track turn.id ?? $index) {
+              <hr class="gdr-turn-divider" />
               <article class="gdr-turn" [class.is-mine]="turn.isMine" [class.is-story]="turn.isMaster">
                 <div class="gdr-turn-meta">
                   <span class="gdr-turn-author">{{ turn.isMaster ? 'Racconto · Master' : turn.isMine ? 'Tu' : turn.author }}</span
                   ><span class="gdr-turn-date">{{ formatDate(turn.createdAt) }}</span>
                 </div>
-                <app-gdr-turn [source]="turn.body"
-                  [editable]="canPrepare() && turn.isMine && !!turn.isMaster && !contentSaving() && !readingEdit() && !documentEdit() && !turnEdit() && (publishedEditId() === null || publishedEditId() === turn.id)"
-                  [deletable]="canPrepare() && turn.isMine && !!turn.isMaster"
-                  deletionScope="partita"
-                  [characters]="characters()"
-                  [allowGeneric]="!workspace.available()"
-                  (sourceChange)="savePublishedTurn(turn, $event)"
-                  (editingChange)="publishedEditId.set($event ? turn.id ?? null : null)" />
+                @if (playerTurnEdit()?.id === turn.id && playerTurnEdit()) {
+                  <fieldset class="published-turn-editor" [disabled]="contentSaving()">
+                    <app-gdr-source-editor #publishedPlayerComposer
+                      [editorId]="'edit-turn-' + turn.id" label="Modifica il tuo turno"
+                      [source]="playerTurnDraft()" (sourceChange)="playerTurnDraft.set($event)"
+                      [characters]="characters()" [allowGeneric]="!workspace.available()"
+                      (modeChange)="playerTurnPreview.set($event === 'preview')"
+                      (editingChange)="playerTurnInline.set($event)" />
+                    @if (playerTurnEditError()) { <p class="lab-error" role="alert">{{ playerTurnEditError() }}</p> }
+                    <div class="published-turn-actions">
+                      <button class="btn" (click)="cancelPlayerTurnEdit()">Annulla</button>
+                      <button class="btn" [disabled]="invalidPlayerTurn() || playerTurnInline()"
+                        (click)="playerTurnPreview() ? savePlayerTurnEdit() : publishedPlayerComposer.openPreview()">
+                        {{ contentSaving() ? 'Salvataggio…' : playerTurnPreview() ? 'Salva modifiche' : 'Anteprima' }}
+                      </button>
+                    </div>
+                  </fieldset>
+                } @else {
+                  <app-gdr-turn [source]="turn.body"
+                    [editable]="canPrepare() && !!turn.isMaster && publishedTurnEditable(turn)"
+                    [insertable]="canPrepare() && turn.isMine && !!turn.isMaster"
+                    [deletable]="canPrepare() && turn.isMine && !!turn.isMaster"
+                    deletionScope="partita"
+                    [characters]="characters()"
+                    [allowGeneric]="!workspace.available()"
+                    (sourceChange)="savePublishedTurn(turn, $event)"
+                    (editingChange)="publishedEditId.set($event ? turn.id ?? null : null)" />
+                  @if (!turn.isMaster && turn.isMine && turn.id) {
+                    <div class="published-turn-actions">
+                      <button class="lab-text-command" [disabled]="!publishedTurnEditable(turn)" (click)="editPlayerTurn(turn)">Modifica il tuo turno</button>
+                    </div>
+                  }
+                }
               </article>
             }
             @for (turn of local().turns; track turn.id) {
+              <hr class="gdr-turn-divider" />
               <article class="gdr-turn is-mine lab-local-turn">
                 <div class="gdr-turn-meta">
                   <span class="gdr-turn-author">{{ turn.author }} · prova locale</span

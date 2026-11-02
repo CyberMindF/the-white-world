@@ -136,6 +136,13 @@ export class GdrLaboratorio implements OnInit {
   protected readonly contentSaving = signal(false);
   protected readonly failedStoryChange = signal<{id:string;beforeId?:string;source:string}|null>(null);
   protected readonly publishedEditId = signal<number | null>(null);
+  protected readonly playerTurnEdit = signal<ExistingTurn | null>(null);
+  protected readonly playerTurnDraft = signal('');
+  protected readonly playerTurnPreview = signal(false);
+  protected readonly playerTurnInline = signal(false);
+  protected readonly playerTurnEditError = signal('');
+  private readonly playerTurnMissing = signal(false);
+  protected readonly invalidPlayerTurn = computed(() => this.playerTurnMissing() || !this.playerTurnDraft().trim() || this.playerTurnDraft().length > 20000 || parseNarrative(this.playerTurnDraft()).errors.length > 0);
   private readonly realtime = inject(RealtimeService);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly inlineBusy = computed(
@@ -454,8 +461,16 @@ export class GdrLaboratorio implements OnInit {
     try {
       const data = await this.read<{ turns: ExistingTurn[] }>(`/api/gdr/turns?adventure=${encodeURIComponent(id)}`);
       if (id !== this.selected() || version !== this.turnsRequestVersion) return;
-      this.turns.set(data.turns ?? []);
-      if(this.publishedEditId() !== null && !this.turns().some(turn=>turn.id===this.publishedEditId())) this.publishedEditId.set(null);
+      const turns = data.turns ?? [], edit = this.playerTurnEdit();
+      const missing = !!edit && !turns.some(turn => turn.id === edit.id);
+      if (missing) {
+        const index = this.turns().findIndex(turn => turn.id === edit.id);
+        turns.splice(index < 0 ? turns.length : Math.min(index, turns.length), 0, edit);
+        this.playerTurnEditError.set('Il turno non è più disponibile. Il testo in modifica è conservato qui: puoi copiarlo o annullare.');
+      } else if (this.playerTurnMissing()) this.playerTurnEditError.set('');
+      this.playerTurnMissing.set(missing);
+      this.turns.set(turns);
+      if(this.publishedEditId() !== null && !this.playerTurnEdit() && !this.turns().some(turn=>turn.id===this.publishedEditId())) this.publishedEditId.set(null);
       this.turnsError.set('');
     } catch {
       if (id === this.selected() && version === this.turnsRequestVersion)
@@ -521,17 +536,53 @@ export class GdrLaboratorio implements OnInit {
       const pending={...change,id:''};this.failedStoryChange.set(pending);try{localStorage.setItem(this.pendingStoryKey,JSON.stringify(pending));}catch{}
     }finally{this.contentSaving.set(false);}
   }
-  protected async savePublishedTurn(turn: ExistingTurn, body: string): Promise<void> {
-    if (!this.canPrepare() || !turn.isMine || !turn.isMaster || !turn.id || this.contentSaving()) return;
+  protected canEditPublishedTurn(turn: ExistingTurn): boolean {
+    return this.liveGame && !!turn.id && turn.isMine && !this.safe.enabled() && !this.auth.currentUser()?.isTest && !this.auth.impersonation();
+  }
+  protected publishedTurnEditable(turn: ExistingTurn): boolean {
+    return this.canEditPublishedTurn(turn) && !this.contentSaving() && !this.sendingTurn() && !this.readingEdit() && !this.documentEdit() && !this.turnEdit() &&
+      (this.publishedEditId() === null || this.publishedEditId() === turn.id);
+  }
+  protected editPlayerTurn(turn: ExistingTurn): void {
+    if (turn.isMaster || !this.publishedTurnEditable(turn)) return;
+    this.playerTurnMissing.set(false);
+    this.playerTurnEdit.set({...turn});
+    this.playerTurnDraft.set(turn.body);
+    this.playerTurnPreview.set(false);
+    this.playerTurnInline.set(false);
+    this.playerTurnEditError.set('');
+    this.publishedEditId.set(turn.id!);
+  }
+  protected cancelPlayerTurnEdit(): void {
+    if (this.contentSaving()) return;
+    const edit = this.playerTurnEdit();
+    if (this.playerTurnMissing() && edit) this.turns.update(turns => turns.filter(turn => turn.id !== edit.id));
+    this.playerTurnMissing.set(false);
+    this.playerTurnEdit.set(null);
+    this.playerTurnDraft.set('');
+    this.playerTurnInline.set(false);
+    this.playerTurnEditError.set('');
+    this.publishedEditId.set(null);
+  }
+  protected async savePlayerTurnEdit(): Promise<void> {
+    const turn = this.playerTurnEdit();
+    if (!turn || !this.playerTurnPreview() || this.playerTurnInline() || this.invalidPlayerTurn()) return;
+    if (await this.savePublishedTurn(turn, this.playerTurnDraft())) this.cancelPlayerTurnEdit();
+    else this.playerTurnEditError.set(this.status());
+  }
+  protected async savePublishedTurn(turn: ExistingTurn, body: string): Promise<boolean> {
+    if (!this.canEditPublishedTurn(turn) || this.contentSaving() || (turn.isMaster && !this.canPrepare()) || (!body.trim() && !this.canPrepare())) return false;
     this.contentSaving.set(true);
     try {
       const response=await fetch('/api/gdr/turns',{method:body.trim()?'PUT':'DELETE',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:turn.id,adventure:this.selected(),expectedBody:turn.body,body})});
       const result=await response.json();
-      if(!response.ok) throw new Error(result.error || 'Non è stato possibile aggiornare il racconto.');
+      if(!response.ok) throw new Error(result.error || 'Non è stato possibile aggiornare il turno.');
       this.turns.update(turns=>body.trim()?turns.map(t=>t.id===turn.id?{...t,body:body.trim()}:t):turns.filter(t=>t.id!==turn.id));
-      this.status.set(body.trim()?'Racconto aggiornato nella partita, per entrambi.':'Intervento eliminato dalla partita, per entrambi.');
+      this.status.set(body.trim() ? (turn.isMaster ? 'Racconto aggiornato nella partita, per entrambi.' : 'Turno aggiornato nella partita, per entrambi.') : 'Intervento eliminato dalla partita, per entrambi.');
+      return true;
     } catch(error) {
       this.status.set(error instanceof Error ? error.message : 'Aggiornamento non riuscito.');
+      return false;
     } finally { this.contentSaving.set(false); }
   }
   protected async publish(): Promise<void> {

@@ -6,7 +6,7 @@ import {readFileSync} from 'node:fs';
 function fixture() {
   const sqlite=new DatabaseSync(':memory:');
   sqlite.exec(`CREATE TABLE users(id INTEGER PRIMARY KEY,nickname TEXT,role TEXT,is_test INTEGER);
-    INSERT INTO users VALUES(1,'Rory','admin',0),(2,'Desy','member',0),(3,'Test','admin',1);
+    INSERT INTO users VALUES(1,'Rory','admin',0),(2,'Desy','member',0),(3,'Test','admin',1),(4,'Altra giocatrice','member',0);
     CREATE TABLE gdr_turns(id INTEGER PRIMARY KEY,author_id INTEGER,adventure TEXT,body TEXT,created_at TEXT);`);
   const db={prepare(sql){return{bind(...args){return{
     async all(){return {results:sqlite.prepare(sql).all(...args)};},
@@ -15,7 +15,7 @@ function fixture() {
   };}};}};
   const session=async request=>{
     const row=sqlite.prepare('SELECT * FROM users WHERE id=?').get(Number(request.headers.get('x-user')));
-    return row?{user:{...row,isTest:!!row.is_test},sessionId:'test'}:null;
+    return row?{user:{...row,isTest:!!row.is_test},sessionId:'test',...(request.headers.has('x-impersonation')?{impersonation:{readOnly:true}}:{})}:null;
   };
   const source=readFileSync(new URL('./turns.js',import.meta.url),'utf8').replace(/^import[\s\S]*?;\s*/gm,'').replace(/export /g,'');
   const api=new Function('getAuthenticatedSession','json','readJson','recordEvent','notifyRealtime',source+';return {onRequestGet,onRequestPost,onRequestPut,onRequestDelete};')(
@@ -25,7 +25,7 @@ function fixture() {
     const form=new FormData();if(body!==undefined){form.set('body',body);form.set('isMaster','true');}
     return (body===undefined?api.onRequestGet:api.onRequestPost)({env:{DB:db},waitUntil(){},request:new Request('https://test/api/gdr/turns',{method:body===undefined?'GET':'POST',headers:{'x-user':String(user)},...(body===undefined?{}:{body:form})})});
   };
-  const change=(user,method,payload)=>(method==='DELETE'?api.onRequestDelete:api.onRequestPut)({env:{DB:db},waitUntil(){},request:new Request('https://test/api/gdr/turns',{method,headers:{'x-user':String(user),'Content-Type':'application/json'},body:JSON.stringify(payload)})});
+  const change=(user,method,payload,extra={})=>(method==='DELETE'?api.onRequestDelete:api.onRequestPut)({env:{DB:db},waitUntil(){},request:new Request('https://test/api/gdr/turns',{method,headers:{'x-user':String(user),'Content-Type':'application/json',...extra},body:JSON.stringify(payload)})});
   return {sqlite,call,change};
 }
 
@@ -61,4 +61,32 @@ test('l’etichetta master dipende dall’autore autenticato, anche per i turni 
   h.sqlite.prepare('INSERT INTO gdr_turns(author_id,adventure,body,created_at) VALUES(?,?,?,?)').run(1,'il-prezzo-della-verita','Vecchio seguito della storia','2026-10-31T12:00:00Z');
   assert.equal((await (await h.call(2)).json()).turns[0].isMaster,true);
   assert.equal((await (await h.call(3,'Prova')).json()).isMaster,false);h.sqlite.close();
+});
+
+test('Desy modifica soltanto il proprio turno; autore, data e ordine restano invariati e la modifica è condivisa',async()=>{
+ const h=fixture();const first=await (await h.call(2,'Prima risposta.')).json();await h.call(1,'Il master continua.');
+ const before=h.sqlite.prepare('SELECT * FROM gdr_turns WHERE id=?').get(first.turnId);
+ const payload={id:first.turnId,adventure:'il-prezzo-della-verita',expectedBody:before.body,body:'Risposta corretta.\n\n::: azione\nAccarezzo Sally.\n:::'};
+ assert.equal((await h.change(4,'PUT',payload)).status,403);
+ assert.equal((await h.change(1,'PUT',payload)).status,403);
+ assert.equal((await h.change(2,'PUT',payload,{'x-impersonation':'1'})).status,403);
+ assert.equal((await h.change(2,'PUT',payload)).status,200);
+ const after=h.sqlite.prepare('SELECT * FROM gdr_turns WHERE id=?').get(first.turnId);
+ assert.equal(after.author_id,before.author_id);assert.equal(after.created_at,before.created_at);
+ for(const user of [1,2]){
+  const turns=(await (await h.call(user)).json()).turns;assert.deepEqual(turns.map(t=>t.id),[first.turnId,first.turnId+1]);assert.equal(turns[0].body,payload.body);assert.equal(turns[0].isMaster,false);
+ }
+ assert.equal((await h.change(2,'PUT',{...payload,body:'Vecchia scheda'})).status,409);
+ assert.equal((await h.change(2,'DELETE',{...payload,expectedBody:after.body})).status,403);
+ assert.equal(h.sqlite.prepare('SELECT body FROM gdr_turns WHERE id=?').get(first.turnId).body,payload.body);
+ h.sqlite.close();
+});
+test('modifica player: testo vuoto o troppo lungo, avventura errata, account test e turni altrui non vengono salvati',async()=>{
+ const h=fixture();const mine=await (await h.call(2,'Risposta originale.')).json(), master=await (await h.call(1,'Storia originale.')).json();
+ const payload={id:mine.turnId,expectedBody:'Risposta originale.',body:'Nuovo testo'};
+ for(const body of ['', '   ', 'x'.repeat(20001)]) assert.equal((await h.change(2,'PUT',{...payload,body})).status,400);
+ assert.equal((await h.change(2,'PUT',{...payload,adventure:'altra-avventura'})).status,404);
+ assert.equal((await h.change(3,'PUT',payload)).status,403);
+ assert.equal((await h.change(2,'PUT',{id:master.turnId,expectedBody:'Storia originale.',body:'No'})).status,403);
+ assert.equal(h.sqlite.prepare('SELECT body FROM gdr_turns WHERE id=?').get(mine.turnId).body,'Risposta originale.');h.sqlite.close();
 });
