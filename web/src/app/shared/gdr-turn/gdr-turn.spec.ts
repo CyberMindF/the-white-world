@@ -97,6 +97,42 @@ describe('eliminazione dei blocchi della storia',()=>{
   area.value=source;area.dispatchEvent(new Event('input'));fixture.detectChanges();buttons('Applica al testo')[0].click();
   expect(save).toHaveBeenCalledWith({id:'22',source});expect(privateCopy).not.toHaveBeenCalled();
  });
+ it.each([
+  ['Aggiungi sopra',0,'41'],['Aggiungi sopra',1,'76'],['Aggiungi sotto',0,'76'],['Aggiungi sotto',1,undefined],
+ ])('inserisce da modifica con %s sul blocco %s senza righe di + nella lettura',async(label,index,beforeId)=>{
+  const blocks:GdrBlockRow[]=[{id:'41',documentKey:'avventura',position:0,type:'paragraph',data:{text:'Prima.'}},{id:'76',documentKey:'avventura',position:1,type:'paragraph',data:{text:'Dopo.'}}];
+  const {fixture,buttons}=setup(serializeGdrBlocks(blocks));fixture.componentRef.setInput('insertable',true);fixture.componentRef.setInput('persistedBlocks',blocks);fixture.detectChanges();
+  const insert=vi.fn(),copy=vi.fn();fixture.componentInstance.insertBlock.subscribe(insert);fixture.componentInstance.sourceChange.subscribe(copy);
+  expect(fixture.nativeElement.querySelector('.insertion-point')).toBeNull();expect(buttons('Aggiungi sopra')).toHaveLength(0);expect(buttons('Aggiungi sotto')).toHaveLength(0);
+  fixture.nativeElement.querySelectorAll('button.gdr-edit-start')[index].click();fixture.detectChanges();await fixture.whenStable();
+  buttons(label)[0].click();fixture.detectChanges();await fixture.whenStable();
+  expect(fixture.nativeElement.querySelectorAll('.inline-editor')).toHaveLength(1);
+  const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;area.value='Nuovo blocco.';area.dispatchEvent(new Event('input'));fixture.detectChanges();
+  buttons('Aggiungi al racconto')[0].click();expect(insert).toHaveBeenCalledWith({beforeId,source:'Nuovo blocco.'});expect(copy).not.toHaveBeenCalled();
+  expect(blocks.map(b=>b.id)).toEqual(['41','76']);
+ });
+ it('aggiunge sotto un blocco nel turno pubblicato senza riscrivere dialoghi o ritorni a capo esistenti',async()=>{
+  const source='Prima.\r\n\r\n::: dialogo Ada\r\nCiao.\r\n:::';
+  const {fixture,buttons}=setup(source);fixture.componentRef.setInput('insertable',true);fixture.detectChanges();
+  fixture.nativeElement.querySelector('button.edit-speaker').click();fixture.detectChanges();await fixture.whenStable();buttons('Aggiungi sotto')[0].click();fixture.detectChanges();await fixture.whenStable();
+  const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;area.value='Dopo.';area.dispatchEvent(new Event('input'));fixture.detectChanges();
+  const save=vi.fn();fixture.componentInstance.sourceChange.subscribe(save);buttons('Aggiungi al racconto')[0].click();expect(save).toHaveBeenCalledWith(source+'\r\n\r\nDopo.');
+ });
+ it('aggiunge dentro un blocco narrativo condiviso mantenendo il suo ID originale',async()=>{
+  const blocks:GdrBlockRow[]=[{id:'22',documentKey:'avventura',position:0,type:'paragraph',data:{text:'Prima.\n\n::: dialogo Ada\nCiao.\n:::\n\nDopo.',format:'gdr-narrative'}}];
+  const {fixture,buttons}=setup(serializeGdrBlocks(blocks));fixture.componentRef.setInput('insertable',true);fixture.componentRef.setInput('persistedBlocks',blocks);fixture.detectChanges();
+  fixture.nativeElement.querySelector('button.edit-speaker').click();fixture.detectChanges();await fixture.whenStable();buttons('Aggiungi sopra')[0].click();fixture.detectChanges();await fixture.whenStable();
+  const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;area.value='Nuovo.';area.dispatchEvent(new Event('input'));fixture.detectChanges();
+  const save=vi.fn(),insert=vi.fn();fixture.componentInstance.blockChange.subscribe(save);fixture.componentInstance.insertBlock.subscribe(insert);buttons('Aggiungi al racconto')[0].click();
+  expect(save).toHaveBeenCalledWith({id:'22',source:'Prima.\n\nNuovo.\n\n::: dialogo Ada\nCiao.\n:::\n\nDopo.'});expect(insert).not.toHaveBeenCalled();
+ });
+ it('conserva le modifiche aperte e chiede di applicarle prima di cambiare blocco',async()=>{
+  const {fixture,buttons}=setup('Prima.');fixture.componentRef.setInput('insertable',true);fixture.detectChanges();
+  fixture.nativeElement.querySelector('button.gdr-edit-start').click();fixture.detectChanges();await fixture.whenStable();
+  const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;area.value='Modifica da conservare.';area.dispatchEvent(new Event('input'));fixture.detectChanges();
+  expect(buttons('Aggiungi sopra')[0].disabled).toBe(true);expect(buttons('Aggiungi sotto')[0].disabled).toBe(true);expect(area.value).toBe('Modifica da conservare.');
+  expect(fixture.nativeElement.textContent).toContain('Applica o annulla le modifiche');
+ });
  it('aggiunge contenuti condivisi anche quando la storia è vuota, senza creare una bozza privata',async()=>{
   const {fixture,buttons}=setup('');fixture.componentRef.setInput('insertable',true);fixture.componentRef.setInput('sharedDocument',true);fixture.detectChanges();
   const insert=vi.fn(),privateCopy=vi.fn();fixture.componentInstance.insertBlock.subscribe(insert);fixture.componentInstance.sourceChange.subscribe(privateCopy);

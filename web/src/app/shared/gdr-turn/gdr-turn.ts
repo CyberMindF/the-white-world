@@ -22,16 +22,8 @@ interface RenderedSection extends NarrativeSection {
   imports: [GdrBlocks, FormsModule, NgTemplateOutlet],
   template: `
     @for (section of rendered(); track section.id; let sectionIndex = $index) {
-      @if (editable() && insertable()) {
-        <ng-container
-          *ngTemplateOutlet="
-            insertionPoint;
-            context: {
-              offset: section.start,
-              label: 'Aggiungi prima del blocco ' + (sectionIndex + 1),
-            }
-          "
-        />
+      @if (isInsertingBeside(section, 'above')) {
+        <ng-container *ngTemplateOutlet="inlineEditor" />
       }
       @if (isEditing(section)) {
         <ng-container *ngTemplateOutlet="inlineEditor" />
@@ -47,39 +39,19 @@ interface RenderedSection extends NarrativeSection {
           *ngTemplateOutlet="content; context: { $implicit: section, canEdit: editable() && editBlocks() }"
         />
       }
+      @if (isInsertingBeside(section, 'below')) {
+        <ng-container *ngTemplateOutlet="inlineEditor" />
+      }
     }
-    @if (editable() && insertable()) {
-      <ng-container
-        *ngTemplateOutlet="
-          insertionPoint;
-          context: {
-            offset: source().length,
-            label: rendered().length ? 'Aggiungi alla fine' : 'Inizia a scrivere',
-            empty: !rendered().length,
-          }
-        "
-      />
-    }
-    <ng-template #insertionPoint let-offset="offset" let-label="label" let-empty="empty">
-      @if (isInserting(offset)) {
+    @if (editable() && insertable() && !rendered().length) {
+      @if (inserting()) {
         <ng-container *ngTemplateOutlet="inlineEditor" />
       } @else {
-        <div class="insertion-point" [class.is-empty]="empty">
-          <button
-            type="button"
-            [attr.aria-label]="label"
-            [title]="label"
-            [disabled]="!!editing()"
-            (click)="startInserting(offset)"
-          >
-            <span aria-hidden="true">＋</span>
-            @if (empty) {
-              <span>Inizia a scrivere</span>
-            }
-          </button>
-        </div>
+        <button class="start-writing" type="button" aria-label="Inizia a scrivere" (click)="startInserting(0)">
+          Inizia a scrivere
+        </button>
       }
-    </ng-template>
+    }
     <ng-template #inlineEditor>
       <section
         class="inline-editor"
@@ -163,12 +135,19 @@ interface RenderedSection extends NarrativeSection {
           ><button type="button" [attr.aria-pressed]="preview()" (click)="preview.set(!preview())">
             Anteprima di questa parte
           </button>
+          @if (insertable() && !inserting() && !deleting()) {
+            <button type="button" [disabled]="!canAddBeside()" (click)="addBeside('above')">Aggiungi sopra</button>
+            <button type="button" [disabled]="!canAddBeside()" (click)="addBeside('below')">Aggiungi sotto</button>
+          }
           @if (canDelete() && !deleting()) {
             <button type="button" class="delete-block" (click)="requestDelete()">
               {{ editing()?.ownerId || deletionScope() === 'partita' ? 'Elimina blocco' : 'Elimina dalla bozza' }}
             </button>
           }
         </div>
+        @if (insertable() && !inserting() && !deleting() && !canAddBeside()) {
+          <p class="inline-message" role="status">Applica o annulla le modifiche per aggiungere un altro blocco.</p>
+        }
         @if (deleting()) {
           <div class="delete-confirm" role="alert">
             <p>Eliminare questo blocco {{ editing()?.ownerId || deletionScope() === 'partita' ? 'dalla partita' : 'dalla bozza' }}?</p>
@@ -311,56 +290,15 @@ interface RenderedSection extends NarrativeSection {
     .edit-start {
       font-size: 0.75rem;
     }
-    .insertion-point {
-      display: flex;
-      justify-content: flex-start;
-      position: relative;
-      height: 1.25rem;
-    }
-    .insertion-point button {
-      position: absolute;
-      left: 0.15rem;
-      top: 50%;
-      transform: translateY(-50%);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      width: 1.8rem;
-      height: 1.8rem;
-      padding: 0;
-      border: 0;
-      border-radius: 999px;
-      background: transparent;
-      color: var(--muted-color);
-      font: inherit;
-      font-size: 0.78rem;
-      opacity: 0.62;
-      cursor: pointer;
-    }
-    .insertion-point button:hover,
-    .insertion-point button:focus-visible {
-      background: var(--button-hover-bg);
-      color: var(--accent-color);
-      opacity: 1;
-    }
-    .insertion-point button:disabled {
-      opacity: 0.35;
-      cursor: default;
-    }
-    .insertion-point.is-empty {
-      height: auto;
-      justify-content: flex-start;
+    .start-writing {
       margin-block: 1rem;
-    }
-    .insertion-point.is-empty button {
-      position: static;
-      transform: none;
-      width: auto;
-      height: auto;
       border: 1px dashed var(--border-color);
-      padding: 0.55rem 1rem;
-      opacity: 1;
+      border-radius: .65rem;
+      padding: .55rem 1rem;
+      background: transparent;
+      color: var(--text-color);
+      font: inherit;
+      cursor: pointer;
     }
     .inline-tools {
       display: flex;
@@ -574,6 +512,7 @@ export class GdrTurn {
     end: number;
     snapshot: string;
     inserting?: boolean;
+    anchor?: {start:number;end:number;side:'above'|'below'};
     persistentId?:string;
     ownerId?:string;
     ownerStart?:number;
@@ -585,13 +524,26 @@ export class GdrTurn {
       !!current && !current.inserting && current.start === range.start && current.end === range.end
     );
   }
-  protected isInserting(offset: number): boolean {
-    return this.editing()?.inserting === true && this.editing()?.start === offset;
+  protected readonly canAddBeside = computed(() => {
+    const current = this.editing();
+    return this.editable() && this.insertable() && !!current && !current.inserting &&
+      current.snapshot === this.source() && this.draft() === current.snapshot.slice(current.start, current.end);
+  });
+  protected isInsertingBeside(range: {start:number;end:number}, side: 'above'|'below'): boolean {
+    const current = this.editing();
+    return current?.inserting === true && current.anchor?.side === side &&
+      current.anchor.start === range.start && current.anchor.end === range.end;
   }
-  protected startInserting(offset: number): void {
+  protected addBeside(side: 'above'|'below'): void {
+    const current = this.editing();
+    if (!current || !this.canAddBeside() || this.deleting()) return;
+    this.editing.set(null);
+    this.startInserting(side === 'above' ? current.start : current.end, {start:current.start,end:current.end,side});
+  }
+  protected startInserting(offset: number, anchor?: {start:number;end:number;side:'above'|'below'}): void {
     if (!this.editable() || !this.insertable() || this.editing() || this.deleting()) return;
     const owner=this.rendered().find(section=>section.ownerId && offset>section.ownerStart! && offset<section.ownerEnd!);
-    this.editing.set({ start: offset, end: offset, snapshot: this.source(), inserting: true,...(owner?{ownerId:owner.ownerId,ownerStart:owner.ownerStart,ownerEnd:owner.ownerEnd}:{}) });
+    this.editing.set({ start: offset, end: offset, snapshot: this.source(), inserting: true,anchor,...(owner?{ownerId:owner.ownerId,ownerStart:owner.ownerStart,ownerEnd:owner.ownerEnd}:{}) });
     this.draft.set('');
     this.preview.set(false);
     this.message.set('');

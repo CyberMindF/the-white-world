@@ -71,9 +71,10 @@ try {
   const thread=page.locator('.gdr-thread'),master=thread.locator('article.is-story');
   await master.getByText('Il master continua la storia.',{exact:true}).waitFor();
   assert.equal(await thread.locator('.gdr-turn-divider').count(),2);
-  assert.equal(await master.locator('.insertion-point button').count(),2);
+  assert.equal(await master.locator('.insertion-point button').count(),0);
   assert.equal(await thread.getByRole('button',{name:'Modifica il tuo turno',exact:true}).count(),0);
-  await master.getByRole('button',{name:'Aggiungi alla fine',exact:true}).click();
+  await master.getByRole('button',{name:'Modifica paragrafo',exact:false}).first().click();
+  await master.getByRole('button',{name:'Aggiungi sotto',exact:true}).click();
   await master.getByLabel('Testo del nuovo blocco',{exact:true}).fill('Un nuovo paragrafo nel seguito.');
   await master.getByRole('button',{name:'Aggiungi al racconto',exact:true}).click();
   await master.getByText('Un nuovo paragrafo nel seguito.',{exact:true}).waitFor();
@@ -104,6 +105,6 @@ try {
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     await thread.screenshot({path:join(screenshots,`turni-master-${width}.png`),animations:'disabled'});
   }
-  assert.deepEqual(errors,[]);console.log('PASS: modifica player autenticata, anteprima e annullamento, salvataggio visibile al master, + nel seguito, separatori e 3 viewport. Screenshot:',screenshots);
+  assert.deepEqual(errors,[]);console.log('PASS: modifica player autenticata, anteprima e annullamento, salvataggio visibile al master, aggiunta dal blocco nel seguito senza +, separatori e 3 viewport. Screenshot:',screenshots);
 }catch(error){await page.screenshot({path:join(screenshots,'errore.png')});console.error('Screenshot:',screenshots);console.error('Browser errors:',errors);throw error;}
 finally{await browser.close();await new Promise(resolve=>server.close(resolve));harness.sqlite.close();}
