@@ -231,17 +231,22 @@ interface RenderedSection extends NarrativeSection {
     .delete-confirm p { margin: 0 0 .6rem; font-size: .9rem; }
     .delete-confirm button { padding: .4rem .75rem; margin-right: .5rem; border: 1px solid var(--border-color); border-radius: .5rem; background: var(--button-bg); color: var(--text-color); font: inherit; cursor: pointer; }
     .dialogue {
+      display: grid;
+      grid-template-columns: 40px minmax(0, 1fr);
+      column-gap: 0.7rem;
+      row-gap: 0.15rem;
+      align-items: start;
       margin: 1.5rem 0;
     }
     .speaker {
-      display: flex;
-      align-items: center;
-      gap: 0.7rem;
+      display: contents;
       color: var(--accent-color);
       font-size: 0.9rem;
     }
     .speaker img,
     .initial {
+      grid-column: 1;
+      grid-row: 1 / span 2;
       width: 40px;
       height: 40px;
       border-radius: 50%;
@@ -258,8 +263,15 @@ interface RenderedSection extends NarrativeSection {
       line-height: 1.8;
       margin: 0.6rem 0 1.2rem;
     }
+    .speaker > strong,
+    .edit-speaker {
+      grid-column: 2;
+      line-height: 1.4;
+    }
     .dialogue p {
-      margin-left: calc(40px + 0.7rem);
+      grid-column: 2;
+      margin: 0;
+      line-height: 1.65;
     }
     .action {
       font-style: italic;
