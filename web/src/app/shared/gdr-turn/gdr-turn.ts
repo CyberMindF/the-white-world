@@ -5,11 +5,14 @@ import { GdrBlocks } from '../gdr-blocks/gdr-blocks';
 import { BLOCK_TYPES, SNIPPET_LABELS } from '../gdr-blocks/gdr-snippets';
 import { NarrativeCharacter, insertNarrativeBlock, narrativeSnippet } from './gdr-writing';
 import { NarrativeSection, parseNarrative } from './gdr-turn.parser';
-import { GdrBlockRow } from '../gdr-blocks/gdr-block.types';
+import { GdrBlockRow, GdrParagraphData } from '../gdr-blocks/gdr-block.types';
 import { serializeGdrBlocks } from '../gdr-blocks/gdr-markdown.serializer';
 
 interface RenderedSection extends NarrativeSection {
   persistentId?: string;
+  ownerId?: string;
+  ownerStart?: number;
+  ownerEnd?: number;
 }
 
 @Component({
@@ -31,10 +34,10 @@ interface RenderedSection extends NarrativeSection {
       }
       @if (isEditing(section)) {
         <ng-container *ngTemplateOutlet="inlineEditor" />
-      } @else if (section.kind === 'document' && editable()) {
+      } @else if (section.kind === 'document') {
         <app-gdr-blocks
           [blocks]="section.blocks"
-          [editable]="editBlocks()"
+          [editable]="editable() && editBlocks()"
           [continuation]="sectionIndex > 0"
           (editBlock)="startEditing(section)"
         />
@@ -43,17 +46,17 @@ interface RenderedSection extends NarrativeSection {
           *ngTemplateOutlet="content; context: { $implicit: section, canEdit: editable() && editBlocks() }"
         />
       }
-      @if (editable() && deletable() && !editing() && (!persistedBlocks().length || section.persistentId)) {
+      @if (editable() && deletable() && !editing() && (!persistedBlocks().length || section.ownerId)) {
         <div class="block-removal">
           @if (deleting()?.id === section.id) {
             <div class="delete-confirm" role="alert">
-              <p>Eliminare questo blocco {{ section.persistentId || deletionScope() === 'partita' ? 'dalla partita' : 'dalla bozza' }}?</p>
+              <p>Eliminare questo blocco {{ section.ownerId || deletionScope() === 'partita' ? 'dalla partita' : 'dalla bozza' }}?</p>
               <button type="button" (click)="confirmDelete()">Elimina</button>
               <button type="button" (click)="cancelDelete()">Annulla</button>
             </div>
           } @else {
             <button type="button" [disabled]="!!deleting()" (click)="requestDelete(section)">
-              {{ section.persistentId || deletionScope() === 'partita' ? 'Elimina blocco' : 'Elimina dalla bozza' }}
+              {{ section.ownerId || deletionScope() === 'partita' ? 'Elimina blocco' : 'Elimina dalla bozza' }}
             </button>
           }
         </div>
@@ -447,7 +450,10 @@ export class GdrTurn {
   readonly deletable = input(false);
   readonly deletionScope = input<'bozza' | 'partita'>('bozza');
   readonly persistedBlocks = input<GdrBlockRow[]>([]);
+  readonly sharedDocument = input(false);
   readonly deleteBlock = output<string>();
+  readonly blockChange = output<{id:string;source:string}>();
+  readonly insertBlock = output<{beforeId?:string;source:string}>();
   readonly characters = input<NarrativeCharacter[]>([]);
   readonly allowGeneric = input(true);
   protected readonly blockTypes = BLOCK_TYPES;
@@ -460,21 +466,26 @@ export class GdrTurn {
   protected readonly parsed = computed(() => parseNarrative(this.source()));
   protected readonly rendered = computed<RenderedSection[]>(() => {
     const originals = this.persistedBlocks().slice().sort((a,b)=>a.position-b.position);
-    if (this.editable() && originals.length && serializeGdrBlocks(originals) === this.source()) {
+    if (originals.length && serializeGdrBlocks(originals) === this.source()) {
       let offset = 0;
-      return originals.flatMap(block => {
+      return originals.flatMap<RenderedSection>(block => {
         const source = serializeGdrBlocks([block]), start = offset;
         offset += source.length + 2;
-        return parseNarrative(source).sections.map((section,index) => ({
+        const owner={ownerId:block.id,ownerStart:start,ownerEnd:start+source.length};
+        if(block.type!=='paragraph' || (block.data as GdrParagraphData).format!=='gdr-narrative') {
+          return [{kind:'document' as const,id:`stored-${block.id}`,text:'',speaker:'',portrait:'',blocks:[block],
+            start,end:start+source.length,ranges:[{start,end:start+source.length,startLine:0,endLine:source.split('\n').length-1}],persistentId:block.id,...owner}];
+        }
+        const sections=parseNarrative(source).sections.flatMap(section=>section.kind==='document'?section.blocks.map((child,index)=>({...section,blocks:[child],ranges:[section.ranges[index]],start:section.ranges[index].start,end:section.ranges[index].end})): [section]);
+        return sections.map((section,index) => ({
           ...section, id: `stored-${block.id}-${index}`,
           start: start + section.start, end: start + section.end,
-          persistentId: index === 0 ? block.id : undefined,
+          ...owner,
           ranges: section.ranges.map(range=>({...range,start:start+range.start,end:start+range.end})),
         }));
       });
     }
-    return this.editable()
-      ? this.parsed().sections.flatMap((section) =>
+    return this.parsed().sections.flatMap((section) =>
           section.kind === 'document'
             ? section.blocks.map((block, i) => ({
                 ...section,
@@ -485,8 +496,7 @@ export class GdrTurn {
                 end: section.ranges[i].end,
               }))
             : [section],
-        )
-      : this.parsed().sections;
+        );
   });
   protected readonly deleting = signal<(RenderedSection & {snapshot:string}) | null>(null);
   constructor() {
@@ -504,7 +514,11 @@ export class GdrTurn {
   protected confirmDelete(): void {
     const target=this.deleting();
     if (!target || target.snapshot !== this.source() || !this.editable() || !this.deletable()) return;
-    if (target.persistentId) this.deleteBlock.emit(target.persistentId);
+    if(target.ownerId && !target.persistentId) {
+      const source=target.snapshot.slice(target.ownerStart!,target.start)+target.snapshot.slice(target.end,target.ownerEnd!);
+      if(source.trim()) this.blockChange.emit({id:target.ownerId,source});
+      else this.deleteBlock.emit(target.ownerId);
+    } else if (target.persistentId) this.deleteBlock.emit(target.persistentId);
     else this.sourceChange.emit(target.snapshot.slice(0,target.start) + target.snapshot.slice(target.end));
     this.cancelDelete();
   }
@@ -518,6 +532,9 @@ export class GdrTurn {
     end: number;
     snapshot: string;
     inserting?: boolean;
+    ownerId?:string;
+    ownerStart?:number;
+    ownerEnd?:number;
   } | null>(null);
   protected isEditing(range: { start: number; end: number }): boolean {
     const current = this.editing();
@@ -530,7 +547,8 @@ export class GdrTurn {
   }
   protected startInserting(offset: number): void {
     if (!this.editable() || !this.insertable() || this.editing() || this.deleting()) return;
-    this.editing.set({ start: offset, end: offset, snapshot: this.source(), inserting: true });
+    const owner=this.rendered().find(section=>section.ownerId && offset>section.ownerStart! && offset<section.ownerEnd!);
+    this.editing.set({ start: offset, end: offset, snapshot: this.source(), inserting: true,...(owner?{ownerId:owner.ownerId,ownerStart:owner.ownerStart,ownerEnd:owner.ownerEnd}:{}) });
     this.draft.set('');
     this.preview.set(false);
     this.message.set('');
@@ -561,7 +579,7 @@ export class GdrTurn {
       area.setSelectionRange(position, position + snippet.length);
     });
   }
-  public startEditing(range: { start: number; end: number }): void {
+  public startEditing(range: { start: number; end: number; ownerId?:string; ownerStart?:number; ownerEnd?:number }): void {
     if (!this.editable() || !this.editBlocks() || !range || this.deleting()) return;
     if (this.editing()) {
       this.message.set('Applica o annulla questa modifica prima di aprirne un’altra.');
@@ -583,6 +601,15 @@ export class GdrTurn {
         'Il documento è cambiato. Copia la modifica, annulla e riapri questo punto.',
       );
       return;
+    }
+    if(current.ownerId) {
+      const source=current.inserting?insertNarrativeBlock(current.snapshot.slice(current.ownerStart,current.ownerEnd),current.start-current.ownerStart!,this.draft()):current.snapshot.slice(current.ownerStart!,current.start)+this.draft()+current.snapshot.slice(current.end,current.ownerEnd!);
+      if(!source.trim()) {this.message.set('Per rimuovere il blocco usa Elimina blocco.');return;}
+      this.blockChange.emit({id:current.ownerId,source});this.cancel();return;
+    }
+    if(current.inserting && (this.persistedBlocks().length || this.sharedDocument())) {
+      const before=this.rendered().find(section=>section.ownerStart!>=current.start);
+      this.insertBlock.emit({beforeId:before?.ownerId,source:this.draft()});this.cancel();return;
     }
     this.sourceChange.emit(
       current.inserting

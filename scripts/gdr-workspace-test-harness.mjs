@@ -25,8 +25,8 @@ export function apiHarness() {
   const session=async request=>{const id=Number(request.headers.get('x-user') || 1);return id?{user:{id,nickname:id===1?'Master':'Giocatrice',role:id===1?'admin':'member',isTest:request.headers.has('x-test')}}:null;};
   const json=(body,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
   const get=new Function('getAuthenticatedSession','json',...Object.keys(helpers),loadSource('./index.js')+';return onRequestGet;')(session,json,...Object.values(helpers));
-  const post=new Function('getAuthenticatedSession','json',...Object.keys(legacy),...Object.keys(helpers),loadSource('./mutate.js')+';return onRequestPost;')(session,json,...Object.values(legacy),...Object.values(helpers));
-  const call=(user=1,method='GET',body,adventure='il-prezzo-della-verita',extra={})=>(method==='GET'?get:post)({env:{DB:db},request:new Request('https://test/api/gdr-workspace?adventure='+adventure,{method,headers:{'x-user':String(user),...extra},body:body===undefined?undefined:JSON.stringify(body)})});
+  const post=new Function('getAuthenticatedSession','json','notifyRealtime',...Object.keys(legacy),...Object.keys(helpers),loadSource('./mutate.js')+';return onRequestPost;')(session,json,async()=>{},...Object.values(legacy),...Object.values(helpers));
+  const call=(user=1,method='GET',body,adventure='il-prezzo-della-verita',extra={})=>(method==='GET'?get:post)({env:{DB:db},waitUntil(){},request:new Request('https://test/api/gdr-workspace?adventure='+adventure,{method,headers:{'x-user':String(user),...extra},body:body===undefined?undefined:JSON.stringify(body)})});
   const media=new Map();
   const bucket={async put(key,data,options){media.set(key,{data:new Uint8Array(data),type:options.httpMetadata.contentType});}};
   const mediaPost=new Function('getAuthenticatedSession','json',...Object.keys(helpers),loadSource('./media.js')+';return onRequestPost;')(session,json,...Object.values(helpers));

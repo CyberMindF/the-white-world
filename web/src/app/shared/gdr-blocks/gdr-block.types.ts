@@ -16,6 +16,7 @@ export interface GdrHeadingData {
 export interface GdrParagraphData {
   text: string;
   emphasis?: boolean;
+  format?: 'gdr-narrative';
 }
 
 export interface GdrCalloutData {

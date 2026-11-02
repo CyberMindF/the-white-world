@@ -23,6 +23,9 @@ class TurnPage extends GdrLaboratorio {
   seedStory() { this.blocks.set([{id:'9',documentKey:'avventura',position:0,type:'npc_grid',data:{entries:[{name:'Shivay',image:'/assets/originale.webp',alt:'Shivay',description:'Compagna'}]}}]); }
   removeStoryBlock(id:string) {return this.deleteStoryBlock(id);}
   storyCount() {return this.narrativeBlocks().length;}
+  editStory(id:string,source:string){return this.saveStoryBlock({id,source});}
+  sharedReading(){return this.sharedStorySource();}
+  privateDraft(source:string){this.updateDocument(source);}
   seedTurn(turn:{id:number;author:string;isMine:boolean;isMaster:boolean;body:string;createdAt:string}) {this.turns.set([turn]);}
   removeTurnPart(body:string) {return this.savePublishedTurn(this.turns()[0],body);}
   state() { return { local: this.local(), turns: this.turns(), status: this.status(), error: this.turnsError() }; }
@@ -52,6 +55,17 @@ describe('invio dei turni della partita reale', () => {
     const fetchMock=vi.fn().mockResolvedValue(reply({deleted:true}));vi.stubGlobal('fetch',fetchMock);
     const page=create();page.seedStory();await page.removeStoryBlock('9');
     expect(fetchMock.mock.calls[0][0]).toBe('/api/gdr-blocks/9');expect(fetchMock.mock.calls[0][1].method).toBe('DELETE');expect(page.storyCount()).toBe(0);
+  });
+  it('una vecchia bozza privata non sostituisce mai il contenuto della partita condivisa',()=>{
+    const page=create();page.seedStory();const shared=page.sharedReading();page.privateDraft('Solo nel browser del master.');
+    expect(page.sharedReading()).toBe(shared);expect(page.sharedReading()).not.toContain('Solo nel browser');
+  });
+  it('salva un dialogo iniziale nella riga condivisa e non crea una nuova copia privata',async()=>{
+    const source='::: dialogo Shivay | /assets/avatar.webp\nNon è una buona notizia.\n:::';
+    const fetchMock=vi.fn().mockResolvedValue(reply({id:'9',documentKey:'avventura',position:0,type:'paragraph',data:{text:source,format:'gdr-narrative'},updatedAt:'nuova'}));vi.stubGlobal('fetch',fetchMock);
+    const page=create();page.seedStory();await page.editStory('9',source);
+    expect(fetchMock.mock.calls[0][1].method).toBe('PUT');expect(JSON.parse(fetchMock.mock.calls[0][1].body).data).toEqual({text:source,format:'gdr-narrative'});
+    expect(page.sharedReading()).toBe(source);expect(page.state().local.documentDraft).toBeNull();
   });
   it('salva la rimozione di un paragrafo pubblicato e cancella l’intervento quando si rimuove l’ultimo blocco',async()=>{
     const fetchMock=vi.fn().mockImplementation(async()=>reply({saved:true}));vi.stubGlobal('fetch',fetchMock);

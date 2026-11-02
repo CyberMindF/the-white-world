@@ -25,6 +25,7 @@ import { GdrNotesEditor } from '../../shared/gdr-notes/gdr-notes-editor';
 import { GdrPanel } from '../../shared/gdr-panel/gdr-panel';
 import { GdrTurn } from '../../shared/gdr-turn/gdr-turn';
 import { parseNarrative } from '../../shared/gdr-turn/gdr-turn.parser';
+import { recoverStoryDraft } from '../../shared/gdr-turn/gdr-draft-recovery';
 import {
   GdrSourceEditor,
   NarrativeCharacter,
@@ -133,6 +134,7 @@ export class GdrLaboratorio implements OnInit {
   protected readonly turnPreview = signal(false);
   protected readonly sendingTurn = signal(false);
   protected readonly contentSaving = signal(false);
+  protected readonly failedStoryChange = signal<{id:string;beforeId?:string;source:string}|null>(null);
   protected readonly publishedEditId = signal<number | null>(null);
   private readonly realtime = inject(RealtimeService);
   private readonly destroyRef = inject(DestroyRef);
@@ -179,7 +181,6 @@ export class GdrLaboratorio implements OnInit {
   protected readonly turnsError = signal('');
   protected readonly status = signal('');
   protected readonly documentEditor = signal(false);
-  protected readonly showOriginal = signal(false);
   protected readonly fields = signal<Field[]>([]);
   protected readonly values = signal<Record<string, string>>({});
   protected readonly toolsError = signal('');
@@ -209,7 +210,8 @@ export class GdrLaboratorio implements OnInit {
   protected readonly rulesBlocks = computed(() => this.referenceBlocks().rules);
   protected readonly powersBlocks = computed(() => this.referenceBlocks().powers);
   protected readonly characterBlocks = computed(() => this.forDocument(this.adventure().character));
-  protected readonly sharedStorySource = computed(() => serializeGdrBlocks(this.narrativeBlocks()));
+  protected readonly sharedStorySource = computed(() => this.adventure().legacy ? serializeGdrBlocks(this.narrativeBlocks()) : this.workspace.adventures().find(a=>a.id===this.selected())?.source ?? '');
+  protected readonly recoveredChanges = computed(() => this.local().documentDraft === null ? [] : recoverStoryDraft(this.narrativeBlocks(),this.local().documentDraft!));
   protected readonly siteImages = computed(() => gdrLibraryImages([
     ...this.workspace.characters().flatMap(c => [
       { src: c.photo, label: c.name + ' · foto' },
@@ -274,7 +276,10 @@ export class GdrLaboratorio implements OnInit {
       if (this.liveGame && event['adventure'] === this.selected()) void this.loadTurns(this.selected());
     });
     this.realtime.on('gdr-story:changed').pipe(takeUntilDestroyed(this.destroyRef)).subscribe(event => {
-      if (this.liveGame && event['adventure'] === this.selected()) void this.reloadStory();
+      if (this.liveGame && event['adventure'] === this.selected()) {
+        void this.reloadStory();
+        if(!this.workspace.pendingChanges()) void this.workspace.load(this.selected());
+      }
     });
     await this.select(
       this.adventures().some((a) => a.id === requested) ? requested! : this.selected(),
@@ -288,6 +293,7 @@ export class GdrLaboratorio implements OnInit {
   private get storageKey(): string {
     return `gdr-laboratorio-v2-${this.auth.currentUser()?.id ?? 'local'}-${this.selected()}`;
   }
+  private get pendingStoryKey():string {return this.storageKey+'-pending-shared-block';}
   private restore(): LocalState {
     try {
       const raw = localStorage.getItem(this.storageKey);
@@ -332,7 +338,6 @@ export class GdrLaboratorio implements OnInit {
   }
   protected updateDocument(value: string): void {
     this.local.update((s) => ({ ...s, documentDraft: value }));
-    this.showOriginal.set(false);
     this.persist();
   }
   private async read<T>(url: string): Promise<T> {
@@ -356,8 +361,12 @@ export class GdrLaboratorio implements OnInit {
     this.adventureTitle.set(this.adventure().title);
     this.status.set('');
     this.local.set(this.restore());
+    this.failedStoryChange.set(null);
+    try {
+      const pending=JSON.parse(localStorage.getItem(this.pendingStoryKey)||'null');
+      if(pending && typeof pending.id==='string' && typeof pending.source==='string' && pending.source.length<=20000) this.failedStoryChange.set(pending);
+    } catch { /* Nessuna modifica recuperabile. */ }
     this.documentEditor.set(false);
-    this.showOriginal.set(this.liveGame && this.adventure().legacy && this.local().documentDraft !== null);
     this.rulesSearch.set('');
     this.loading.set(true);
     this.contentError.set('');
@@ -474,6 +483,43 @@ export class GdrLaboratorio implements OnInit {
     } catch(error) {
       this.status.set(error instanceof Error ? error.message : 'Eliminazione non riuscita.');
     } finally { this.contentSaving.set(false); }
+  }
+  protected async saveStoryBlock(change:{id:string;source:string}): Promise<void> {
+    if(!this.canPrepare() || this.contentSaving() || !this.liveGame) return;
+    const original=this.blocks().find(block=>block.id===change.id && block.documentKey===this.adventure().document);
+    const parsed=parseNarrative(change.source);
+    if(!original || !change.source.trim() || parsed.errors.length) return;
+    const simple=parsed.sections.length===1 && parsed.sections[0].kind==='document' && parsed.sections[0].blocks.length===1 ? parsed.sections[0].blocks[0] : null;
+    const type=simple?.type ?? 'paragraph';
+    const data=simple?.data ?? {text:change.source,format:'gdr-narrative'};
+    this.contentSaving.set(true);
+    try {
+      const response=await fetch('/api/gdr-blocks/'+encodeURIComponent(change.id),{method:'PUT',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,data,expectedUpdatedAt:original.updatedAt,expectedType:original.type,expectedData:original.data})});
+      const saved=await response.json();
+      if(!response.ok) throw new Error(saved.error || 'Non è stato possibile salvare nella partita.');
+      this.blocks.update(blocks=>blocks.map(block=>block.id===change.id?saved:block));
+      this.failedStoryChange.set(null);
+      try {localStorage.removeItem(this.pendingStoryKey);} catch { /* Il server ha salvato. */ }
+      this.status.set('Modifica salvata nella partita: visibile anche a Desy.');
+    } catch(error) {
+      this.failedStoryChange.set(change);
+      try {localStorage.setItem(this.pendingStoryKey,JSON.stringify(change));} catch { /* La copia resta visibile. */ }
+      this.status.set((error instanceof Error?error.message:'Salvataggio non riuscito.')+' La modifica è conservata qui sotto, non è ancora pubblicata.');
+    } finally {this.contentSaving.set(false);}
+  }
+  protected async insertStoryBlock(change:{beforeId?:string;source:string}): Promise<void> {
+    if(!this.canPrepare() || this.contentSaving() || !this.liveGame || !this.adventure().document) return;
+    const parsed=parseNarrative(change.source);if(!change.source.trim() || parsed.errors.length)return;
+    const simple=parsed.sections.length===1 && parsed.sections[0].kind==='document' && parsed.sections[0].blocks.length===1?parsed.sections[0].blocks[0]:null;
+    const before=this.blocks().find(block=>block.id===change.beforeId);
+    this.contentSaving.set(true);
+    try{
+      const response=await fetch('/api/gdr-blocks',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({documentKey:this.adventure().document,type:simple?.type??'paragraph',data:simple?.data??{text:change.source,format:'gdr-narrative'},beforeId:change.beforeId,expectedBeforeData:before?.data,expectedBeforeUpdatedAt:before?.updatedAt})});
+      const saved=await response.json();if(!response.ok)throw new Error(saved.error||'Aggiunta non riuscita.');
+      await this.reloadStory();this.failedStoryChange.set(null);try{localStorage.removeItem(this.pendingStoryKey);}catch{}this.status.set('Blocco aggiunto alla partita, per entrambi.');
+    }catch(error){this.status.set((error instanceof Error?error.message:'Aggiunta non riuscita.')+' Il testo da aggiungere resta disponibile nel riquadro di recupero.');
+      const pending={...change,id:''};this.failedStoryChange.set(pending);try{localStorage.setItem(this.pendingStoryKey,JSON.stringify(pending));}catch{}
+    }finally{this.contentSaving.set(false);}
   }
   protected async savePublishedTurn(turn: ExistingTurn, body: string): Promise<void> {
     if (!this.canPrepare() || !turn.isMine || !turn.isMaster || !turn.id || this.contentSaving()) return;

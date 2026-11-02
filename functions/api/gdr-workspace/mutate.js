@@ -1,5 +1,6 @@
 import { syncLegacy, validateCharacterFields } from "./legacy.js";
 import { getAuthenticatedSession, json } from "../auth/_shared.js";
+import { notifyRealtime } from "../_shared/realtime.js";
 import {
   WorkspaceError,
   requireMaster,
@@ -430,13 +431,11 @@ export async function onRequestPost(context) {
     } catch {
       throw new WorkspaceError("Richiesta non valida.", 400);
     }
-    return json(
-      await mutate(
-        context.env.DB.withSession("first-primary"),
-        session.user,
-        payload,
-      ),
-    );
+    const db=context.env.DB.withSession("first-primary");
+    const linked=['saveCharacter','deleteCharacter'].includes(payload?.action) && payload.characterId ? await db.prepare('SELECT adventure_id FROM gdr_workspace_characters WHERE id=?').bind(payload.characterId).first() : null;
+    const result=await mutate(db,session.user,payload);
+    if(linked) context.waitUntil(notifyRealtime(context.env,{type:'gdr-story:changed',action:'character_updated',actorUserId:session.user.id,adventure:linked.adventure_id}));
+    return json(result);
   } catch (error) {
     return failure(error, "gdr_workspace_mutation_error");
   }

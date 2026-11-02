@@ -74,6 +74,7 @@
               >
                 Gestisci PG e PNG
               </button>
+              @if (!liveGame || !adventure().legacy) {
               <button
                 class="lab-text-command"
                 [disabled]="inlineBusy() || workspace.saving()"
@@ -83,21 +84,24 @@
               >
                 {{ documentEditor() ? 'Chiudi testo completo' : 'Modifica testo completo' }}
               </button>
-              @if (adventure().legacy && local().documentDraft !== null) {
-                <button class="btn" [disabled]="inlineBusy()" (click)="showOriginal.set(!showOriginal())">
-                  {{
-                    showOriginal()
-                      ? 'Riprendi bozza locale'
-                      : 'Mostra versione condivisa'
-                  }}</button
-                ><span>{{
-                  showOriginal()
-                    ? 'Stai leggendo la partita condivisa'
-                    : 'Stai leggendo una bozza locale'
-                }}</span>
+              }
+              @if (liveGame && adventure().legacy && local().documentDraft !== null) {
+                <button class="btn" [disabled]="inlineBusy()" (click)="documentEditor.set(!documentEditor())">{{documentEditor()?'Chiudi bozza precedente':'Recupera modifiche precedenti'}}</button>
               }
             </div>
-            @if (documentEditor()) {
+            @if (documentEditor() && liveGame && adventure().legacy) {
+              <section class="lab-document-editor" aria-label="Modifiche precedenti non pubblicate">
+                <h2>Modifiche precedenti non pubblicate</h2>
+                <p class="lab-help">Queste modifiche erano rimaste nel tuo browser. Controlla il pezzo da recuperare e salvalo nella partita.</p>
+                @for (change of recoveredChanges(); track change.id) {
+                  <section class="recovered-change">
+                    <app-gdr-turn [source]="change.source" />
+                    <button class="btn" [disabled]="contentSaving()" (click)="saveStoryBlock(change)">Salva questa modifica per entrambi</button>
+                  </section>
+                } @empty {<p class="lab-help">Non ci sono modifiche recuperabili automaticamente. La copia precedente è conservata qui sotto.</p>}
+                <details><summary>Leggi la copia precedente</summary><app-gdr-turn [source]="local().documentDraft || ''" /></details>
+              </section>
+            } @else if (documentEditor()) {
               <section
                 id="complete-adventure-editor"
                 class="lab-document-editor"
@@ -177,38 +181,26 @@
               }
             </div>
           }
-          @if (canPrepare() && local().documentDraft !== null && !showOriginal()) {
-            <app-gdr-turn
-              [source]="local().documentDraft!"
-              [editable]="canPrepare() && !documentEditor() && !workspace.saving() && !contentSaving() && publishedEditId() === null"
-              [deletable]="canPrepare()"
-              [insertable]="true"
-              [characters]="characters()"
-              [allowGeneric]="!workspace.available()"
-              (sourceChange)="updateDocument($event)"
-              (editingChange)="inlineDocumentEditing($event)"
-            />
-          } @else {
-            @if (canPrepare()) {
-              <app-gdr-turn
-                [source]="adventure().legacy ? sharedStorySource() : documentSource()"
-                [persistedBlocks]="adventure().legacy && liveGame ? narrativeBlocks() : []"
-                [editable]="!documentEditor() && !workspace.saving() && !contentSaving() && publishedEditId() === null"
-                [deletable]="true"
-                (deleteBlock)="deleteStoryBlock($event)"
-                [insertable]="true"
-                [characters]="characters()"
-                [allowGeneric]="!workspace.available()"
-                (sourceChange)="updateDocument($event)"
-                (editingChange)="inlineDocumentEditing($event)"
-              />
-            } @else {
-              @if (adventure().legacy) {
-                <app-gdr-blocks [blocks]="narrativeBlocks()" />
-              } @else {
-                <app-gdr-turn [source]="documentSource()" />
-              }
-            }
+          <app-gdr-turn
+            [source]="sharedStorySource()"
+            [persistedBlocks]="adventure().legacy ? narrativeBlocks() : []"
+            [sharedDocument]="liveGame && adventure().legacy"
+            [editable]="canPrepare() && !documentEditor() && !workspace.saving() && !contentSaving() && publishedEditId() === null"
+            [deletable]="canPrepare()"
+            (deleteBlock)="deleteStoryBlock($event)"
+            (blockChange)="saveStoryBlock($event)"
+            (insertBlock)="insertStoryBlock($event)"
+            [insertable]="canPrepare()"
+            [characters]="characters()"
+            [allowGeneric]="!workspace.available()"
+            (sourceChange)="updateDocument($event); documentEditor.set(true)"
+            (editingChange)="inlineDocumentEditing($event)"
+          />
+          @if (canPrepare() && failedStoryChange(); as change) {
+            <section class="lab-document-editor" aria-label="Modifica non salvata">
+              <h3>Modifica non salvata</h3><app-gdr-turn [source]="change.source" />
+              <button class="btn" [disabled]="contentSaving()" (click)="change.id ? saveStoryBlock(change) : insertStoryBlock(change)">Riprova salvataggio per entrambi</button>
+            </section>
           }
           @if (adventure().legacy && !narrativeBlocks().length) {
             <p class="lab-help">

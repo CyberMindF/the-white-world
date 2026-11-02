@@ -12,11 +12,11 @@ export async function onRequestPut(context) {
   try {
     const session = await getAuthenticatedSession(request, env);
     if (!session) return json({ error: "Sessione non valida o scaduta." }, 401);
-    if (!hasPermission(session.user.role, "content.edit")) {
+    if (session.user.isTest || !hasPermission(session.user.role, "content.edit")) {
       return json({ error: "Non autorizzato." }, 403);
     }
 
-    const existing = await env.DB.prepare("SELECT id FROM gdr_blocks WHERE id = ?").bind(params.id).first();
+    const existing = await env.DB.prepare("SELECT * FROM gdr_blocks WHERE id = ?").bind(params.id).first();
     if (!existing) {
       return json({ error: "Blocco non trovato." }, 404);
     }
@@ -27,18 +27,23 @@ export async function onRequestPut(context) {
 
     if (!type) return json({ error: "Tipo di blocco non valido." }, 400);
     if (!data) return json({ error: "Contenuto del blocco non valido." }, 400);
+    const hasSnapshot=payload && ('expectedUpdatedAt' in payload || 'expectedType' in payload || 'expectedData' in payload);
+    if(hasSnapshot && (payload.expectedUpdatedAt!==existing.updated_at || payload.expectedType!==existing.type || JSON.stringify(payload.expectedData)!==JSON.stringify(JSON.parse(existing.data)))) return json({error:'Il blocco è cambiato. Ricarica prima di salvare.'},409);
 
     const now = new Date().toISOString();
-    await env.DB
-      .prepare("UPDATE gdr_blocks SET type = ?, data = ?, updated_at = ? WHERE id = ?")
-      .bind(type, data, now, params.id)
+    const result=await env.DB
+      .prepare("UPDATE gdr_blocks SET type = ?, data = ?, updated_at = ? WHERE id = ? AND data = ? AND updated_at = ?")
+      .bind(type, data, now, params.id,existing.data,existing.updated_at)
       .run();
+    if(!result.meta.changes) return json({error:'Il blocco è cambiato. Ricarica prima di salvare.'},409);
 
     context.waitUntil(recordEvent(env, { userId: session.user.id, sessionId: session.sessionId }, {
       section: "gdr",
       eventType: "content_updated",
       metadata: { blockId: params.id }
     }));
+    const adventure=existing.document_key==='avventura'?'il-prezzo-della-verita':existing.document_key==='casa-avventura'?'la-casa-che-trattiene-il-respiro':null;
+    if(adventure) context.waitUntil(notifyRealtime(env,{type:'gdr-story:changed',action:'updated',actorUserId:session.user.id,adventure,blockId:params.id}));
 
     const updated = await env.DB.prepare("SELECT * FROM gdr_blocks WHERE id = ?").bind(params.id).first();
     return json(toBlockView(updated));
