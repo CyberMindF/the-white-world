@@ -46,21 +46,6 @@ interface RenderedSection extends NarrativeSection {
           *ngTemplateOutlet="content; context: { $implicit: section, canEdit: editable() && editBlocks() }"
         />
       }
-      @if (editable() && deletable() && !editing() && (!persistedBlocks().length || section.ownerId)) {
-        <div class="block-removal">
-          @if (deleting()?.id === section.id) {
-            <div class="delete-confirm" role="alert">
-              <p>Eliminare questo blocco {{ section.ownerId || deletionScope() === 'partita' ? 'dalla partita' : 'dalla bozza' }}?</p>
-              <button type="button" (click)="confirmDelete()">Elimina</button>
-              <button type="button" (click)="cancelDelete()">Annulla</button>
-            </div>
-          } @else {
-            <button type="button" [disabled]="!!deleting()" (click)="requestDelete(section)">
-              {{ section.ownerId || deletionScope() === 'partita' ? 'Elimina blocco' : 'Elimina dalla bozza' }}
-            </button>
-          }
-        </div>
-      }
     }
     @if (editable() && insertable()) {
       <ng-container
@@ -158,7 +143,7 @@ interface RenderedSection extends NarrativeSection {
         <div class="inline-actions">
           <button
             type="button"
-            [disabled]="(inserting() && !draft().trim()) || draftParsed().errors.length > 0"
+            [disabled]="!!deleting() || (inserting() && !draft().trim()) || draftParsed().errors.length > 0"
             (click)="apply()"
           >
             {{ inserting() ? 'Aggiungi al racconto' : 'Applica al testo' }}</button
@@ -167,7 +152,19 @@ interface RenderedSection extends NarrativeSection {
           ><button type="button" [attr.aria-pressed]="preview()" (click)="preview.set(!preview())">
             Anteprima di questa parte
           </button>
+          @if (canDelete() && !deleting()) {
+            <button type="button" class="delete-block" (click)="requestDelete()">
+              {{ editing()?.ownerId || deletionScope() === 'partita' ? 'Elimina blocco' : 'Elimina dalla bozza' }}
+            </button>
+          }
         </div>
+        @if (deleting()) {
+          <div class="delete-confirm" role="alert">
+            <p>Eliminare questo blocco {{ editing()?.ownerId || deletionScope() === 'partita' ? 'dalla partita' : 'dalla bozza' }}?</p>
+            <button type="button" (click)="confirmDelete()">Elimina</button>
+            <button type="button" (click)="cancelDelete()">Annulla</button>
+          </div>
+        }
         @if (preview()) {
           <div class="inline-preview">
             @for (section of draftParsed().sections; track section.id) {
@@ -229,9 +226,7 @@ interface RenderedSection extends NarrativeSection {
       display: block;
       overflow-wrap: anywhere;
     }
-    .block-removal { margin: -.3rem 0 1rem; }
-    .block-removal > button { border: 0; background: transparent; color: var(--muted-color); font: inherit; font-size: .78rem; padding: .35rem 0; cursor: pointer; text-decoration: underline; }
-    .delete-confirm { padding: .8rem; border: 1px solid var(--border-color); border-radius: .65rem; background: var(--panel-color); }
+    .delete-confirm { margin: 0 .7rem .7rem; padding: .8rem; border: 1px solid var(--border-color); border-radius: .65rem; background: var(--panel-color); }
     .delete-confirm p { margin: 0 0 .6rem; font-size: .9rem; }
     .delete-confirm button { padding: .4rem .75rem; margin-right: .5rem; border: 1px solid var(--border-color); border-radius: .5rem; background: var(--button-bg); color: var(--text-color); font: inherit; cursor: pointer; }
     .dialogue {
@@ -418,6 +413,10 @@ interface RenderedSection extends NarrativeSection {
     .inline-actions button:first-child {
       color: var(--accent-color);
     }
+    .inline-actions .delete-block {
+      margin-inline-start: auto;
+      color: var(--danger-text-color);
+    }
     .inline-preview {
       padding: 0.9rem;
       border-top: 1px solid var(--border-color);
@@ -498,19 +497,24 @@ export class GdrTurn {
             : [section],
         );
   });
-  protected readonly deleting = signal<(RenderedSection & {snapshot:string}) | null>(null);
+  protected readonly deleting = signal<(Pick<RenderedSection, 'start' | 'end' | 'ownerId' | 'ownerStart' | 'ownerEnd' | 'persistentId'> & {snapshot:string}) | null>(null);
+  protected readonly canDelete = computed(() => {
+    const current = this.editing();
+    return this.editable() && this.deletable() && !!current && !current.inserting &&
+      (!this.persistedBlocks().length || !!current.ownerId);
+  });
   constructor() {
     effect(()=>{
       const target=this.deleting();
       if(target && target.snapshot!==this.source()) this.cancelDelete();
     });
   }
-  protected requestDelete(section: RenderedSection): void {
-    if (!this.editable() || !this.deletable() || this.editing()) return;
-    this.deleting.set({...section,snapshot:this.source()});
-    this.editingChange.emit(true);
+  protected requestDelete(): void {
+    const current = this.editing();
+    if (!this.canDelete() || !current || current.snapshot !== this.source()) return;
+    this.deleting.set({...current});
   }
-  protected cancelDelete(): void { this.deleting.set(null); this.editingChange.emit(false); }
+  protected cancelDelete(): void { this.deleting.set(null); }
   protected confirmDelete(): void {
     const target=this.deleting();
     if (!target || target.snapshot !== this.source() || !this.editable() || !this.deletable()) return;
@@ -520,7 +524,7 @@ export class GdrTurn {
       else this.deleteBlock.emit(target.ownerId);
     } else if (target.persistentId) this.deleteBlock.emit(target.persistentId);
     else this.sourceChange.emit(target.snapshot.slice(0,target.start) + target.snapshot.slice(target.end));
-    this.cancelDelete();
+    this.cancel();
   }
   protected readonly inserting = computed(() => this.editing()?.inserting === true);
   protected readonly draft = signal('');
@@ -532,6 +536,7 @@ export class GdrTurn {
     end: number;
     snapshot: string;
     inserting?: boolean;
+    persistentId?:string;
     ownerId?:string;
     ownerStart?:number;
     ownerEnd?:number;
@@ -585,7 +590,8 @@ export class GdrTurn {
       this.message.set('Applica o annulla questa modifica prima di aprirne un’altra.');
       return;
     }
-    this.editing.set({ ...range, snapshot: this.source() });
+    const section = this.rendered().find(section => section.start === range.start && section.end === range.end);
+    this.editing.set({ ...section, ...range, snapshot: this.source() });
     this.draft.set(this.source().slice(range.start, range.end));
     this.preview.set(false);
     this.message.set('');
@@ -594,7 +600,7 @@ export class GdrTurn {
   }
   protected apply(): void {
     const current = this.editing();
-    if (!current || (current.inserting && !this.draft().trim()) || this.draftParsed().errors.length)
+    if (!current || this.deleting() || (current.inserting && !this.draft().trim()) || this.draftParsed().errors.length)
       return;
     if (current.snapshot !== this.source()) {
       this.message.set(
@@ -621,6 +627,7 @@ export class GdrTurn {
     this.cancel();
   }
   protected cancel(): void {
+    this.deleting.set(null);
     this.editing.set(null);
     this.editingChange.emit(false);
     this.message.set('');

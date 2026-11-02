@@ -17,22 +17,46 @@ describe('eliminazione dei blocchi della storia',()=>{
   const source='Stesso testo.\r\n\r\n::: dialogo Ada\r\nCiao.\r\n:::\r\n\r\nStesso testo.';
   const {fixture,buttons}=setup(source);fixture.componentRef.setInput('deletionScope','partita');fixture.detectChanges();
   const change=vi.fn();fixture.componentInstance.sourceChange.subscribe(change);
-  buttons('Elimina blocco')[2].click();fixture.detectChanges();expect(change).not.toHaveBeenCalled();
+  expect(buttons('Elimina blocco')).toHaveLength(0);
+  fixture.nativeElement.querySelectorAll('button.gdr-edit-start')[1].click();fixture.detectChanges();
+  buttons('Elimina blocco')[0].click();fixture.detectChanges();expect(change).not.toHaveBeenCalled();
   buttons('Annulla')[0].click();fixture.detectChanges();expect(change).not.toHaveBeenCalled();
-  buttons('Elimina blocco')[2].click();fixture.detectChanges();buttons('Elimina')[0].click();
+  expect(fixture.nativeElement.querySelector('textarea')).not.toBeNull();
+  buttons('Elimina blocco')[0].click();fixture.detectChanges();buttons('Elimina')[0].click();fixture.detectChanges();
+  expect(fixture.nativeElement.querySelector('textarea')).toBeNull();
   expect(change).toHaveBeenCalledWith(source.slice(0,source.lastIndexOf('Stesso testo.')));
  });
  it('usa l’ID originale del blocco condiviso, senza modificare o riserializzare gli altri blocchi',()=>{
   const blocks:GdrBlockRow[]=[{id:'41',documentKey:'avventura',position:0,type:'paragraph',data:{text:'Prima.'}},{id:'76',documentKey:'avventura',position:1,type:'paragraph',data:{text:'Da eliminare.'}}];
   const {fixture,buttons}=setup(serializeGdrBlocks(blocks));fixture.componentRef.setInput('persistedBlocks',blocks);fixture.detectChanges();
   const remove=vi.fn(),change=vi.fn();fixture.componentInstance.deleteBlock.subscribe(remove);fixture.componentInstance.sourceChange.subscribe(change);
-  buttons('Elimina blocco')[1].click();fixture.detectChanges();buttons('Elimina')[0].click();
+  expect(buttons('Elimina blocco')).toHaveLength(0);
+  fixture.nativeElement.querySelectorAll('button.gdr-edit-start')[1].click();fixture.detectChanges();
+  buttons('Elimina blocco')[0].click();fixture.detectChanges();buttons('Elimina')[0].click();
   expect(remove).toHaveBeenCalledWith('76');expect(change).not.toHaveBeenCalled();
  });
- it('nasconde i comandi nella lettura player e annulla una conferma se il testo cambia',()=>{
-  const {fixture,buttons}=setup('Prima.');fixture.componentRef.setInput('deletable',false);fixture.detectChanges();expect(buttons('Elimina dalla bozza')).toHaveLength(0);
-  fixture.componentRef.setInput('deletable',true);fixture.detectChanges();buttons('Elimina dalla bozza')[0].click();fixture.detectChanges();
-  fixture.componentRef.setInput('source','Testo aggiornato.');fixture.detectChanges();expect(buttons('Elimina')).toHaveLength(0);expect(buttons('Elimina dalla bozza')[0].disabled).toBe(false);
+ it('nasconde l’eliminazione fuori dalla modifica e blocca la conferma se il testo cambia',()=>{
+  const {fixture,buttons}=setup('Prima.');
+  const remove=vi.fn();fixture.componentInstance.sourceChange.subscribe(remove);
+  fixture.componentRef.setInput('editable',false);fixture.detectChanges();
+  expect(buttons('Elimina dalla bozza')).toHaveLength(0);expect(fixture.nativeElement.querySelector('button.gdr-edit-start')).toBeNull();
+  fixture.componentRef.setInput('editable',true);fixture.detectChanges();
+  fixture.nativeElement.querySelector('button.gdr-edit-start').click();fixture.detectChanges();
+  buttons('Elimina dalla bozza')[0].click();fixture.detectChanges();
+  fixture.componentRef.setInput('source','Nuova.');fixture.detectChanges();
+  expect(buttons('Elimina')).toHaveLength(0);
+  buttons('Elimina dalla bozza')[0].click();fixture.detectChanges();
+  expect(buttons('Elimina')).toHaveLength(0);expect(remove).not.toHaveBeenCalled();
+ });
+ it('annulla solo la conferma di eliminazione, conservando testo e modifica aperta',async()=>{
+  const {fixture,buttons}=setup('Prima.');const editing=vi.fn();fixture.componentInstance.editingChange.subscribe(editing);
+  fixture.nativeElement.querySelector('button.gdr-edit-start').click();fixture.detectChanges();await fixture.whenStable();
+  const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
+  area.value='Modifica non ancora salvata.';area.dispatchEvent(new Event('input'));fixture.detectChanges();
+  buttons('Elimina dalla bozza')[0].click();fixture.detectChanges();expect(buttons('Applica al testo')[0].disabled).toBe(true);
+  buttons('Annulla')[0].click();fixture.detectChanges();
+  expect(area.value).toBe('Modifica non ancora salvata.');expect(buttons('Applica al testo')[0].disabled).toBe(false);
+  expect(editing.mock.calls).toEqual([[true]]);
  });
  it('mostra foto, descrizioni multilinea e dialoghi identici a master e player',()=>{
   const dialogue='La voce di Shivay.\n\n::: dialogo Shivay | /assets/avatar.webp\nNon è una buona notizia.\n:::';
@@ -56,6 +80,7 @@ describe('eliminazione dei blocchi della storia',()=>{
   const {fixture,buttons}=setup('');fixture.componentRef.setInput('insertable',true);fixture.componentRef.setInput('sharedDocument',true);fixture.detectChanges();
   const insert=vi.fn(),privateCopy=vi.fn();fixture.componentInstance.insertBlock.subscribe(insert);fixture.componentInstance.sourceChange.subscribe(privateCopy);
   fixture.nativeElement.querySelector('button[aria-label="Inizia a scrivere"]').click();fixture.detectChanges();await fixture.whenStable();
+  expect(buttons('Elimina dalla bozza')).toHaveLength(0);expect(buttons('Elimina blocco')).toHaveLength(0);
   const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;area.value='Un nuovo inizio.';area.dispatchEvent(new Event('input'));fixture.detectChanges();buttons('Aggiungi al racconto')[0].click();
   expect(insert).toHaveBeenCalledWith({beforeId:undefined,source:'Un nuovo inizio.'});expect(privateCopy).not.toHaveBeenCalled();
  });

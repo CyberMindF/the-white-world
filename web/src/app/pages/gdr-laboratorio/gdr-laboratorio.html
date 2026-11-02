@@ -224,7 +224,6 @@
                 </div>
                 <app-gdr-turn [source]="turn.body"
                   [editable]="canPrepare() && turn.isMine && !!turn.isMaster && !contentSaving() && !readingEdit() && !documentEdit() && !turnEdit() && (publishedEditId() === null || publishedEditId() === turn.id)"
-                  [editBlocks]="false"
                   [deletable]="canPrepare() && turn.isMine && !!turn.isMaster"
                   deletionScope="partita"
                   [characters]="characters()"
