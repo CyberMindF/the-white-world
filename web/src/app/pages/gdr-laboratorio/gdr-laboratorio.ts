@@ -132,10 +132,12 @@ export class GdrLaboratorio implements OnInit {
   protected readonly turnEdit = signal(false);
   protected readonly turnPreview = signal(false);
   protected readonly sendingTurn = signal(false);
+  protected readonly contentSaving = signal(false);
+  protected readonly publishedEditId = signal<number | null>(null);
   private readonly realtime = inject(RealtimeService);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly inlineBusy = computed(
-    () => this.readingEdit() || this.documentEdit() || this.turnEdit(),
+    () => this.readingEdit() || this.documentEdit() || this.turnEdit() || this.publishedEditId() !== null || this.contentSaving(),
   );
   protected inlineDocumentEditing(value: boolean): void {
     this.readingEdit.set(value);
@@ -207,6 +209,7 @@ export class GdrLaboratorio implements OnInit {
   protected readonly rulesBlocks = computed(() => this.referenceBlocks().rules);
   protected readonly powersBlocks = computed(() => this.referenceBlocks().powers);
   protected readonly characterBlocks = computed(() => this.forDocument(this.adventure().character));
+  protected readonly sharedStorySource = computed(() => serializeGdrBlocks(this.narrativeBlocks()));
   protected readonly siteImages = computed(() => gdrLibraryImages([
     ...this.workspace.characters().flatMap(c => [
       { src: c.photo, label: c.name + ' · foto' },
@@ -269,6 +272,9 @@ export class GdrLaboratorio implements OnInit {
     }
     this.realtime.on('gdr-turns:changed').pipe(takeUntilDestroyed(this.destroyRef)).subscribe(event => {
       if (this.liveGame && event['adventure'] === this.selected()) void this.loadTurns(this.selected());
+    });
+    this.realtime.on('gdr-story:changed').pipe(takeUntilDestroyed(this.destroyRef)).subscribe(event => {
+      if (this.liveGame && event['adventure'] === this.selected()) void this.reloadStory();
     });
     await this.select(
       this.adventures().some((a) => a.id === requested) ? requested! : this.selected(),
@@ -351,7 +357,7 @@ export class GdrLaboratorio implements OnInit {
     this.status.set('');
     this.local.set(this.restore());
     this.documentEditor.set(false);
-    this.showOriginal.set(false);
+    this.showOriginal.set(this.liveGame && this.adventure().legacy && this.local().documentDraft !== null);
     this.rulesSearch.set('');
     this.loading.set(true);
     this.contentError.set('');
@@ -440,14 +446,50 @@ export class GdrLaboratorio implements OnInit {
       const data = await this.read<{ turns: ExistingTurn[] }>(`/api/gdr/turns?adventure=${encodeURIComponent(id)}`);
       if (id !== this.selected() || version !== this.turnsRequestVersion) return;
       this.turns.set(data.turns ?? []);
+      if(this.publishedEditId() !== null && !this.turns().some(turn=>turn.id===this.publishedEditId())) this.publishedEditId.set(null);
       this.turnsError.set('');
     } catch {
       if (id === this.selected() && version === this.turnsRequestVersion)
         this.turnsError.set('Non è stato possibile aggiornare i turni. Riprova il caricamento.');
     }
   }
+  private async reloadStory(): Promise<void> {
+    const id=this.selected();
+    try {
+      const data=await this.read<{blocks:GdrBlockRow[]}>('/api/gdr-blocks');
+      if (this.selected()===id) this.blocks.set(data.blocks ?? []);
+    } catch { if(this.selected()===id) this.contentError.set('Non è stato possibile aggiornare la storia. Ricarica la pagina.'); }
+  }
+  protected async deleteStoryBlock(id: string): Promise<void> {
+    if (!this.canPrepare() || this.contentSaving() || !this.liveGame) return;
+    const block=this.blocks().find(b=>b.id===id && b.documentKey===this.adventure().document);
+    if (!block) return;
+    this.contentSaving.set(true);
+    try {
+      const response=await fetch('/api/gdr-blocks/'+encodeURIComponent(id),{method:'DELETE',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedUpdatedAt:block.updatedAt,expectedType:block.type,expectedData:block.data})});
+      const data=await response.json();
+      if(!response.ok) throw new Error(data.error || 'Non è stato possibile eliminare il blocco.');
+      this.blocks.update(blocks=>blocks.filter(b=>b.id!==id));
+      this.status.set('Blocco eliminato dalla partita, per entrambi.');
+    } catch(error) {
+      this.status.set(error instanceof Error ? error.message : 'Eliminazione non riuscita.');
+    } finally { this.contentSaving.set(false); }
+  }
+  protected async savePublishedTurn(turn: ExistingTurn, body: string): Promise<void> {
+    if (!this.canPrepare() || !turn.isMine || !turn.isMaster || !turn.id || this.contentSaving()) return;
+    this.contentSaving.set(true);
+    try {
+      const response=await fetch('/api/gdr/turns',{method:body.trim()?'PUT':'DELETE',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:turn.id,adventure:this.selected(),expectedBody:turn.body,body})});
+      const result=await response.json();
+      if(!response.ok) throw new Error(result.error || 'Non è stato possibile aggiornare il racconto.');
+      this.turns.update(turns=>body.trim()?turns.map(t=>t.id===turn.id?{...t,body:body.trim()}:t):turns.filter(t=>t.id!==turn.id));
+      this.status.set(body.trim()?'Racconto aggiornato nella partita, per entrambi.':'Intervento eliminato dalla partita, per entrambi.');
+    } catch(error) {
+      this.status.set(error instanceof Error ? error.message : 'Aggiornamento non riuscito.');
+    } finally { this.contentSaving.set(false); }
+  }
   protected async publish(): Promise<void> {
-    if (this.invalidTurn() || this.sendingTurn() || this.turnEdit() || !this.turnPreview()) return;
+    if (this.invalidTurn() || this.sendingTurn() || this.turnEdit() || this.contentSaving() || this.publishedEditId() !== null || !this.turnPreview()) return;
     if (!this.liveGame) {
       this.publishLocal();
       return;

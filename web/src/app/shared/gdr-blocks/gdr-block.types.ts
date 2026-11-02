@@ -64,4 +64,5 @@ export interface GdrBlockRow {
   type: GdrBlockType;
   data: GdrBlockData;
   position: number;
+  updatedAt?: string;
 }

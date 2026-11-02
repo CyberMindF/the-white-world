@@ -21,6 +21,10 @@ class TurnPage extends GdrLaboratorio {
   imageNames() { return this.siteImages().map(image=>image.label); }
   storyPhoto() { return (this.narrativeBlocks()[0].data as GdrNpcGridData).entries[0].image; }
   seedStory() { this.blocks.set([{id:'9',documentKey:'avventura',position:0,type:'npc_grid',data:{entries:[{name:'Shivay',image:'/assets/originale.webp',alt:'Shivay',description:'Compagna'}]}}]); }
+  removeStoryBlock(id:string) {return this.deleteStoryBlock(id);}
+  storyCount() {return this.narrativeBlocks().length;}
+  seedTurn(turn:{id:number;author:string;isMine:boolean;isMaster:boolean;body:string;createdAt:string}) {this.turns.set([turn]);}
+  removeTurnPart(body:string) {return this.savePublishedTurn(this.turns()[0],body);}
   state() { return { local: this.local(), turns: this.turns(), status: this.status(), error: this.turnsError() }; }
 }
 function create(live = true, player = false) {
@@ -43,6 +47,17 @@ describe('invio dei turni della partita reale', () => {
   it('usa il personaggio della scheda classica per il dialogo della giocatrice', () => {
     const page=create(true,true);
     expect(page.voices()).toEqual([]);
+  });
+  it('elimina il blocco iniziale sul server e aggiorna la storia senza cancellare altri dati',async()=>{
+    const fetchMock=vi.fn().mockResolvedValue(reply({deleted:true}));vi.stubGlobal('fetch',fetchMock);
+    const page=create();page.seedStory();await page.removeStoryBlock('9');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/gdr-blocks/9');expect(fetchMock.mock.calls[0][1].method).toBe('DELETE');expect(page.storyCount()).toBe(0);
+  });
+  it('salva la rimozione di un paragrafo pubblicato e cancella l’intervento quando si rimuove l’ultimo blocco',async()=>{
+    const fetchMock=vi.fn().mockImplementation(async()=>reply({saved:true}));vi.stubGlobal('fetch',fetchMock);
+    const page=create();page.seedTurn({id:8,author:'Rory',isMine:true,isMaster:true,body:'Prima.\n\nDopo.',createdAt:'2026-11-02T00:00:00Z'});
+    await page.removeTurnPart('Dopo.');expect(fetchMock.mock.calls[0][1].method).toBe('PUT');expect(page.state().turns[0].body).toBe('Dopo.');
+    await page.removeTurnPart('');expect(fetchMock.mock.calls[1][1].method).toBe('DELETE');expect(page.state().turns).toHaveLength(0);
   });
   it('la giocatrice conserva gli strumenti semplici e i propri appunti modificabili',()=>{
     const page=create(true,true);expect(page.tools()).toEqual({master:false,notesReadOnly:false});

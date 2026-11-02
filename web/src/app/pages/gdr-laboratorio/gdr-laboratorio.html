@@ -76,7 +76,7 @@
               </button>
               <button
                 class="lab-text-command"
-                [disabled]="readingEdit() || documentEdit() || workspace.saving()"
+                [disabled]="inlineBusy() || workspace.saving()"
                 [attr.aria-expanded]="documentEditor()"
                 aria-controls="complete-adventure-editor"
                 (click)="documentEditor.set(!documentEditor())"
@@ -84,16 +84,16 @@
                 {{ documentEditor() ? 'Chiudi testo completo' : 'Modifica testo completo' }}
               </button>
               @if (adventure().legacy && local().documentDraft !== null) {
-                <button class="btn" (click)="showOriginal.set(!showOriginal())">
+                <button class="btn" [disabled]="inlineBusy()" (click)="showOriginal.set(!showOriginal())">
                   {{
                     showOriginal()
-                      ? 'Mostra la mia versione di prova'
-                      : 'Confronta con il contenuto originale'
+                      ? 'Riprendi bozza locale'
+                      : 'Mostra versione condivisa'
                   }}</button
                 ><span>{{
                   showOriginal()
-                    ? 'Stai leggendo l’originale'
-                    : 'Stai leggendo la tua versione locale'
+                    ? 'Stai leggendo la partita condivisa'
+                    : 'Stai leggendo una bozza locale'
                 }}</span>
               }
             </div>
@@ -177,10 +177,11 @@
               }
             </div>
           }
-          @if (local().documentDraft !== null && !showOriginal()) {
+          @if (canPrepare() && local().documentDraft !== null && !showOriginal()) {
             <app-gdr-turn
               [source]="local().documentDraft!"
-              [editable]="canPrepare() && !documentEditor() && !workspace.saving()"
+              [editable]="canPrepare() && !documentEditor() && !workspace.saving() && !contentSaving() && publishedEditId() === null"
+              [deletable]="canPrepare()"
               [insertable]="true"
               [characters]="characters()"
               [allowGeneric]="!workspace.available()"
@@ -188,10 +189,13 @@
               (editingChange)="inlineDocumentEditing($event)"
             />
           } @else {
-            @if (canPrepare() && !showOriginal()) {
+            @if (canPrepare()) {
               <app-gdr-turn
-                [source]="documentSource()"
-                [editable]="!documentEditor() && !workspace.saving()"
+                [source]="adventure().legacy ? sharedStorySource() : documentSource()"
+                [persistedBlocks]="adventure().legacy && liveGame ? narrativeBlocks() : []"
+                [editable]="!documentEditor() && !workspace.saving() && !contentSaving() && publishedEditId() === null"
+                [deletable]="true"
+                (deleteBlock)="deleteStoryBlock($event)"
                 [insertable]="true"
                 [characters]="characters()"
                 [allowGeneric]="!workspace.available()"
@@ -226,7 +230,15 @@
                   <span class="gdr-turn-author">{{ turn.isMaster ? 'Racconto · Master' : turn.isMine ? 'Tu' : turn.author }}</span
                   ><span class="gdr-turn-date">{{ formatDate(turn.createdAt) }}</span>
                 </div>
-                <app-gdr-turn [source]="turn.body" />
+                <app-gdr-turn [source]="turn.body"
+                  [editable]="canPrepare() && turn.isMine && !!turn.isMaster && !contentSaving() && !readingEdit() && !documentEdit() && !turnEdit() && (publishedEditId() === null || publishedEditId() === turn.id)"
+                  [editBlocks]="false"
+                  [deletable]="canPrepare() && turn.isMine && !!turn.isMaster"
+                  deletionScope="partita"
+                  [characters]="characters()"
+                  [allowGeneric]="!workspace.available()"
+                  (sourceChange)="savePublishedTurn(turn, $event)"
+                  (editingChange)="publishedEditId.set($event ? turn.id ?? null : null)" />
               </article>
             }
             @for (turn of local().turns; track turn.id) {
@@ -259,7 +271,7 @@
             <div class="gdr-turn-submit-row">
               <button
                 class="btn btn-submit"
-                [disabled]="invalidTurn() || turnEdit() || sendingTurn()"
+                [disabled]="invalidTurn() || turnEdit() || sendingTurn() || publishedEditId() !== null || contentSaving()"
                 (click)="turnPreview() ? publish() : turnComposer.openPreview()"
               >
                 {{ sendingTurn() ? 'Pubblicazione…' : !turnPreview() ? 'Anteprima' : liveGame ? canPrepare() ? 'Pubblica racconto' : 'Pubblica turno' : 'Pubblica turno di prova' }}</button

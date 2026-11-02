@@ -1,10 +1,16 @@
-import { Component, ElementRef, ViewChild, computed, input, output, signal } from '@angular/core';
+import { Component, ElementRef, ViewChild, computed, effect, input, output, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { GdrBlocks } from '../gdr-blocks/gdr-blocks';
 import { BLOCK_TYPES, SNIPPET_LABELS } from '../gdr-blocks/gdr-snippets';
 import { NarrativeCharacter, insertNarrativeBlock, narrativeSnippet } from './gdr-writing';
-import { parseNarrative } from './gdr-turn.parser';
+import { NarrativeSection, parseNarrative } from './gdr-turn.parser';
+import { GdrBlockRow } from '../gdr-blocks/gdr-block.types';
+import { serializeGdrBlocks } from '../gdr-blocks/gdr-markdown.serializer';
+
+interface RenderedSection extends NarrativeSection {
+  persistentId?: string;
+}
 
 @Component({
   selector: 'app-gdr-turn',
@@ -28,14 +34,29 @@ import { parseNarrative } from './gdr-turn.parser';
       } @else if (section.kind === 'document' && editable()) {
         <app-gdr-blocks
           [blocks]="section.blocks"
-          [editable]="true"
+          [editable]="editBlocks()"
           [continuation]="sectionIndex > 0"
           (editBlock)="startEditing(section)"
         />
       } @else {
         <ng-container
-          *ngTemplateOutlet="content; context: { $implicit: section, canEdit: editable() }"
+          *ngTemplateOutlet="content; context: { $implicit: section, canEdit: editable() && editBlocks() }"
         />
+      }
+      @if (editable() && deletable() && !editing() && (!persistedBlocks().length || section.persistentId)) {
+        <div class="block-removal">
+          @if (deleting()?.id === section.id) {
+            <div class="delete-confirm" role="alert">
+              <p>Eliminare questo blocco {{ section.persistentId || deletionScope() === 'partita' ? 'dalla partita' : 'dalla bozza' }}?</p>
+              <button type="button" (click)="confirmDelete()">Elimina</button>
+              <button type="button" (click)="cancelDelete()">Annulla</button>
+            </div>
+          } @else {
+            <button type="button" [disabled]="!!deleting()" (click)="requestDelete(section)">
+              {{ section.persistentId || deletionScope() === 'partita' ? 'Elimina blocco' : 'Elimina dalla bozza' }}
+            </button>
+          }
+        </div>
       }
     }
     @if (editable() && insertable()) {
@@ -205,6 +226,11 @@ import { parseNarrative } from './gdr-turn.parser';
       display: block;
       overflow-wrap: anywhere;
     }
+    .block-removal { margin: -.3rem 0 1rem; }
+    .block-removal > button { border: 0; background: transparent; color: var(--muted-color); font: inherit; font-size: .78rem; padding: .35rem 0; cursor: pointer; text-decoration: underline; }
+    .delete-confirm { padding: .8rem; border: 1px solid var(--border-color); border-radius: .65rem; background: var(--panel-color); }
+    .delete-confirm p { margin: 0 0 .6rem; font-size: .9rem; }
+    .delete-confirm button { padding: .4rem .75rem; margin-right: .5rem; border: 1px solid var(--border-color); border-radius: .5rem; background: var(--button-bg); color: var(--text-color); font: inherit; cursor: pointer; }
     .dialogue {
       margin: 1.5rem 0;
     }
@@ -416,7 +442,12 @@ import { parseNarrative } from './gdr-turn.parser';
 export class GdrTurn {
   readonly source = input.required<string>();
   readonly editable = input(false);
+  readonly editBlocks = input(true);
   readonly insertable = input(false);
+  readonly deletable = input(false);
+  readonly deletionScope = input<'bozza' | 'partita'>('bozza');
+  readonly persistedBlocks = input<GdrBlockRow[]>([]);
+  readonly deleteBlock = output<string>();
   readonly characters = input<NarrativeCharacter[]>([]);
   readonly allowGeneric = input(true);
   protected readonly blockTypes = BLOCK_TYPES;
@@ -427,8 +458,22 @@ export class GdrTurn {
   @ViewChild('inlineArea') private area?: ElementRef<HTMLTextAreaElement>;
   protected readonly fieldId = 'inline-' + crypto.randomUUID();
   protected readonly parsed = computed(() => parseNarrative(this.source()));
-  protected readonly rendered = computed(() =>
-    this.editable()
+  protected readonly rendered = computed<RenderedSection[]>(() => {
+    const originals = this.persistedBlocks().slice().sort((a,b)=>a.position-b.position);
+    if (this.editable() && originals.length && serializeGdrBlocks(originals) === this.source()) {
+      let offset = 0;
+      return originals.flatMap(block => {
+        const source = serializeGdrBlocks([block]), start = offset;
+        offset += source.length + 2;
+        return parseNarrative(source).sections.map((section,index) => ({
+          ...section, id: `stored-${block.id}-${index}`,
+          start: start + section.start, end: start + section.end,
+          persistentId: index === 0 ? block.id : undefined,
+          ranges: section.ranges.map(range=>({...range,start:start+range.start,end:start+range.end})),
+        }));
+      });
+    }
+    return this.editable()
       ? this.parsed().sections.flatMap((section) =>
           section.kind === 'document'
             ? section.blocks.map((block, i) => ({
@@ -441,8 +486,28 @@ export class GdrTurn {
               }))
             : [section],
         )
-      : this.parsed().sections,
-  );
+      : this.parsed().sections;
+  });
+  protected readonly deleting = signal<(RenderedSection & {snapshot:string}) | null>(null);
+  constructor() {
+    effect(()=>{
+      const target=this.deleting();
+      if(target && target.snapshot!==this.source()) this.cancelDelete();
+    });
+  }
+  protected requestDelete(section: RenderedSection): void {
+    if (!this.editable() || !this.deletable() || this.editing()) return;
+    this.deleting.set({...section,snapshot:this.source()});
+    this.editingChange.emit(true);
+  }
+  protected cancelDelete(): void { this.deleting.set(null); this.editingChange.emit(false); }
+  protected confirmDelete(): void {
+    const target=this.deleting();
+    if (!target || target.snapshot !== this.source() || !this.editable() || !this.deletable()) return;
+    if (target.persistentId) this.deleteBlock.emit(target.persistentId);
+    else this.sourceChange.emit(target.snapshot.slice(0,target.start) + target.snapshot.slice(target.end));
+    this.cancelDelete();
+  }
   protected readonly inserting = computed(() => this.editing()?.inserting === true);
   protected readonly draft = signal('');
   protected readonly draftParsed = computed(() => parseNarrative(this.draft()));
@@ -464,7 +529,7 @@ export class GdrTurn {
     return this.editing()?.inserting === true && this.editing()?.start === offset;
   }
   protected startInserting(offset: number): void {
-    if (!this.editable() || !this.insertable() || this.editing()) return;
+    if (!this.editable() || !this.insertable() || this.editing() || this.deleting()) return;
     this.editing.set({ start: offset, end: offset, snapshot: this.source(), inserting: true });
     this.draft.set('');
     this.preview.set(false);
@@ -497,7 +562,7 @@ export class GdrTurn {
     });
   }
   public startEditing(range: { start: number; end: number }): void {
-    if (!this.editable() || !range) return;
+    if (!this.editable() || !this.editBlocks() || !range || this.deleting()) return;
     if (this.editing()) {
       this.message.set('Applica o annulla questa modifica prima di aprirne un’altra.');
       return;

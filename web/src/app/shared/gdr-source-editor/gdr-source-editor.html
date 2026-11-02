@@ -118,6 +118,7 @@
           <app-gdr-turn
             [source]="source()"
             [editable]="mode() === 'preview'"
+            [deletable]="masterTools() || document()"
             [characters]="characters()"
             [allowGeneric]="allowGeneric()"
             (sourceChange)="sourceChange.emit($event)"

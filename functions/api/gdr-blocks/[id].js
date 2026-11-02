@@ -1,6 +1,7 @@
 import { getAuthenticatedSession, json, readJson } from "../auth/_shared.js";
 import { hasPermission } from "../_shared/permissions.js";
 import { recordEvent } from "../_shared/events.js";
+import { notifyRealtime } from "../_shared/realtime.js";
 import { normalizeData, normalizeType } from "./_shared.js";
 import { toBlockView } from "./index.js";
 
@@ -52,22 +53,31 @@ export async function onRequestDelete(context) {
   try {
     const session = await getAuthenticatedSession(context.request, env);
     if (!session) return json({ error: "Sessione non valida o scaduta." }, 401);
-    if (!hasPermission(session.user.role, "content.delete")) {
+    if (session.user.isTest || !hasPermission(session.user.role, "content.delete")) {
       return json({ error: "Non autorizzato." }, 403);
     }
 
-    const existing = await env.DB.prepare("SELECT id FROM gdr_blocks WHERE id = ?").bind(params.id).first();
+    const existing = await env.DB.prepare("SELECT id,updated_at,document_key,type,data FROM gdr_blocks WHERE id = ?").bind(params.id).first();
     if (!existing) {
       return json({ error: "Blocco non trovato." }, 404);
     }
 
-    await env.DB.prepare("DELETE FROM gdr_blocks WHERE id = ?").bind(params.id).run();
+    const jsonBody=context.request.headers.get('Content-Type')?.includes('application/json');
+    const payload=jsonBody ? await readJson(context.request) : null;
+    if(jsonBody && (!payload || typeof payload!=='object' || Array.isArray(payload))) return json({error:'Richiesta non valida.'},400);
+    const hasSnapshot=payload && ('expectedUpdatedAt' in payload || 'expectedType' in payload || 'expectedData' in payload);
+    if(hasSnapshot && (typeof payload.expectedUpdatedAt!=='string' || payload.expectedUpdatedAt!==existing.updated_at)) return json({error:'Il blocco è cambiato. Ricarica prima di eliminarlo.'},409);
+    if(hasSnapshot && (payload.expectedType!==existing.type || JSON.stringify(payload.expectedData)!==JSON.stringify(JSON.parse(existing.data)))) return json({error:'Il blocco è cambiato. Ricarica prima di eliminarlo.'},409);
+    const result=await env.DB.prepare("DELETE FROM gdr_blocks WHERE id = ? AND updated_at = ? AND type = ? AND data = ?").bind(params.id,existing.updated_at,existing.type,existing.data).run();
+    if(!result.meta.changes) return json({error:'Il blocco è cambiato. Ricarica prima di eliminarlo.'},409);
 
     context.waitUntil(recordEvent(env, { userId: session.user.id, sessionId: session.sessionId }, {
       section: "gdr",
       eventType: "content_deleted",
       metadata: { blockId: params.id }
     }));
+    const adventure=existing.document_key==='avventura'?'il-prezzo-della-verita':existing.document_key==='casa-avventura'?'la-casa-che-trattiene-il-respiro':null;
+    if(adventure) context.waitUntil(notifyRealtime(env,{type:'gdr-story:changed',action:'deleted',actorUserId:session.user.id,adventure,blockId:params.id}));
 
     return json({ id: params.id, deleted: true });
   } catch (error) {
