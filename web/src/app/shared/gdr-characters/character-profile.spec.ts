@@ -11,6 +11,11 @@ const file = () => ({
   images: { photo: '', avatar: '' },
 });
 describe('file personaggio portabile', () => {
+  it('conserva il flag pet senza importare il collegamento a un PG di un’altra copia',()=>{
+    const result=parseCharacterBundle(JSON.stringify({...file(),isPet:true,petOwnerId:'pg-originale'}));
+    expect(result.isPet).toBe(true);expect(result).not.toHaveProperty('petOwnerId');
+    expect(()=>parseCharacterBundle(JSON.stringify({...file(),kind:'pg',isPet:true}))).toThrow();
+  });
   it('conserva statistiche e compagno nel file del personaggio',()=>{const result=parseCharacterBundle(JSON.stringify({...file(),characterFields:{catName:'Luna',statMente:'4'}}));expect(result.characterFields).toEqual({catName:'Luna',statMente:'4'});});
 
   it('mantiene profilo e inventario e genera nuovi identificativi per gli oggetti', () => {

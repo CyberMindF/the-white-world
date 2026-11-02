@@ -97,6 +97,7 @@
                 <option value="all">PG e PNG</option>
                 <option value="pg">Solo PG</option>
                 <option value="png">Solo PNG</option>
+                <option value="pet">Solo pet</option>
               </select>
               <label for="character-status">Stato</label
               ><select
@@ -129,7 +130,7 @@
                     ><strong>{{ character.name }} {{ character.profile?.surname }}</strong
                     ><small
                       >{{ character.kind === 'pg' ? 'PG' : 'PNG'
-                      }}{{ character.archived ? ' · archiviato' : '' }}</small
+                      }}{{ character.isPet ? ' · Pet' : '' }}{{ character.archived ? ' · archiviato' : '' }}</small
                     ><span class="assignment-caption">{{
                       assignmentLabel(character.id)
                     }}</span></span
@@ -160,7 +161,7 @@
                 @for (c of workspace.characters(); track c.id) {
                   <option [value]="c.id">
                     {{ c.name }} {{ c.profile?.surname }} · {{ c.kind === 'pg' ? 'PG' : 'PNG'
-                    }}{{ c.archived ? ' · archiviato' : '' }}
+                    }}{{ c.isPet ? ' · Pet' : '' }}{{ c.archived ? ' · archiviato' : '' }}
                   </option>
                 }
               </select>
@@ -175,7 +176,7 @@
                 <div>
                   <small
                     >{{ c.kind === 'pg' ? 'Personaggio giocante' : 'Personaggio non giocante'
-                    }}{{ c.archived ? ' · archiviato' : '' }}</small
+                    }}{{ c.isPet ? ' · Pet' : '' }}{{ c.archived ? ' · archiviato' : '' }}</small
                   >
                   <h3>{{ c.name }} {{ c.profile?.surname }}</h3>
                   @if (canManage()) {
@@ -427,7 +428,7 @@
                           </section>
                           @if (textFields().length) {
                             <section class="edit-section">
-                              <h4>Descrizione e compagno</h4>
+                              <h4>Descrizione</h4>
                               @for (field of textFields(); track field.key) {
                                 <label [for]="'sheet-field-' + field.key">{{ field.label }}</label>
                                 @if (field.long) {
@@ -542,6 +543,23 @@
                             [ngModel]="name()"
                             (ngModelChange)="name.set($event); dirty.set(true)"
                           />
+                          @if (c.kind === 'png') {
+                            <section class="pet-settings" aria-label="Pet e assegnazione">
+                              <label class="check" for="character-is-pet">
+                                <input id="character-is-pet" type="checkbox" [ngModel]="isPet()" (ngModelChange)="changePet($event)" />
+                                Pet
+                              </label>
+                              @if (isPet()) {
+                                <label for="pet-owner">Assegna al PG</label>
+                                <select id="pet-owner" [ngModel]="petOwnerId()" (ngModelChange)="petOwnerId.set($event); dirty.set(true)">
+                                  <option value="">Non assegnato</option>
+                                  @for (owner of petOwners(); track owner.id) {
+                                    <option [value]="owner.id">{{ owner.name }} {{ owner.profile?.surname }}{{ owner.archived ? ' · archiviato' : '' }}</option>
+                                  }
+                                </select>
+                              }
+                            </section>
+                          }
                           <details class="form-group">
                             <summary>Foto e avatar</summary>
                             <p class="hint">
@@ -678,6 +696,7 @@
                       </dl>
                       @if (
                         !extraFields().length &&
+                        !assignedPets().length &&
                         !c.sheet &&
                         !c.photo &&
                         !c.profile?.appearance &&
@@ -709,6 +728,30 @@
                             }
                           }
                         </dl>
+                      }
+                      @if (c.kind === 'pg') {
+                        <section class="assigned-pets" aria-label="Pet assegnati">
+                          <h4>Pet assegnati</h4>
+                          @for (pet of assignedPets(); track pet.id) {
+                            <article class="assigned-pet">
+                              @if (pet.portrait || pet.photo) {
+                                <img [src]="pet.portrait || pet.photo" [alt]="pet.name" />
+                              } @else {
+                                <span class="avatar-initial" aria-hidden="true">🐾</span>
+                              }
+                              <div>
+                                <strong>{{ pet.name }}</strong>
+                                @if (pet.description) { <p>{{ pet.description }}</p> }
+                                @if (canManage()) {
+                                  <button class="btn" [disabled]="hasChanges()" (click)="openPet(pet.id)">Apri PNG</button>
+                                }
+                              </div>
+                            </article>
+                          } @empty {
+                            <p class="hint">Nessun pet assegnato.</p>
+                          }
+                          @if (canManage()) { <p class="hint">Per assegnare un pet, apri un PNG, seleziona “Pet” e scegli il PG.</p> }
+                        </section>
                       }
                       @if (c.sheet) {
                         <section class="master-guidance">

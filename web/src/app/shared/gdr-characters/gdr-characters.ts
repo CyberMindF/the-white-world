@@ -127,7 +127,7 @@ export class GdrCharacters {
     this.workspace.active()?.kind === 'pg'
       ? this.fields().filter(
           (f) =>
-            !/^(name|nome|surname|cognome|nome_personaggio|character_name|inventory)$/i.test(f.key),
+            !/^(name|nome|surname|cognome|nome_personaggio|character_name|inventory|catName)$/i.test(f.key),
         ).map(f => this.statLabels[f.key] ? { ...f, label: this.statLabels[f.key] } : f)
       : [],
   );
@@ -297,7 +297,7 @@ export class GdrCharacters {
     }
   }
   protected readonly mediaBusy = signal(false);
-  protected readonly filter = signal<'all' | 'pg' | 'png'>('all');
+  protected readonly filter = signal<'all' | 'pg' | 'png' | 'pet'>('all');
   protected readonly search = signal('');
   protected readonly statusFilter = signal<'active' | 'archived' | 'all'>('active');
   protected readonly section = signal<'sheet' | 'assignments' | 'inventory' | 'manage'>('sheet');
@@ -326,6 +326,11 @@ export class GdrCharacters {
     () => this.workspace.characters().filter((c) => !c.archived).length,
   );
   protected assignmentLabel(id: string): string {
+    const character = this.workspace.characters().find(c => c.id === id);
+    if (character?.isPet) {
+      const owner = this.workspace.characters().find(c => c.id === character.petOwnerId);
+      return owner ? 'Pet di ' + [owner.name, owner.profile?.surname].filter(Boolean).join(' ') : 'Pet non assegnato';
+    }
     const names = this.workspace
       .grants()
       .filter((g) => g.characterId === id && (g.canSpeak || g.canEditSheet || g.canInventory))
@@ -347,13 +352,27 @@ export class GdrCharacters {
       .characters()
       .filter(
         (c) =>
-          (this.filter() === 'all' || c.kind === this.filter()) &&
+          (this.filter() === 'all' || c.kind === this.filter() || (this.filter() === 'pet' && c.isPet)) &&
           (this.statusFilter() === 'all' || (this.statusFilter() === 'archived') === c.archived) &&
           (c.name + ' ' + (c.profile?.surname ?? '') + ' ' + this.assignmentLabel(c.id))
             .toLocaleLowerCase('it')
             .includes(this.search().toLocaleLowerCase('it')),
       ),
   );
+  protected readonly isPet = signal(false);
+  protected readonly petOwnerId = signal('');
+  protected readonly petOwners = computed(() => this.workspace.characters().filter(c => c.kind === 'pg'));
+  protected readonly assignedPets = computed(() => this.workspace.pets().filter(p => p.ownerCharacterId === this.workspace.active()?.id));
+  protected changePet(value: boolean): void {
+    this.isPet.set(value);
+    if (!value) this.petOwnerId.set('');
+    this.dirty.set(true);
+  }
+  protected openPet(id: string): void {
+    if (!this.canManage() || this.hasChanges()) return;
+    this.choose(id);
+    this.section.set('sheet');
+  }
   protected readonly name = signal('');
   protected readonly portrait = signal('');
   protected readonly sheet = signal('');
@@ -403,6 +422,8 @@ export class GdrCharacters {
     });
   }
   private populate(c: WorkspaceCharacter): void {
+    this.isPet.set(c.isPet === true);
+    this.petOwnerId.set(c.petOwnerId ?? '');
     this.profile.set({ ...emptyProfile(), ...c.profile });
     this.photo.set(gdrImagePath(c.photo ?? '') || c.photo || '');
     this.name.set([c.name, c.profile?.surname].filter(Boolean).join(' '));
@@ -485,6 +506,7 @@ export class GdrCharacters {
         profile: { ...this.profile(), surname: '' },
         sheet: this.sheet(),
         characterFields: this.sheetFields(),
+        ...(this.canManage() && c.kind === 'png' ? {isPet:this.isPet(), petOwnerId:this.petOwnerId() || null} : {}),
       })
     ) {
       const next = this.workspace.active();
@@ -603,6 +625,7 @@ export class GdrCharacters {
         id,
         adventureId: this.workspace.selectedId(),
         kind: bundle.kind,
+        isPet: bundle.isPet ?? false,
         name: bundle.name,
         profile: bundle.profile,
         sheet: bundle.sheet,

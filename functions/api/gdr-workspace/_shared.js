@@ -109,6 +109,8 @@ export function characterView(row, user) {
     id: row.id,
     adventureId: row.adventure_id,
     kind: row.kind,
+    isPet: row.is_pet === 1,
+    petOwnerId: row.pet_owner_id ?? null,
     name: row.name,
     portrait: row.portrait,
     sheet: row.sheet,

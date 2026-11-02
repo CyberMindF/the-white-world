@@ -21,10 +21,20 @@ export interface CharacterProfile {
   goal: string;
   abilities: string;
 }
+export interface AssignedPet {
+  id: string;
+  ownerCharacterId: string;
+  name: string;
+  portrait: string;
+  photo: string;
+  description: string;
+}
 export interface WorkspaceCharacter {
   id: string;
   adventureId: string;
   kind: 'pg' | 'png';
+  isPet?: boolean;
+  petOwnerId?: string | null;
   name: string;
   portrait: string;
   photo: string;
@@ -51,6 +61,7 @@ export interface CharacterGrant {
   canInventory: boolean;
 }
 interface WorkspaceResponse {
+  pets?: AssignedPet[];
   adventures: WorkspaceAdventure[];
   characters: WorkspaceCharacter[];
   grants: CharacterGrant[];
@@ -68,6 +79,7 @@ interface WorkspaceResponse {
 @Injectable()
 export class GdrWorkspaceService {
   readonly adventures = signal<WorkspaceAdventure[]>([]);
+  readonly pets = signal<AssignedPet[]>([]);
   readonly storyCharacters = signal<NonNullable<WorkspaceResponse['storyCharacters']>>([]);
   readonly characters = signal<WorkspaceCharacter[]>([]);
   readonly grants = signal<CharacterGrant[]>([]);
@@ -128,6 +140,7 @@ export class GdrWorkspaceService {
       const state = data as WorkspaceResponse;
       this.adventures.set(state.adventures ?? []);
       this.characters.set(state.characters ?? []);
+      this.pets.set(state.pets ?? []);
       this.storyCharacters.set(state.storyCharacters ?? []);
       this.grants.set(state.grants ?? []);
       this.users.set(state.users ?? []);
@@ -137,6 +150,7 @@ export class GdrWorkspaceService {
       if (version === this.version) {
         this.available.set(false);
         this.characters.set([]);
+        this.pets.set([]);
         this.error.set(
           error instanceof Error ? error.message : 'Impossibile caricare i personaggi.',
         );

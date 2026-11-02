@@ -788,3 +788,15 @@ summary:focus-visible {
 .portrait-dialog input[type='range'] {
   padding: 0.3rem 0;
 }
+
+.pet-settings,
+.assigned-pets {
+  margin-block: 1.2rem;
+  padding-block: 1rem;
+  border-block: 1px solid var(--border-color);
+}
+.assigned-pets h4 { margin: 0 0 .8rem; }
+.assigned-pet { display: flex; align-items: flex-start; gap: .8rem; margin-block: .8rem; }
+.assigned-pet > img { width: 56px; height: 56px; flex-shrink: 0; object-fit: cover; border-radius: 50%; }
+.assigned-pet > div { min-width: 0; }
+.assigned-pet p { margin: .3rem 0; white-space: pre-line; font-size: .9rem; }

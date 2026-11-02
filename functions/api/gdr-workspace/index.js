@@ -43,6 +43,23 @@ export async function onRequestGet(context) {
             .all()
         ).results;
     }
+    // Solo i pet dei PG visibili, senza concedere accesso alla scheda privata del PNG.
+    const pets = adventure ? (await db.prepare(`
+      SELECT pet.id,pet.pet_owner_id,pet.name,pet.portrait,pet.photo,pet.profile_json
+      FROM gdr_workspace_characters pet
+      INNER JOIN gdr_workspace_characters pg ON pg.id=pet.pet_owner_id
+      WHERE pet.adventure_id=? AND pet.is_pet=1 AND pet.archived=0 AND pg.archived=0
+        AND (?=1 OR EXISTS(SELECT 1 FROM gdr_workspace_grants g WHERE g.character_id=pg.id
+          AND g.user_id=? AND (g.can_speak=1 OR g.can_edit_sheet=1 OR g.can_inventory=1)))
+      ORDER BY pet.name,pet.id
+    `).bind(adventure, isMaster(user) ? 1 : 0, user.id).all()).results.map(row => ({
+      id: row.id,
+      ownerCharacterId: row.pet_owner_id,
+      name: [row.name, JSON.parse(row.profile_json).surname].filter(Boolean).join(' '),
+      portrait: row.portrait,
+      photo: row.photo,
+      description: JSON.parse(row.profile_json).appearance ?? '',
+    })) : [];
     const users = isMaster(user)
       ? (
           await db
@@ -73,6 +90,7 @@ export async function onRequestGet(context) {
       : [];
     return json({
       storyCharacters,
+      pets,
       adventures: adventures.results.map((a) => ({
         ...a,
         legacy: a.legacy === 1,

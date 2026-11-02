@@ -188,15 +188,48 @@ describe('scheda unica nel pannello della giocatrice',()=>{
   workspace.characters.set([{...character('ada','Ada'),revision:2,characterFields:{catName:'Luna',statMente:'4'}}]);
   fixture.componentRef.setInput('managementMode',false);
   fixture.componentRef.setInput('fields',[{key:'name',label:'Nome',type:'text'},{key:'catName',label:'Nome del gatto',type:'text'},{key:'statMente',label:'Mente',type:'number',min:1,max:5}]);fixture.detectChanges();
-  expect(fixture.nativeElement.textContent).toContain('Luna');expect(fixture.nativeElement.textContent).toContain('Ada');
+  expect(fixture.nativeElement.textContent).not.toContain('Nome del gatto');expect(fixture.nativeElement.textContent).toContain('Ada');
   const button=(label:string)=>Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>).find(b=>b.textContent?.trim()===label)!;
   button('Modifica personaggio').click();fixture.detectChanges();await fixture.whenStable();
   expect(fixture.nativeElement.querySelector('#character-sheet')).toBeNull();
   expect(fixture.nativeElement.querySelector('#character-photo')).toBeNull();
   expect(fixture.nativeElement.querySelector('#profile-abilities')).toBeNull();
   const name=fixture.nativeElement.querySelector('#character-name') as HTMLInputElement;name.value='Alba';name.dispatchEvent(new Event('input'));
-  const pet=fixture.nativeElement.querySelector('#sheet-field-catName') as HTMLTextAreaElement;pet.value='Stella';pet.dispatchEvent(new Event('input'));fixture.detectChanges();
+  expect(fixture.nativeElement.querySelector('#sheet-field-catName')).toBeNull();fixture.detectChanges();
   const save=vi.spyOn(workspace,'save').mockResolvedValue(false);button('Salva modifiche').click();await fixture.whenStable();
-  expect(save).toHaveBeenCalledWith(expect.objectContaining({characterId:'ada',name:'Alba',characterFields:{catName:'Stella',statMente:'4'}}));
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({characterId:'ada',name:'Alba',characterFields:{catName:'Luna',statMente:'4'}}));
+ });
+});
+
+describe('pet assegnati ai PG', () => {
+ afterEach(()=>TestBed.resetTestingModule());
+ it('il master contrassegna un PNG come pet e salva il PG scelto sullo stesso personaggio',async()=>{
+  const {workspace,fixture,button}=setup();
+  workspace.characters.update(chars=>[...chars,{...character('sally','Sally'),kind:'png'}]);workspace.activeId.set('sally');fixture.detectChanges();
+  button('Modifica scheda').click();fixture.detectChanges();await fixture.whenStable();
+  expect(fixture.nativeElement.querySelector('#pet-owner')).toBeNull();
+  fixture.nativeElement.querySelector('#character-is-pet').click();fixture.detectChanges();await fixture.whenStable();
+  const owner=fixture.nativeElement.querySelector('#pet-owner') as HTMLSelectElement;
+  owner.value='ada';owner.dispatchEvent(new Event('change'));fixture.detectChanges();
+  const save=vi.spyOn(workspace,'save').mockResolvedValue(false);button('Salva modifiche').click();await fixture.whenStable();
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({action:'saveCharacter',characterId:'sally',isPet:true,petOwnerId:'ada'}));
+  button('Annulla').click();fixture.detectChanges();expect(workspace.pendingChanges()).toBe(false);
+ });
+ it('mostra il PG assegnatario nel roster e permette di aprire il pet dalla scheda del PG',()=>{
+  const {workspace,fixture,button}=setup();
+  workspace.characters.update(chars=>[...chars,{...character('sally','Sally'),kind:'png',isPet:true,petOwnerId:'ada'}]);
+  workspace.pets.set([{id:'sally',ownerCharacterId:'ada',name:'Sally',portrait:'/assets/sally.webp',photo:'',description:'Una gatta curiosa.'}]);fixture.detectChanges();
+  expect(fixture.nativeElement.querySelector('.roster').textContent).toContain('Pet di Ada');
+  expect(fixture.nativeElement.querySelector('.assigned-pets').textContent).toContain('Sally');
+  button('Apri PNG').click();fixture.detectChanges();expect(workspace.active()?.id).toBe('sally');
+ });
+ it('la giocatrice consulta i pet del proprio PG senza ricevere comandi di assegnazione o il vecchio campo del gatto',()=>{
+  const {workspace,fixture,button}=setup();workspace.isMaster.set(false);fixture.componentRef.setInput('managementMode',false);
+  fixture.componentRef.setInput('fields',[{key:'catName',label:'Nome del gatto',type:'text'}]);
+  workspace.pets.set([{id:'sally',ownerCharacterId:'ada',name:'Sally',portrait:'/assets/sally.webp',photo:'',description:'Una gatta curiosa.'},{id:'other',ownerCharacterId:'bea',name:'Altro pet',portrait:'',photo:'',description:''}]);fixture.detectChanges();
+  const panel=fixture.nativeElement.querySelector('.assigned-pets');expect(panel.textContent).toContain('Sally');expect(panel.textContent).not.toContain('Altro pet');
+  expect(panel.querySelector('img').getAttribute('src')).toBe('/assets/sally.webp');expect(panel.querySelector('button')).toBeNull();
+  button('Modifica personaggio').click();fixture.detectChanges();
+  expect(fixture.nativeElement.querySelector('#character-is-pet')).toBeNull();expect(fixture.nativeElement.querySelector('#sheet-field-catName')).toBeNull();
  });
 });

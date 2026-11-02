@@ -237,3 +237,51 @@ test('Stress e slot: aggiornamento immediato anche con caratteristiche bloccate 
  h.sqlite.prepare("UPDATE gdr_workspace_characters SET fields_json=json_set(fields_json,'$.spellSlotsCurrent','0') WHERE id=?").run(c.id);
  await assert.rejects(()=>mutate(h.db,member,{action:'adjustResource',characterId:c.id,revision:c.revision,fieldKey:'spellSlotsCurrent',delta:-1}),e=>e.status===400);h.sqlite.close();
 });
+
+const savePet = (h, id, values={}) => mutate(h.db,master,{
+ action:'saveCharacter',characterId:id,revision:revision(h.sqlite,id),name:id,portrait:'',sheet:'',...values,
+});
+test('pet: PNG canonico, lettura sulla scheda del PG senza accesso ai dati privati o nuovi permessi',async()=>{
+ const h=apiHarness();await character(h.db,'daisy');await grant(h.db,h.sqlite,'daisy',{canEditSheet:true});
+ await mutate(h.db,master,{action:'createCharacter',id:'sally',adventureId,kind:'png',name:'Sally',isPet:true,petOwnerId:'daisy',sheet:'Segreto',portrait:'/assets/sally.webp',profile:{appearance:'Gatta curiosa',history:'Finale segreto'}});
+ let player=await (await h.call(2)).json();
+ assert.deepEqual(player.characters.map(c=>c.id),['daisy']);assert.deepEqual(player.pets,[{id:'sally',ownerCharacterId:'daisy',name:'Sally',portrait:'/assets/sally.webp',photo:'',description:'Gatta curiosa'}]);
+ assert.equal(JSON.stringify(player.pets).includes('Segreto'),false);assert.deepEqual((await (await h.call(3)).json()).pets,[]);
+ const masterPet=(await (await h.call(1)).json()).characters.find(c=>c.id==='sally');assert.equal(masterPet.isPet,true);assert.equal(masterPet.petOwnerId,'daisy');
+ await denied(()=>mutate(h.db,member,{action:'saveCharacter',characterId:'sally',revision:masterPet.revision,name:'No',sheet:'',portrait:''}));
+ await denied(()=>mutate(h.db,member,{action:'saveCharacter',characterId:'daisy',revision:revision(h.sqlite,'daisy'),name:'Daisy',isPet:true,petOwnerId:'daisy'}));
+ await savePet(h,'sally',{name:'Sally nuova',portrait:'/assets/new.webp'});
+ player=await (await h.call(2)).json();assert.equal(player.pets[0].name,'Sally nuova');assert.equal(player.pets[0].portrait,'/assets/new.webp');assert.equal(player.pets[0].ownerCharacterId,'daisy');
+ assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM gdr_workspace_grants WHERE character_id=?').get('sally').n,0);h.sqlite.close();
+});
+test('pet: più compagni per PG, riassegnazione e revoca aggiornano la lettura della giocatrice',async()=>{
+ const h=apiHarness();await character(h.db,'daisy');await character(h.db,'other-pg');await grant(h.db,h.sqlite,'daisy');
+ for(const id of ['sally','luna']) {await character(h.db,id,'png');await savePet(h,id,{isPet:true,petOwnerId:'daisy'});}
+ assert.equal((await (await h.call(2)).json()).pets.length,2);
+ await savePet(h,'sally',{petOwnerId:'other-pg'});let data=await (await h.call(2)).json();assert.deepEqual(data.pets.map(p=>p.id),['luna']);
+ await savePet(h,'luna',{isPet:false,petOwnerId:null});assert.deepEqual((await (await h.call(2)).json()).pets,[]);
+ await grant(h.db,h.sqlite,'other-pg');assert.equal((await (await h.call(2)).json()).pets[0].id,'sally');
+ await grant(h.db,h.sqlite,'other-pg',{canSpeak:false});assert.deepEqual((await (await h.call(2)).json()).pets,[]);h.sqlite.close();
+});
+test('pet: solo PNG, assegnazione a PG della stessa avventura e conflitti senza sovrascrittura',async()=>{
+ const h=apiHarness();await character(h.db,'daisy');await character(h.db,'sally','png');await character(h.db,'npc','png');
+ await mutate(h.db,master,{action:'createCharacter',id:'foreign',adventureId:'la-casa-che-trattiene-il-respiro',kind:'pg',name:'Altro PG'});
+ for(const owner of ['missing','npc','foreign']) await assert.rejects(()=>savePet(h,'sally',{isPet:true,petOwnerId:owner}),e=>e.status===400);
+ await assert.rejects(()=>savePet(h,'daisy',{isPet:true}),e=>e.status===400);
+ await assert.rejects(()=>savePet(h,'sally',{isPet:null}),e=>e.status===400);
+ await assert.rejects(()=>savePet(h,'sally',{isPet:false,petOwnerId:'daisy'}),e=>e.status===400);
+ const stale=revision(h.sqlite,'sally');await savePet(h,'sally',{isPet:true,petOwnerId:'daisy'});
+ await assert.rejects(()=>savePet(h,'sally',{isPet:false,petOwnerId:null,revision:stale}),e=>e.status===409);
+ assert.equal(h.sqlite.prepare('SELECT pet_owner_id FROM gdr_workspace_characters WHERE id=?').get('sally').pet_owner_id,'daisy');
+ assert.throws(()=>h.sqlite.prepare('UPDATE gdr_workspace_characters SET pet_owner_id=? WHERE id=?').run('foreign','sally'));
+ h.sqlite.close();
+});
+test('pet: archiviazione nasconde il compagno; eliminare il PG lo scollega senza eliminare il PNG',async()=>{
+ const h=apiHarness();await character(h.db,'daisy');await grant(h.db,h.sqlite,'daisy');await character(h.db,'sally','png');await savePet(h,'sally',{isPet:true,petOwnerId:'daisy'});
+ await mutate(h.db,master,{action:'archive',characterId:'sally',revision:revision(h.sqlite,'sally'),archived:true});assert.deepEqual((await (await h.call(2)).json()).pets,[]);
+ await mutate(h.db,master,{action:'archive',characterId:'sally',revision:revision(h.sqlite,'sally'),archived:false});assert.equal((await (await h.call(2)).json()).pets.length,1);
+ const before=revision(h.sqlite,'sally');await mutate(h.db,master,{action:'deleteCharacter',characterId:'daisy',revision:revision(h.sqlite,'daisy')});
+ const pet=h.sqlite.prepare('SELECT * FROM gdr_workspace_characters WHERE id=?').get('sally');assert.equal(pet.is_pet,1);assert.equal(pet.pet_owner_id,null);assert.equal(pet.revision,before+1);
+ assert.deepEqual((await (await h.call(2)).json()).pets,[]);
+ await assert.rejects(()=>savePet(h,'sally',{revision:before}),e=>e.status===409);h.sqlite.close();
+});

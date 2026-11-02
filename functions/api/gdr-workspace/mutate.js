@@ -99,9 +99,10 @@ export async function mutate(db, user, payload) {
       .bind(p.adventureId)
       .first();
     if (!adventure) throw new WorkspaceError("Avventura non trovata.", 404);
+    const pet = await petSettings(db, p, {kind:p.kind, adventure_id:p.adventureId});
     await db
       .prepare(
-        `INSERT INTO gdr_workspace_characters (id,adventure_id,kind,name,portrait,sheet,profile_json,photo,inventory_json,created_by,created_at,fields_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`,
+        `INSERT INTO gdr_workspace_characters (id,adventure_id,kind,name,portrait,sheet,profile_json,photo,inventory_json,created_by,created_at,fields_json,is_pet,pet_owner_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`,
       )
       .bind(
         p.id,
@@ -122,6 +123,8 @@ export async function mutate(db, user, payload) {
             p.characterFields ?? {},
           ),
         ),
+        +pet.isPet,
+        pet.ownerId,
       )
       .run();
     return { saved: true, id: p.id };
@@ -300,6 +303,8 @@ export async function mutate(db, user, payload) {
     return { saved: true };
   }
   if (p.action === "saveCharacter") {
+    if (!master && (p.isPet !== undefined || p.petOwnerId !== undefined)) requireMaster(user);
+    const pet = await petSettings(db, p, character);
     if (
       !master &&
       character.adventure_id === "il-prezzo-della-verita" &&
@@ -321,7 +326,7 @@ export async function mutate(db, user, payload) {
 
     const result = await db
       .prepare(
-        `UPDATE gdr_workspace_characters SET name=?,portrait=?,sheet=?,profile_json=?,photo=?,fields_json=?,revision=revision+1
+        `UPDATE gdr_workspace_characters SET name=?,portrait=?,sheet=?,profile_json=?,photo=?,fields_json=?,is_pet=?,pet_owner_id=?,revision=revision+1
       WHERE id=? AND revision=? AND (?=1 OR (kind='pg' AND archived=0 AND EXISTS(SELECT 1 FROM gdr_workspace_grants g WHERE g.character_id=gdr_workspace_characters.id AND g.user_id=? AND g.can_edit_sheet=1)))`,
       )
       .bind(
@@ -357,6 +362,8 @@ export async function mutate(db, user, payload) {
               : (p.characterFields ?? JSON.parse(character.fields_json)),
           ),
         ),
+        +pet.isPet,
+        pet.ownerId,
         character.id,
         p.revision,
         master ? 1 : 0,
@@ -393,6 +400,19 @@ export async function mutate(db, user, payload) {
   }
   throw new WorkspaceError("Operazione non valida.", 400);
 }
+async function petSettings(db, payload, character) {
+  const isPet = payload.isPet === undefined ? character.is_pet === 1 : payload.isPet;
+  const ownerId = payload.petOwnerId === undefined ? (isPet ? character.pet_owner_id ?? null : null) : payload.petOwnerId;
+  if (typeof isPet !== 'boolean' || (isPet && character.kind !== 'png') ||
+      (ownerId !== null && (!validId(ownerId) || !isPet)))
+    throw new WorkspaceError('Solo un PNG contrassegnato come pet può essere assegnato a un PG.', 400);
+  if (ownerId !== null) {
+    const owner = await db.prepare("SELECT id FROM gdr_workspace_characters WHERE id=? AND adventure_id=? AND kind='pg'").bind(ownerId, character.adventure_id).first();
+    if (!owner) throw new WorkspaceError('Scegli un PG della stessa avventura.', 400);
+  }
+  return {isPet, ownerId};
+}
+
 function changed(result) {
   if (!result.meta.changes)
     throw new WorkspaceError(
@@ -432,7 +452,7 @@ export async function onRequestPost(context) {
       throw new WorkspaceError("Richiesta non valida.", 400);
     }
     const db=context.env.DB.withSession("first-primary");
-    const linked=['saveCharacter','deleteCharacter'].includes(payload?.action) && payload.characterId ? await db.prepare('SELECT adventure_id FROM gdr_workspace_characters WHERE id=?').bind(payload.characterId).first() : null;
+    const linked=['saveCharacter','deleteCharacter','archive','grant'].includes(payload?.action) && payload.characterId ? await db.prepare('SELECT adventure_id FROM gdr_workspace_characters WHERE id=?').bind(payload.characterId).first() : null;
     const result=await mutate(db,session.user,payload);
     if(linked) context.waitUntil(notifyRealtime(context.env,{type:'gdr-story:changed',action:'character_updated',actorUserId:session.user.id,adventure:linked.adventure_id}));
     return json(result);

@@ -25,6 +25,7 @@ export interface CharacterBundle {
   format: 'mondobianco.character';
   version: 1;
   kind: 'pg' | 'png';
+  isPet?: boolean;
   name: string;
   profile: CharacterProfile;
   sheet: string;
@@ -48,6 +49,8 @@ export function parseCharacterBundle(raw: string): CharacterBundle {
     !['pg', 'png'].includes(value.kind ?? '')
   )
     throw new Error('Questo file non è un personaggio del Mondo Bianco compatibile.');
+  if (value.isPet !== undefined && (typeof value.isPet !== 'boolean' || (value.isPet && value.kind !== 'png')))
+    throw new Error('Solo un PNG può essere un pet.');
   const string = (v: unknown, max: number, required = false) => {
     if (typeof v !== 'string' || v.length > max || (required && !v.trim()))
       throw new Error('Un campo del personaggio è mancante o troppo lungo.');
@@ -94,6 +97,7 @@ export function parseCharacterBundle(raw: string): CharacterBundle {
     format: 'mondobianco.character',
     version: 1,
     kind: value.kind!,
+    isPet: value.isPet ?? false,
     name: string(value.name, 160, true),
     profile,
     sheet: string(value.sheet ?? '', 20000),
@@ -126,6 +130,7 @@ export async function exportCharacter(c: WorkspaceCharacter): Promise<CharacterB
     format: 'mondobianco.character',
     version: 1,
     kind: c.kind,
+    isPet: c.isPet ?? false,
     name: c.name,
     profile: { ...emptyProfile(), ...c.profile },
     sheet: c.sheet,
