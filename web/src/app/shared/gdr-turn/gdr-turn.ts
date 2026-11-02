@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { updateGdrTextarea } from '../gdr-textarea';
 import { GdrBlocks } from '../gdr-blocks/gdr-blocks';
 import { BLOCK_TYPES, SNIPPET_LABELS } from '../gdr-blocks/gdr-snippets';
-import { NarrativeCharacter, insertNarrativeBlock, narrativeSnippet } from './gdr-writing';
+import { NarrativeCharacter, insertNarrativeBlock, narrativeSnippet, replaceNarrativeSelection } from './gdr-writing';
 import { NarrativeSection, parseNarrative } from './gdr-turn.parser';
 import { GdrBlockRow, GdrParagraphData } from '../gdr-blocks/gdr-block.types';
 import { serializeGdrBlocks } from '../gdr-blocks/gdr-markdown.serializer';
@@ -588,9 +588,8 @@ export class GdrTurn {
       if (type === 'npc_grid') this.message.set('Scegli un PNG con una foto completa nel menu Personaggio.');
       return;
     }
-    const next = insertNarrativeBlock(this.draft().slice(0, start) + this.draft().slice(end), start, snippet);
-    const position = next.indexOf(snippet, start);
-    updateGdrTextarea(area, () => this.draft.set(next), position, position + snippet.length);
+    const replacement = replaceNarrativeSelection(this.draft(), start, end, snippet);
+    updateGdrTextarea(area, () => this.draft.set(replacement.source), replacement.start, replacement.end);
   }
 
   public startEditing(range: { start: number; end: number; ownerId?:string; ownerStart?:number; ownerEnd?:number }): void {

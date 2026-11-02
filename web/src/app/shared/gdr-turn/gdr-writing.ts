@@ -36,14 +36,28 @@ export function narrativeSnippet(
   return SNIPPETS[type as keyof typeof SNIPPETS] ?? '';
 }
 
-/** Aggiunge solo i separatori necessari, conservando intatto il testo già presente. */
-export function insertNarrativeBlock(source: string, offset: number, content: string): string {
+/** Sostituisce la selezione riusando i separatori esistenti, senza righe vuote ai bordi. */
+export function replaceNarrativeSelection(source: string, start: number, end: number, content: string): {
+  source: string; start: number; end: number;
+} {
   const newline = source.includes('\r\n') ? '\r\n' : '\n';
-  const join = (left: string, right: string): string => {
-    if (!left || !right) return left + right;
+  const separator = (left: string, right: string): string => {
+    if (!left || !right) return '';
     const ending = left.replace(/\r\n?/g, '\n').match(/\n*$/)![0].length;
     const starting = right.replace(/\r\n?/g, '\n').match(/^\n*/)![0].length;
-    return left + newline.repeat(Math.max(0, 2 - ending - starting)) + right;
+    return newline.repeat(Math.max(0, 2 - ending - starting));
   };
-  return join(join(source.slice(0, offset), content), source.slice(offset));
+  const before = source.slice(0, start), after = source.slice(end);
+  const prefix = separator(before, content), suffix = separator(content, after);
+  const insertedStart = before.length + prefix.length;
+  return {
+    source: before + prefix + content + suffix + after,
+    start: insertedStart,
+    end: insertedStart + content.length,
+  };
+}
+
+/** Aggiunge solo i separatori necessari, conservando intatto il testo già presente. */
+export function insertNarrativeBlock(source: string, offset: number, content: string): string {
+  return replaceNarrativeSelection(source, offset, offset, content).source;
 }

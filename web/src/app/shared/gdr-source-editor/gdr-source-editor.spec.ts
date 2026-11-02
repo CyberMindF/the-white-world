@@ -80,6 +80,16 @@ describe('anteprima prima della pubblicazione', () => {
     expect(result.trim()).toBe('![Il castello](/assets/castello.webp)');expect(parseNarrative(result).errors).toEqual([]);
     expect(fixture.nativeElement.querySelector('.image-picker')).toBeNull();
   });
+  it('non aggiunge righe vuote in fondo e riusa quelle attorno alla selezione', async()=>{
+    const {fixture,button}=setup('');await fixture.whenStable();
+    let updated='';fixture.componentInstance.sourceChange.subscribe(value=>updated=value);
+    const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
+    button('Azione').click();expect(updated).toBe('::: azione\nDescrivi cosa fa il personaggio.\n:::');
+    const source='Prima.\r\n\r\nCiao.\r\n\r\nDopo.';
+    fixture.componentRef.setInput('source',source);fixture.detectChanges();await fixture.whenStable();
+    const start=source.indexOf('Ciao.');area.setSelectionRange(start,start+5);
+    button('Nota').click();expect(updated).toBe('Prima.\r\n\r\n::: nota\nCiao.\n:::\r\n\r\nDopo.');
+  });
   it('offre gli stessi strumenti per il testo iniziale e per il seguito del master',()=>{
     const {fixture}=setup('');fixture.componentRef.setInput('allowImages',true);fixture.componentRef.setInput('document',true);fixture.detectChanges();
     const labels=()=>Array.from(fixture.nativeElement.querySelectorAll('.toolbar button') as NodeListOf<HTMLButtonElement>).map(b=>b.textContent?.trim());

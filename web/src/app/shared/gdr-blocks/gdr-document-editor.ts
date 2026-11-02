@@ -1,6 +1,7 @@
 import { Component, Input, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { updateGdrTextarea } from '../gdr-textarea';
+import { replaceNarrativeSelection } from '../gdr-turn/gdr-writing';
 import { AuthService } from '../../core/auth.service';
 import { GdrBlocksService } from '../../core/gdr-blocks.service';
 import { GdrBlocks } from './gdr-blocks';
@@ -101,15 +102,11 @@ export class GdrDocumentEditor implements OnInit {
     const current = this.sourceText();
     const start = textarea.selectionStart ?? current.length;
     const end = textarea.selectionEnd ?? current.length;
-    const needsLeadingBreak = start > 0 && current[start - 1] !== '\n';
-    const prefix = needsLeadingBreak ? '\n\n' : '';
-    const insertion = `${prefix}${snippet}`;
-    const next = current.slice(0, start) + insertion + current.slice(end);
-    const cursor = start + insertion.length;
+    const replacement = replaceNarrativeSelection(current, start, end, snippet);
     updateGdrTextarea(textarea, () => {
-      this.sourceText.set(next);
+      this.sourceText.set(replacement.source);
       this.saveError.set('');
-    }, cursor, cursor);
+    }, replacement.end, replacement.end);
   }
 
   protected async save(): Promise<void> {

@@ -6,7 +6,7 @@ import { parseNarrative, safeNarrativeImage } from '../gdr-turn/gdr-turn.parser'
 import { BLOCK_TYPES, SNIPPET_LABELS } from '../gdr-blocks/gdr-snippets';
 import { GdrImageLibrary, GdrLibraryImage } from '../gdr-characters/gdr-image-library';
 
-import { NarrativeCharacter, narrativeSnippet } from '../gdr-turn/gdr-writing';
+import { NarrativeCharacter, narrativeSnippet, replaceNarrativeSelection } from '../gdr-turn/gdr-writing';
 export type { NarrativeCharacter } from '../gdr-turn/gdr-writing';
 @Component({
   selector: 'app-gdr-source-editor',
@@ -85,26 +85,14 @@ export class GdrSourceEditor {
       return;
     }
     this.voiceMessage.set('');
-    const prefix =
-      start && !text.slice(0, start).endsWith('\n\n')
-        ? text[start - 1] === '\n'
-          ? '\n'
-          : '\n\n'
-        : '';
-    const suffix =
-      end < text.length && !text.slice(end).startsWith('\n\n')
-        ? text[end] === '\n'
-          ? '\n'
-          : '\n\n'
-        : '\n\n';
-    const insertion = prefix + snippet + suffix;
+    const replacement = replaceNarrativeSelection(text, start, end, snippet);
     const fenced = ['dialogo', 'azione', 'nota', 'callout'].includes(type);
     const heading = type === 'heading' || type === 'subtitle';
     const contentOffset = fenced ? snippet.indexOf('\n') + 1 : heading ? snippet.indexOf(' ') + 1 : type === 'emphasis' ? 1 : 0;
     const contentLength = fenced ? snippet.lastIndexOf('\n') - contentOffset : type === 'emphasis' ? snippet.length - 2 : snippet.length - contentOffset;
     updateGdrTextarea(area, () => {
-      this.sourceChange.emit(text.slice(0, start) + insertion + text.slice(end));
+      this.sourceChange.emit(replacement.source);
       this.mode.set(this.mode() === 'preview' ? 'split' : this.mode());
-    }, start + prefix.length + contentOffset, start + prefix.length + contentOffset + contentLength);
+    }, replacement.start + contentOffset, replacement.start + contentOffset + contentLength);
   }
 }
