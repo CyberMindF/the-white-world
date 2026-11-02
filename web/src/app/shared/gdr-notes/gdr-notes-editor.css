@@ -1,4 +1,6 @@
 :host { display: block; }
+fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.gdr-notes-toolbar button:disabled { opacity: .5; cursor: default; }
 
 .gdr-notes-toolbar {
   display: flex;

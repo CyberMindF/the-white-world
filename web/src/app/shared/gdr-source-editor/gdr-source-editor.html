@@ -42,7 +42,7 @@
       @for (type of blockTypes; track type) {
         @if (type !== 'image' || allowImages()) {
         <button class="btn" type="button" (click)="insert(type, sourceArea)">
-          {{ snippetLabels[type] }}
+          {{ type === 'callout' ? 'Riquadro' : snippetLabels[type] }}
         </button>
         }
       }
@@ -50,6 +50,24 @@
       <button class="btn" type="button" (click)="insert('image', sourceArea)">Immagine</button>
     }
   </div>
+  @if (masterTools() || document()) {
+    <div class="toolbar master-toolbar" role="group" aria-label="Impaginazione della storia">
+      <span class="tools-label">Storia</span>
+      @if (!document()) {
+        @for (type of masterBlockTypes; track type) {
+          <button class="btn" type="button" (click)="insert(type, sourceArea)">{{ type === 'callout' ? 'Riquadro' : snippetLabels[type] }}</button>
+        }
+      }
+      <button class="btn" type="button" (click)="insert('subtitle', sourceArea)">Sottotitolo</button>
+      <button class="btn" type="button" (click)="insert('emphasis', sourceArea)">Corsivo</button>
+    </div>
+  }
+  @if (allowImages() && imagePickerOpen()) {
+    <div class="image-picker">
+      <app-gdr-image-library [images]="images()" [story]="true" (selected)="insertImage($event.src, sourceArea)" />
+      <button type="button" class="btn" (click)="imagePickerOpen.set(false)">Chiudi immagini</button>
+    </div>
+  }
   <div class="view-tools" role="group" aria-label="Visualizzazione editor">
     <button
       class="btn"
@@ -136,6 +154,11 @@
         <li><strong>Dialogo</strong>: scegli il personaggio e inserisci le sue parole.</li>
         <li><strong>Azione</strong>: racconta cosa fa.</li>
         <li><strong>Nota</strong>: scrivi al master fuori dalla storia.</li>
+        @if (masterTools() || document()) {
+          <li><strong>Titolo e Sottotitolo</strong>: aprono un capitolo o una scena.</li>
+          <li><strong>Riquadro, Elenco e Tabella</strong>: organizzano indizi e dettagli della storia.</li>
+          <li><strong>Immagine</strong>: scegli una miniatura per inserirla nel testo.</li>
+        }
         <li>Puoi selezionare una frase e premere un tasto per trasformarla.</li>
         <li>Con <strong>Anteprima</strong> controlli il risultato, poi scegli <strong>Pubblica turno</strong>.</li>
       </ul>

@@ -208,7 +208,10 @@ export class GdrLaboratorio implements OnInit {
   protected readonly siteImages = computed(() => imagesFromGdrBlocks([
     ...this.blocks(),
     ...this.workspace.adventures().flatMap(a => parseNarrative(a.source).sections.flatMap(s => s.blocks)),
-  ]));
+  ]).concat(this.workspace.characters().flatMap(c => [
+    { src: c.photo, label: c.name + ' · foto' },
+    { src: c.portrait, label: c.name + ' · ritratto' },
+  ])));
   protected readonly documentSource = computed(
     () =>
       this.local().documentDraft ??
@@ -252,6 +255,7 @@ export class GdrLaboratorio implements OnInit {
   private requestVersion = 0;
   private turnsRequestVersion = 0;
   protected readonly liveGame = this.route.snapshot.paramMap.has('adventureId');
+  protected readonly notesReadOnly = computed(() => !this.liveGame || !!this.auth.impersonation());
   async ngOnInit(): Promise<void> {
     const requested = this.route.snapshot.paramMap.get('adventureId');
     if (requested && !ADVENTURES.some((a) => a.id === requested)) {
@@ -309,10 +313,6 @@ export class GdrLaboratorio implements OnInit {
         'Impossibile salvare nel browser. Copia il testo prima di chiudere la pagina.',
       );
     }
-  }
-  protected updateNotes(value: string): void {
-    this.local.update((s) => ({ ...s, notes: value }));
-    this.persist();
   }
   protected updateDraft(value: string): void {
     this.local.update((s) => ({ ...s, draft: value }));

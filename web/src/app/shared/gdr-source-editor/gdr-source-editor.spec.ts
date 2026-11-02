@@ -3,6 +3,7 @@ import { By } from '@angular/platform-browser';
 import { afterEach, describe, expect, it } from 'vitest';
 import { GdrSourceEditor } from './gdr-source-editor';
 import { GdrTurn } from '../gdr-turn/gdr-turn';
+import { parseNarrative } from '../gdr-turn/gdr-turn.parser';
 
 describe('anteprima prima della pubblicazione', () => {
   afterEach(() => TestBed.resetTestingModule());
@@ -55,6 +56,29 @@ describe('anteprima prima della pubblicazione', () => {
     area.setSelectionRange(0,4);
     button('Dialogo').click(); fixture.detectChanges();
     expect(updated).toContain('::: dialogo Ada\nCiao\n:::');
+  });
+  it('offre l’impaginazione solo al master e converte la selezione in titoli o riquadri validi', async () => {
+    const {fixture,button}=setup('Un incontro');
+    expect(button('Titolo')).toBeUndefined();expect(button('Tabella')).toBeUndefined();
+    fixture.componentRef.setInput('masterTools',true);fixture.detectChanges();
+    await fixture.whenStable();
+    for(const label of ['Titolo','Sottotitolo','Riquadro','Elenco','Tabella','Corsivo']) expect(button(label)).toBeTruthy();
+    const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
+    area.setSelectionRange(0,11);let result='';fixture.componentInstance.sourceChange.subscribe(value=>result=value);
+    button('Sottotitolo').click();expect(result.trim()).toBe('### Un incontro');expect(parseNarrative(result).errors).toEqual([]);
+    button('Riquadro').click();expect(result).toContain('::: callout\nUn incontro\n:::');expect(parseNarrative(result).errors).toEqual([]);
+    fixture.componentRef.setInput('masterTools',false);fixture.detectChanges();expect(button('Titolo')).toBeUndefined();
+  });
+  it('inserisce un’immagine scelta dalle miniature senza richiedere un percorso', () => {
+    const {fixture,button}=setup('');
+    fixture.componentRef.setInput('allowImages',true);
+    fixture.componentRef.setInput('images',[{src:'/assets/castello.webp',label:'Il castello'}]);fixture.detectChanges();
+    let result='';fixture.componentInstance.sourceChange.subscribe(value=>result=value);
+    button('Immagine').click();fixture.detectChanges();
+    expect(result).toBe('');expect(fixture.nativeElement.querySelector('.library-tools')).toBeNull();
+    (fixture.nativeElement.querySelector('button[aria-label="Inserisci Il castello"]') as HTMLButtonElement).click();fixture.detectChanges();
+    expect(result.trim()).toBe('![Il castello](/assets/castello.webp)');expect(parseNarrative(result).errors).toEqual([]);
+    expect(fixture.nativeElement.querySelector('.image-picker')).toBeNull();
   });
 
 });

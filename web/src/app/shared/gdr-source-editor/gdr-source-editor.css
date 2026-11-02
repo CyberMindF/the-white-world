@@ -21,6 +21,9 @@
 .toolbar label {
   margin: 0 0.2rem 0 0;
 }
+.tools-label { color: var(--muted-color); font-size: .8rem; margin-right: .3rem; }
+.master-toolbar { background: var(--panel-color); }
+.image-picker { padding: 0 .9rem .8rem; border-bottom: 1px solid var(--border-color); }
 .toolbar select {
   width: auto;
   max-width: 100%;

@@ -34,8 +34,13 @@ export class GdrNotesEditor implements AfterViewInit, OnDestroy {
   protected readonly disabled = signal(true);
   protected readonly statusMessage = signal('Sto caricando i tuoi appunti...');
   protected readonly colors = NOTE_TEXT_COLORS;
+  protected readonly loadFailed = signal(false);
+  protected readonly saveFailed = signal(false);
 
   private saveTimeout: ReturnType<typeof setTimeout> | null = null;
+  private saveQueue: Promise<void> = Promise.resolve();
+  private changeVersion = 0;
+  private destroyed = false;
 
   constructor(private readonly domSanitizer: DomSanitizer) {}
 
@@ -46,37 +51,47 @@ export class GdrNotesEditor implements AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     if (this.saveTimeout) {
       clearTimeout(this.saveTimeout);
+      this.saveTimeout = null;
+      void this.saveNotes();
     }
+    this.destroyed = true;
   }
 
-  private async loadNotes(): Promise<void> {
+  protected async loadNotes(): Promise<void> {
     this.disabled.set(true);
+    this.loadFailed.set(false);
     this.statusMessage.set('Sto caricando i tuoi appunti...');
 
     try {
-      const response = await fetch(`/api/gdr/notes?adventure=${this.adventure}`, { credentials: 'same-origin' });
+      const response = await fetch(`/api/gdr/notes?adventure=${encodeURIComponent(this.adventure)}`, { credentials: 'same-origin' });
       if (!response.ok) {
         throw new Error(`Caricamento fallito: ${response.status}`);
       }
       const data = (await response.json()) as { body?: string };
+      if (this.destroyed) return;
       const safe = this.domSanitizer.sanitize(SecurityContext.HTML, data.body || '') || '';
       this.editorEl.nativeElement.innerHTML = safe;
       this.statusMessage.set('');
+      this.disabled.set(false);
     } catch (error) {
       console.error('Errore nel caricamento degli appunti:', error);
       this.statusMessage.set('Non è stato possibile caricare gli appunti salvati.');
-    } finally {
-      this.disabled.set(false);
+      this.loadFailed.set(true);
     }
   }
 
   protected onInput(): void {
-    if (this.readOnly) return;
+    if (this.readOnly || this.disabled()) return;
+    this.changeVersion++;
+    this.saveFailed.set(false);
     this.statusMessage.set('Sto salvando...');
     if (this.saveTimeout) {
       clearTimeout(this.saveTimeout);
     }
-    this.saveTimeout = setTimeout(() => void this.saveNotes(), SAVE_DEBOUNCE_MS);
+    this.saveTimeout = setTimeout(() => {
+      this.saveTimeout = null;
+      void this.saveNotes();
+    }, SAVE_DEBOUNCE_MS);
   }
 
   // mousedown con preventDefault, non click: altrimenti il contenteditable perde il focus (e
@@ -86,11 +101,13 @@ export class GdrNotesEditor implements AfterViewInit, OnDestroy {
   }
 
   protected applyBold(): void {
+    if (this.readOnly || this.disabled()) return;
     document.execCommand('bold');
     this.onInput();
   }
 
   protected applyUnderline(): void {
+    if (this.readOnly || this.disabled()) return;
     document.execCommand('underline');
     this.onInput();
   }
@@ -100,25 +117,36 @@ export class GdrNotesEditor implements AfterViewInit, OnDestroy {
   // (diverso per ogni tema), letto dallo stile calcolato invece di un hex fisso che stonerebbe
   // in almeno un tema su cinque.
   protected applyColor(color: string): void {
+    if (this.readOnly || this.disabled()) return;
     const resolved = color === 'inherit' ? getComputedStyle(this.editorEl.nativeElement).color : color;
     document.execCommand('foreColor', false, resolved);
     this.onInput();
   }
 
-  private async saveNotes(): Promise<void> {
-    if (this.readOnly) return;
-    try {
-      const formData = new FormData();
-      formData.set('adventure', this.adventure);
-      formData.set('body', this.editorEl.nativeElement.innerHTML);
-      const response = await fetch('/api/gdr/notes', { method: 'POST', credentials: 'same-origin', body: formData });
-      if (!response.ok) {
-        throw new Error(`Salvataggio fallito: ${response.status}`);
+  protected async saveNotes(): Promise<void> {
+    if (this.readOnly || this.disabled()) return;
+    const body = this.editorEl.nativeElement.innerHTML;
+    const adventure = this.adventure;
+    const version = this.changeVersion;
+    this.saveFailed.set(false);
+    this.saveQueue = this.saveQueue.then(async () => {
+      try {
+        const formData = new FormData();
+        formData.set('adventure', adventure);
+        formData.set('body', body);
+        const response = await fetch('/api/gdr/notes', { method: 'POST', credentials: 'same-origin', body: formData, keepalive: true });
+        if (!response.ok) {
+          throw new Error(`Salvataggio fallito: ${response.status}`);
+        }
+        if (!this.destroyed && version === this.changeVersion) this.statusMessage.set('Salvato nel tuo account.');
+      } catch (error) {
+        console.error('Errore nel salvataggio degli appunti:', error);
+        if (!this.destroyed && version === this.changeVersion) {
+          this.statusMessage.set('Non è stato possibile salvare. Il testo è ancora qui: riprova.');
+          this.saveFailed.set(true);
+        }
       }
-      this.statusMessage.set('Salvato.');
-    } catch (error) {
-      console.error('Errore nel salvataggio degli appunti:', error);
-      this.statusMessage.set('Non è stato possibile salvare, riprova.');
-    }
+    });
+    await this.saveQueue;
   }
 }

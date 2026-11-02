@@ -28,6 +28,7 @@ export class GdrImageLibrary {
   readonly images = input<GdrLibraryImage[]>([]);
   readonly photo = input('');
   readonly portrait = input('');
+  readonly story = input(false);
   readonly selected = output<{ src: string; slot: 'photo' | 'avatar' }>();
   protected readonly slot = signal<'photo' | 'avatar'>('photo');
   protected readonly query = signal('');

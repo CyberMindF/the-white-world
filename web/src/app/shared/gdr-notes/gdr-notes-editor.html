@@ -1,4 +1,5 @@
 @if (!readOnly) {
+<fieldset [disabled]="disabled()">
 <div class="gdr-notes-toolbar" role="toolbar" aria-label="Formattazione">
   <button type="button" class="gdr-notes-tool gdr-notes-tool-bold" (mousedown)="preserveSelection($event)" (click)="applyBold()" aria-label="Grassetto">B</button>
   <button type="button" class="gdr-notes-tool gdr-notes-tool-underline" (mousedown)="preserveSelection($event)" (click)="applyUnderline()" aria-label="Sottolineato">S</button>
@@ -14,13 +15,18 @@
     >●</button>
   }
 </div>
+</fieldset>
 
 }
 <div
   #editorEl
   class="gdr-notes-textarea"
+  role="textbox"
+  aria-multiline="true"
   [attr.contenteditable]="!disabled() && !readOnly"
   [attr.aria-label]="'I tuoi appunti'"
   (input)="onInput()"
 ></div>
 <p class="gdr-notes-status" role="status" aria-live="polite">{{ statusMessage() }}</p>
+@if (loadFailed()) { <button type="button" class="btn" (click)="loadNotes()">Riprova caricamento</button> }
+@if (saveFailed() && !readOnly) { <button type="button" class="btn" (click)="saveNotes()">Riprova salvataggio</button> }

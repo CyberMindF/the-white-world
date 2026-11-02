@@ -134,6 +134,7 @@
                   (editingChange)="documentEdit.set($event)"
                   label="Testo completo dell’avventura"
                   [document]="true"
+                  [images]="siteImages()"
                   [allowImages]="canPrepare()"
                   [source]="documentSource()"
                   (sourceChange)="updateDocument($event)"
@@ -245,6 +246,8 @@
           </div>
           <section class="lab-composer" aria-label="Scrivi un messaggio">
             <app-gdr-source-editor
+              [masterTools]="canPrepare()"
+              [images]="siteImages()"
               [allowImages]="canPrepare()"
               #turnComposer
               (modeChange)="turnPreview.set($event === 'preview')"
@@ -317,16 +320,9 @@
           }
         </div>
         <div gdrNotes>
-          @if (adventure().legacy) {
-            <app-gdr-notes-editor [adventure]="adventure().id" [readOnly]="true" />
-          }
-          <label for="workspace-notes">Taccuino di prova · solo in questo browser</label
-          ><textarea
-            id="workspace-notes"
-            rows="8"
-            [ngModel]="local().notes"
-            (ngModelChange)="updateNotes($event)"
-          ></textarea>
+          <h3>Appunti personali</h3>
+          <p class="lab-help">Salvati automaticamente nel tuo account. Li vedi solo tu.</p>
+          <app-gdr-notes-editor [adventure]="adventure().id" [readOnly]="notesReadOnly()" />
         </div>
       </app-gdr-panel>
     }

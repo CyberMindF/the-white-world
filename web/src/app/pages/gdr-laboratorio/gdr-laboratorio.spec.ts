@@ -16,11 +16,12 @@ class TurnPage extends GdrLaboratorio {
   preview() { this.turnPreview.set(true); }
   leavePreview() { this.turnPreview.set(false); }
   send() { return this.publish(); }
+  tools() { return {master: this.canPrepare(), notesReadOnly: this.notesReadOnly()}; }
   state() { return { local: this.local(), turns: this.turns(), status: this.status(), error: this.turnsError() }; }
 }
 function create(live = true, player = false) {
   TestBed.configureTestingModule({providers: [
-    {provide: AuthService, useValue: {currentUser: signal({id: 7, nickname: 'Rory'}), isAdmin: signal(!player)}},
+    {provide: AuthService, useValue: {currentUser: signal({id: 7, nickname: 'Rory'}), isAdmin: signal(!player), impersonation: signal(null)}},
     {provide: SafeModeService, useValue: {enabled: signal(false)}},
     {provide: RealtimeService, useValue: {on: () => EMPTY}},
     {provide: GdrWorkspaceService, useValue: {adventures: signal([]), voices: assignedVoices, available: signal(true)}},
@@ -38,6 +39,14 @@ describe('invio dei turni della partita reale', () => {
   it('usa il personaggio della scheda classica per il dialogo della giocatrice', () => {
     const page=create(true,true);
     expect(page.voices()).toEqual([]);
+  });
+  it('la giocatrice conserva gli strumenti semplici e i propri appunti modificabili',()=>{
+    const page=create(true,true);expect(page.tools()).toEqual({master:false,notesReadOnly:false});
+  });
+  it('il master ha gli strumenti della storia; impersonare Desy lascia gli appunti in sola lettura',()=>{
+    const page=create();expect(page.tools()).toEqual({master:true,notesReadOnly:false});
+    TestBed.inject(AuthService).impersonation.set({actorId:1,actorNickname:'Rory',readOnly:true});
+    expect(page.tools().notesReadOnly).toBe(true);
   });
   it('rende disponibili alla giocatrice anche i personaggi che il master le ha assegnato',()=>{
     const page=create(true,true);

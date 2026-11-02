@@ -19,6 +19,12 @@ export function narrativeSnippet(
     return `::: dialogo ${name}${portrait ? ' | ' + portrait : ''}\n${selected || 'Scrivi qui le sue parole.'}\n:::`;
   if (type === 'azione' || type === 'nota')
     return `::: ${type}\n${selected || (type === 'azione' ? 'Descrivi cosa fa il personaggio.' : 'Scrivi la nota fuori personaggio.')}\n:::`;
+  if (type === 'heading') return `## ${selected || 'Titolo'}`;
+  if (type === 'subtitle') return `### ${selected || 'Sottotitolo'}`;
+  if (type === 'emphasis') return `*${selected || 'Testo in corsivo.'}*`;
+  if (type === 'paragraph') return selected || 'Testo del paragrafo.';
+  if (type === 'callout') return `::: callout\n${selected || 'Testo del riquadro.'}\n:::`;
+  if (type === 'list' && selected) return selected.split(/\r?\n/).filter(line => line.trim()).map(line => '- ' + line).join('\n');
   return SNIPPETS[type as keyof typeof SNIPPETS] ?? '';
 }
 
