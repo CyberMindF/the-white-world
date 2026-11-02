@@ -150,6 +150,22 @@ describe('gestione personaggi del master', () => {
 
 describe('scheda unica nel pannello della giocatrice',()=>{
  afterEach(()=>TestBed.resetTestingModule());
+ it.each([true,false])('unisce il nome esistente nel campo completo, senza duplicare il cognome al salvataggio (master: %s)',async management=>{
+  const {workspace,fixture,button}=setup();
+  const original={...character('ada','Ana María'),revision:2,profile:{...character('ada','').profile,surname:'de la Vega',history:'Storia conservata'}};
+  workspace.characters.set([original]);fixture.componentRef.setInput('managementMode',management);fixture.detectChanges();
+  button(management?'Modifica scheda':'Modifica personaggio').click();fixture.detectChanges();await fixture.whenStable();
+  expect(fixture.nativeElement.querySelector('#profile-surname')).toBeNull();
+  expect((fixture.nativeElement.querySelector('#character-name') as HTMLInputElement).value).toBe('Ana María de la Vega');
+  expect(fixture.nativeElement.textContent).toContain('Nome completo');
+  button('Annulla').click();fixture.detectChanges();
+  expect(workspace.active()?.profile.surname).toBe('de la Vega');
+  button(management?'Modifica scheda':'Modifica personaggio').click();fixture.detectChanges();await fixture.whenStable();
+  const name=fixture.nativeElement.querySelector('#character-name') as HTMLInputElement;
+  name.value='Ana María del Sol';name.dispatchEvent(new Event('input'));fixture.detectChanges();
+  const save=vi.spyOn(workspace,'save').mockResolvedValue(false);button('Salva modifiche').click();await fixture.whenStable();
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({characterId:'ada',name:'Ana María del Sol',profile:expect.objectContaining({surname:'',history:'Storia conservata'})}));
+ });
  it('sceglie una foto dalle miniature e la salva sul PG; annulla ripristina la foto precedente',async()=>{
   const {workspace,fixture,button}=setup();
   workspace.characters.update(cs=>cs.map(c=>c.id==='ada'?{...c,revision:2,portrait:'assets/old-avatar.webp'}:c));fixture.detectChanges();

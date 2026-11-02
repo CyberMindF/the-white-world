@@ -161,7 +161,7 @@ export class GdrCharacters {
     }
   }
   readonly legacyNpcs = input<{ name: string; portrait: string; description: string }[]>([]);
-  protected readonly profileFields = PROFILE_FIELDS;
+  protected readonly profileFields = PROFILE_FIELDS.filter(field => field.key !== 'surname');
   protected readonly playerProfileFields = computed(() =>
     PROFILE_FIELDS.filter(
       (f) =>
@@ -405,7 +405,7 @@ export class GdrCharacters {
   private populate(c: WorkspaceCharacter): void {
     this.profile.set({ ...emptyProfile(), ...c.profile });
     this.photo.set(gdrImagePath(c.photo ?? '') || c.photo || '');
-    this.name.set(c.name);
+    this.name.set([c.name, c.profile?.surname].filter(Boolean).join(' '));
     this.portrait.set(gdrImagePath(c.portrait) || c.portrait);
     this.sheet.set(c.sheet);
     this.sheetFields.set({ ...c.characterFields });
@@ -482,7 +482,7 @@ export class GdrCharacters {
         name: this.name(),
         portrait: this.portrait(),
         photo: this.photo(),
-        profile: this.profile(),
+        profile: { ...this.profile(), surname: '' },
         sheet: this.sheet(),
         characterFields: this.sheetFields(),
       })

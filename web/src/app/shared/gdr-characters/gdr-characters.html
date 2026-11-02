@@ -46,7 +46,7 @@
                   }}
                 </p>
                 <label for="new-character-name">{{
-                  newKind() === 'pg' ? 'Nome provvisorio · facoltativo' : 'Nome'
+                  newKind() === 'pg' ? 'Nome completo · facoltativo' : 'Nome completo'
                 }}</label
                 ><input
                   id="new-character-name"
@@ -86,7 +86,7 @@
                 type="search"
                 [ngModel]="search()"
                 (ngModelChange)="search.set($event)"
-                placeholder="Nome o cognome…"
+                placeholder="Nome del personaggio…"
               />
               <label for="character-filter">Tipo</label
               ><select
@@ -418,18 +418,11 @@
                             <h4>Il tuo personaggio</h4>
                             <div class="identity-inputs">
                               <label for="character-name"
-                                >Nome<input
+                                >Nome completo<input
                                   id="character-name"
                                   maxlength="160"
                                   [ngModel]="name()"
-                                  (ngModelChange)="name.set($event); dirty.set(true)" /></label
-                              ><label for="profile-surname"
-                                >Cognome<input
-                                  id="profile-surname"
-                                  maxlength="160"
-                                  [ngModel]="profile().surname"
-                                  (ngModelChange)="changeProfile('surname', $event)"
-                              /></label>
+                                  (ngModelChange)="name.set($event); dirty.set(true)" /></label>
                             </div>
                           </section>
                           @if (textFields().length) {
@@ -542,7 +535,7 @@
                       } @else {
                         <div class="profile-form">
                           <h4>Identità e descrizione</h4>
-                          <label for="character-name">Nome</label
+                          <label for="character-name">Nome completo</label
                           ><input
                             id="character-name"
                             maxlength="160"
@@ -831,7 +824,7 @@
                               /><span
                                 ><strong>Completare e modificare la scheda</strong
                                 ><small
-                                  >Può scegliere nome, cognome e dettagli del PG gestito qui.</small
+                                  >Può scegliere il nome completo e i dettagli del PG gestito qui.</small
                                 ></span
                               ></label
                             >

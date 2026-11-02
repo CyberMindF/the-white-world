@@ -561,7 +561,7 @@ summary:focus-visible {
 }
 .identity-inputs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 1rem;
 }
 .identity-inputs label {
