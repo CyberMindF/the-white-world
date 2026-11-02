@@ -97,6 +97,27 @@
   line-height: 1.6;
 }
 
+:host .npc-grid.npc-full {
+  grid-template-columns: minmax(0, 1fr);
+}
+:host .npc-full .npc-card {
+  display: block;
+  padding: 0;
+  overflow: hidden;
+}
+:host .npc-full .npc-card img {
+  height: auto;
+  aspect-ratio: auto;
+  object-fit: contain;
+  border-radius: 0;
+}
+:host .npc-full .npc-card h4 {
+  margin: .85rem 1rem 0;
+}
+:host .npc-full .npc-card p {
+  margin: .45rem 1rem 1rem;
+}
+
 :host .avventura-callout {
   margin: 0 0 1.15rem;
   padding: 1.25rem 1.4rem;

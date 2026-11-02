@@ -110,7 +110,7 @@ export function parseNarrative(source: string): NarrativeResult {
     } else {
       if (!buffer.length) bufferLine = i;
       // I costrutti esistenti restano interi, anche se il loro testo contiene comandi narrativi.
-      if (/^::: (callout(?:\s|$)|npc$)/.test(lines[i].trim())) {
+      if (/^::: (callout(?:\s|$)|npc(?: full)?$)/.test(lines[i].trim())) {
         buffer.push(lines[i]);
         while (++i < lines.length) {
           buffer.push(lines[i]);

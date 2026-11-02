@@ -104,7 +104,7 @@ export function parseGdrMarkdown(source: string, ranges?: GdrSourceRange[]): Gdr
       continue;
     }
 
-    if (line.trim() === '::: npc') {
+    if (/^::: npc(?: full)?$/.test(line.trim())) {
       const { content, endIndex, closed } = readFencedBlock(lines, i + 1);
       if (!closed) {
         errors.push({
@@ -117,7 +117,7 @@ export function parseGdrMarkdown(source: string, ranges?: GdrSourceRange[]): Gdr
       const parsed = parseNpcEntries(content, lineNo + 1);
       errors.push(...parsed.errors);
       if (parsed.entries.length > 0) {
-        const data: GdrNpcGridData = { entries: parsed.entries };
+        const data: GdrNpcGridData = { entries: parsed.entries, ...(line.trim() === '::: npc full' ? {layout: 'full' as const} : {}) };
         blocks.push({ type: 'npc_grid', data });
         range(i, endIndex);
       }
@@ -181,7 +181,7 @@ export function parseGdrMarkdown(source: string, ranges?: GdrSourceRange[]): Gdr
       j < lines.length &&
       lines[j].trim() !== '' &&
       !/^(#{1,6})\s+/.test(lines[j]) &&
-      lines[j].trim() !== '::: npc' &&
+      !/^::: npc(?: full)?$/.test(lines[j].trim()) &&
       !lines[j].trim().startsWith('::: callout') &&
       !IMAGE_RE.test(lines[j].trim()) &&
       !/^-\s+/.test(lines[j]) &&

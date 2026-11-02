@@ -99,7 +99,7 @@ export class GdrSourceEditor {
   }
   protected insert(type: string, area: HTMLTextAreaElement, customSnippet?: string): void {
     if (type === 'image' && !this.allowImages()) return;
-    if ((type !== 'image' && BLOCK_TYPES.includes(type as typeof BLOCK_TYPES[number])) || type === 'subtitle' || type === 'emphasis') {
+    if ((type !== 'image' && BLOCK_TYPES.includes(type as typeof BLOCK_TYPES[number])) || type === 'subtitle' || type === 'emphasis' || type === 'npc_full') {
       if (!this.document() && !this.masterTools()) return;
     }
     if (this.inlineEditing()) {
@@ -118,7 +118,7 @@ export class GdrSourceEditor {
     if (type === 'dialogo' && !character && !this.allowGeneric()) return;
     const snippet = customSnippet ?? narrativeSnippet(type, selected, character);
     if (!snippet) {
-      if (type === 'npc_grid') this.voiceMessage.set('Scegli un PNG con una foto completa nel menu Personaggio.');
+      if (type === 'npc_grid' || type === 'npc_full') this.voiceMessage.set('Scegli un PNG con una foto completa nel menu Personaggio.');
       return;
     }
     this.voiceMessage.set('');

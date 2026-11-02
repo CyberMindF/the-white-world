@@ -38,6 +38,7 @@ export interface GdrNpcEntry {
 }
 
 export interface GdrNpcGridData {
+  layout?: 'full';
   entries: GdrNpcEntry[];
 }
 

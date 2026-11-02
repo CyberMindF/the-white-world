@@ -45,7 +45,7 @@ function serializeBlock(block: GdrBlockRow): string {
       const entries = data.entries
         .map((entry) => `- image: ${entry.image}\n  alt: ${entry.alt}\n  name: ${entry.name}\n  description: ${entry.description}`)
         .join('\n');
-      return `::: npc\n${entries}\n:::`;
+      return `::: npc${data.layout === 'full' ? ' full' : ''}\n${entries}\n:::`;
     }
     case 'list': {
       const data = block.data as GdrListData;

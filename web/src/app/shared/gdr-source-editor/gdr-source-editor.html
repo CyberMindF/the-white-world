@@ -50,6 +50,7 @@
             <button class="btn" type="button" (click)="insert(type, sourceArea)">{{ type === 'callout' ? 'Riquadro' : type === 'npc_grid' ? 'Scheda PNG' : snippetLabels[type] }}</button>
           }
         }
+        <button class="btn" type="button" (click)="insert('npc_full', sourceArea)">PNG a tutta pagina</button>
         <button class="btn" type="button" (click)="insert('subtitle', sourceArea)">Sottotitolo</button>
         <button class="btn" type="button" (click)="insert('emphasis', sourceArea)">Corsivo</button>
       </div>
@@ -158,6 +159,7 @@
         @if (masterTools() || document()) {
           <li><strong>Titolo e Sottotitolo</strong>: aprono un capitolo o una scena.</li>
           <li><strong>Riquadro, Elenco e Tabella</strong>: organizzano indizi e dettagli della storia.</li>
+          <li><strong>PNG a tutta pagina</strong>: scegli il PNG nel menu Personaggio e inserisci foto intera, nome e descrizione.</li>
           <li><strong>Immagine</strong>: scegli una miniatura per inserirla nel testo.</li>
         }
         <li>Puoi selezionare una frase e premere un tasto per trasformarla.</li>

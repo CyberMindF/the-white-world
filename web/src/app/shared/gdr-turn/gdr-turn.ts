@@ -101,6 +101,9 @@ interface RenderedSection extends NarrativeSection {
             @for (type of blockTypes; track type) {
               <option [value]="type">{{ snippetLabels[type] }}</option>
             }
+            @if (deletable() || insertable()) {
+              <option value="npc_full">PNG a tutta pagina</option>
+            }
             <option value="dialogo" [disabled]="!characters().length && !allowGeneric()">
               Dialogo
             </option>
@@ -117,6 +120,13 @@ interface RenderedSection extends NarrativeSection {
               @for (c of characters(); track $index) {
                 <option [ngValue]="$index">{{ c.name }}</option>
               }
+            </select>
+          }
+          @if ((deletable() || insertable()) && npcLayout()) {
+            <label [for]="fieldId + '-layout'">Formato PNG</label>
+            <select [id]="fieldId + '-layout'" [ngModel]="npcLayout()" (ngModelChange)="setNpcLayout($event)">
+              <option value="card">Scheda</option>
+              <option value="full">A tutta pagina</option>
             </select>
           }
         </div>
@@ -542,6 +552,21 @@ export class GdrTurn {
   protected readonly inserting = computed(() => this.editing()?.inserting === true);
   protected readonly draft = signal('');
   protected readonly draftParsed = computed(() => parseNarrative(this.draft()));
+  protected readonly npcLayout = computed(() => {
+    const parsed = this.draftParsed();
+    if (parsed.errors.length || parsed.sections.length !== 1) return null;
+    const section = parsed.sections[0];
+    if (section.kind !== 'document' || section.blocks.length !== 1 || section.blocks[0].type !== 'npc_grid') return null;
+    return (section.blocks[0].data as {layout?:'full'}).layout === 'full' ? 'full' : 'card';
+  });
+  protected setNpcLayout(layout: string): void {
+    if (!this.editable() || (!this.deletable() && !this.insertable()) || !this.npcLayout() || !['card','full'].includes(layout)) return;
+    const area = this.area?.nativeElement;
+    if (!area) return;
+    const current = this.draft(), next = current.replace(/^::: npc(?: full)?(?=\r?$)/m, layout === 'full' ? '::: npc full' : '::: npc');
+    const delta = next.length - current.length;
+    updateGdrTextarea(area, () => this.draft.set(next), Math.max(0, area.selectionStart + delta), Math.max(0, area.selectionEnd + delta));
+  }
   protected readonly preview = signal(false);
   protected readonly message = signal('');
   protected readonly editing = signal<{
@@ -575,6 +600,7 @@ export class GdrTurn {
   }
   protected insertSnippet(type: string): void {
     const area = this.area?.nativeElement;
+    if (type === 'npc_full' && !this.deletable() && !this.insertable()) return;
     if (!area || !type || (type === 'dialogo' && !this.characters().length && !this.allowGeneric()))
       return;
     const start = area.selectionStart,
@@ -585,9 +611,10 @@ export class GdrTurn {
       this.characters()[this.voice()] ?? this.characters()[0],
     );
     if (!snippet) {
-      if (type === 'npc_grid') this.message.set('Scegli un PNG con una foto completa nel menu Personaggio.');
+      if (type === 'npc_grid' || type === 'npc_full') this.message.set('Scegli un PNG con una foto completa nel menu Personaggio.');
       return;
     }
+    this.message.set('');
     const replacement = replaceNarrativeSelection(this.draft(), start, end, snippet);
     updateGdrTextarea(area, () => this.draft.set(replacement.source), replacement.start, replacement.end);
   }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { insertNarrativeBlock, narrativeSnippet, replaceNarrativeSelection } from './gdr-writing';
 import { parseNarrative } from './gdr-turn.parser';
+import { serializeGdrBlocks } from '../gdr-blocks/gdr-markdown.serializer';
 
 describe('inserimento nel racconto', () => {
   it('inserisce fra due paragrafi uguali senza confondere o riscrivere i blocchi', () => {
@@ -48,6 +49,16 @@ describe('inserimento nel racconto', () => {
     const spaced = 'Prima.\n\n\n\nVecchio.\n\nDopo.';
     const position = spaced.indexOf('Vecchio.');
     expect(replaceNarrativeSelection(spaced, position, position + 8, 'Nuovo.').source).toBe('Prima.\n\n\n\nNuovo.\n\nDopo.');
+  });
+  it('inserisce un vero blocco PNG a tutta pagina, con foto completa e metadati conservati nel salvataggio', () => {
+    const source = narrativeSnippet('npc_full', '', {id:'shivay',kind:'png',name:'Shivay Lorenne',photo:'/assets/intera.webp',portrait:'/assets/avatar.webp',description:'Una compagna di scuola.'});
+    const result = parseNarrative(source);
+    expect(result.errors).toEqual([]);
+    expect(result.sections[0].blocks[0]).toMatchObject({type:'npc_grid',data:{layout:'full',entries:[{name:'Shivay Lorenne',alt:'Shivay Lorenne',image:'/assets/intera.webp',description:'Una compagna di scuola.'}]}});
+    expect(source).not.toContain('/assets/avatar.webp');
+    expect(serializeGdrBlocks(result.sections[0].blocks)).toBe(source);
+    expect(narrativeSnippet('npc_full','',{kind:'pg',name:'Daisy',photo:'/assets/intera.webp',portrait:''})).toBe('');
+    expect(narrativeSnippet('npc_full','',{kind:'png',name:'Shivay',portrait:'/assets/avatar.webp'})).toBe('');
   });
   it('usa la stessa sintassi e la voce scelta in entrambi gli editor', () => {
     const snippet = narrativeSnippet('dialogo', 'Le mie parole.', {

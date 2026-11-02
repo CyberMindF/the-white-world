@@ -40,6 +40,7 @@ describe('anteprima prima della pubblicazione', () => {
     expect(button('Azione')).toBeTruthy();
     expect(button('Nota')).toBeTruthy();
     expect(button('Immagine')).toBeUndefined();
+    expect(button('PNG a tutta pagina')).toBeUndefined();
     expect(button('Cambia voce nel dialogo')).toBeUndefined();
     expect(fixture.nativeElement.querySelector('pre, code')).toBeNull();
     expect(fixture.nativeElement.textContent).toContain('Personaggio');
@@ -78,6 +79,14 @@ describe('anteprima prima della pubblicazione', () => {
     expect(result).toBe('');expect(fixture.nativeElement.querySelector('.library-tools')).toBeNull();
     (fixture.nativeElement.querySelector('button[aria-label="Inserisci Il castello"]') as HTMLButtonElement).click();fixture.detectChanges();
     expect(result.trim()).toBe('![Il castello](/assets/castello.webp)');expect(parseNarrative(result).errors).toEqual([]);
+    expect(fixture.nativeElement.querySelector('.image-picker')).toBeNull();
+  });
+  it('inserisce il PNG selezionato a tutta pagina senza passare dalla libreria immagini',async()=>{
+    const {fixture,button}=setup('');fixture.componentRef.setInput('masterTools',true);
+    fixture.componentRef.setInput('characters',[{name:'Shivay',kind:'png',portrait:'/assets/avatar.webp',photo:'/assets/intera.webp',description:'Una compagna.'}]);fixture.detectChanges();await fixture.whenStable();
+    let updated='';fixture.componentInstance.sourceChange.subscribe(value=>updated=value);
+    button('PNG a tutta pagina').click();
+    const parsed=parseNarrative(updated);expect(parsed.errors).toEqual([]);expect(parsed.sections[0].blocks[0]).toMatchObject({type:'npc_grid',data:{layout:'full',entries:[{name:'Shivay',image:'/assets/intera.webp',description:'Una compagna.'}]}});
     expect(fixture.nativeElement.querySelector('.image-picker')).toBeNull();
   });
   it('non aggiunge righe vuote in fondo e riusa quelle attorno alla selezione', async()=>{

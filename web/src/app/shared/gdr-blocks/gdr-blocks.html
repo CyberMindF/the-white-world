@@ -75,7 +75,7 @@
       </figure>
     }
     @case ('npc_grid') {
-      <div class="npc-grid">
+      <div class="npc-grid" [class.npc-full]="asNpcGrid(block.data).layout === 'full'">
         @for (entry of asNpcGrid(block.data).entries; track entry.name) {
           <article class="npc-card card glass-surface">
             <img [src]="entry.image" [alt]="entry.alt" loading="lazy" />

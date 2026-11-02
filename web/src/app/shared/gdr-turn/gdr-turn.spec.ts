@@ -66,6 +66,27 @@ describe('eliminazione dei blocchi della storia',()=>{
   const master=reading();expect(master).toEqual({photo:'/assets/intera.webp',description:'Prima riga.\nSeconda riga.',avatar:'/assets/avatar.webp',dialogue:'Non è una buona notizia.'});
   fixture.componentRef.setInput('editable',false);fixture.detectChanges();expect(reading()).toEqual(master);
  });
+ it('cambia il formato di un PNG già presente conservando ID, foto e descrizione',async()=>{
+  const blocks:GdrBlockRow[]=[{id:'22',documentKey:'avventura',position:0,type:'npc_grid',data:{entries:[{name:'Sally',alt:'Sally',image:'/assets/intera.webp',description:'La gatta di Daisy.'}]}}];
+  const {fixture,buttons}=setup(serializeGdrBlocks(blocks));fixture.componentRef.setInput('persistedBlocks',blocks);fixture.detectChanges();
+  fixture.nativeElement.querySelector('button.gdr-edit-start').click();fixture.detectChanges();await fixture.whenStable();
+  const select=fixture.nativeElement.querySelector('select[id$="-layout"]') as HTMLSelectElement;
+  expect(select.value).toBe('card');select.value='full';select.dispatchEvent(new Event('change'));fixture.detectChanges();
+  const save=vi.fn();fixture.componentInstance.blockChange.subscribe(save);buttons('Applica al testo')[0].click();
+  expect(save).toHaveBeenCalledWith({id:'22',source:'::: npc full\n- image: /assets/intera.webp\n  alt: Sally\n  name: Sally\n  description: La gatta di Daisy.\n:::'});
+ });
+ it('inserisce il PNG a tutta pagina anche dalla modifica rapida e lo rende uguale per master e player',async()=>{
+  const {fixture,buttons}=setup('');fixture.componentRef.setInput('insertable',true);
+  fixture.componentRef.setInput('characters',[{id:'sally',name:'Sally',kind:'png',portrait:'/assets/avatar.webp',photo:'/assets/foto-intera.webp',description:'La gatta di Daisy.'}]);fixture.detectChanges();
+  fixture.nativeElement.querySelector('button[aria-label="Inizia a scrivere"]').click();fixture.detectChanges();await fixture.whenStable();
+  const select=fixture.nativeElement.querySelector('select[aria-label="Inserisci contenuto nel blocco"]') as HTMLSelectElement;
+  select.value='npc_full';select.dispatchEvent(new Event('change'));fixture.detectChanges();
+  let source='';fixture.componentInstance.sourceChange.subscribe(value=>source=value);
+  buttons('Aggiungi al racconto')[0].click();fixture.componentRef.setInput('source',source);fixture.detectChanges();
+  const full=fixture.nativeElement.querySelector('.npc-grid.npc-full');
+  expect(full.querySelector('img').getAttribute('src')).toBe('/assets/foto-intera.webp');expect(full.textContent).toContain('Sally');expect(full.textContent).toContain('La gatta di Daisy.');
+  const master=full.textContent;fixture.componentRef.setInput('editable',false);fixture.detectChanges();expect(fixture.nativeElement.querySelector('.npc-grid.npc-full').textContent).toBe(master);
+ });
  it('salva la conversione in dialogo sul blocco condiviso, anziché emettere una copia privata della storia',async()=>{
   const blocks:GdrBlockRow[]=[{id:'22',documentKey:'avventura',position:0,type:'paragraph',data:{text:'Non è una buona notizia.'}}];
   const {fixture,buttons}=setup(serializeGdrBlocks(blocks));fixture.componentRef.setInput('persistedBlocks',blocks);fixture.detectChanges();
