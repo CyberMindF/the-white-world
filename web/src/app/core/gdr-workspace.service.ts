@@ -61,6 +61,7 @@ interface WorkspaceResponse {
     deleted: boolean;
     name: string;
     portrait: string;
+    photo: string;
     description: string;
   }[];
 }

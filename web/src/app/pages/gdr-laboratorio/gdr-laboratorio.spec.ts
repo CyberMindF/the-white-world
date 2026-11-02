@@ -8,6 +8,7 @@ import { SafeModeService } from '../../core/safe-mode.service';
 import { RealtimeService } from '../../core/realtime.service';
 import { GdrWorkspaceService } from '../../core/gdr-workspace.service';
 import { GdrLaboratorio } from './gdr-laboratorio';
+import { GdrNpcGridData } from '../../shared/gdr-blocks/gdr-block.types';
 
 const assignedVoices = signal<{id:string;name:string;profile:{surname:string};portrait:string;kind:'pg'|'png'}[]>([]);
 class TurnPage extends GdrLaboratorio {
@@ -18,6 +19,8 @@ class TurnPage extends GdrLaboratorio {
   send() { return this.publish(); }
   tools() { return {master: this.canPrepare(), notesReadOnly: this.notesReadOnly()}; }
   imageNames() { return this.siteImages().map(image=>image.label); }
+  storyPhoto() { return (this.narrativeBlocks()[0].data as GdrNpcGridData).entries[0].image; }
+  seedStory() { this.blocks.set([{id:'9',documentKey:'avventura',position:0,type:'npc_grid',data:{entries:[{name:'Shivay',image:'/assets/originale.webp',alt:'Shivay',description:'Compagna'}]}}]); }
   state() { return { local: this.local(), turns: this.turns(), status: this.status(), error: this.turnsError() }; }
 }
 function create(live = true, player = false) {
@@ -25,7 +28,7 @@ function create(live = true, player = false) {
     {provide: AuthService, useValue: {currentUser: signal({id: 7, nickname: 'Rory'}), isAdmin: signal(!player), impersonation: signal(null)}},
     {provide: SafeModeService, useValue: {enabled: signal(false)}},
     {provide: RealtimeService, useValue: {on: () => EMPTY}},
-    {provide: GdrWorkspaceService, useValue: {adventures: signal([]), characters: signal([]), voices: assignedVoices, available: signal(true)}},
+    {provide: GdrWorkspaceService, useValue: {adventures: signal([]), characters: signal([]), storyCharacters: signal([]), voices: assignedVoices, available: signal(true)}},
     {provide: ActivatedRoute, useValue: {snapshot: {paramMap: convertToParamMap(live ? {adventureId: 'il-prezzo-della-verita'} : {})}}},
   ]});
   const page = TestBed.runInInjectionContext(() => new TurnPage());
@@ -33,7 +36,7 @@ function create(live = true, player = false) {
   return page;
 }
 const reply = (value: unknown, status = 200) => new Response(JSON.stringify(value), {status});
-const saved = {saved: true, turnId: 42, author: 'Rory', createdAt: '2026-10-31T22:00:00Z'};
+const saved = {saved: true, turnId: 42, author: 'Rory', isMaster:true, createdAt: '2026-10-31T22:00:00Z'};
 describe('invio dei turni della partita reale', () => {
   beforeEach(() => {localStorage.clear(); assignedVoices.set([]);});
   afterEach(() => { vi.unstubAllGlobals(); TestBed.resetTestingModule(); });
@@ -46,6 +49,14 @@ describe('invio dei turni della partita reale', () => {
   });
   it('mantiene professori e PNG nella raccolta anche senza immagini nel racconto o personaggi già creati',()=>{
     const page=create();expect(page.imageNames()).toEqual(expect.arrayContaining(['Valin Fajar','Maerath Solven','Sorenne Caldri','Shivay Lorenne','Lefira Marsan','Pyron Feddott','Dravon Tassyr']));
+  });
+  it('usa la foto completa nella storia anche quando il PNG ha un nuovo avatar',()=>{
+    const page=create();page.seedStory();
+    const workspace=TestBed.inject(GdrWorkspaceService);
+    const npc={sourceKey:'npc:9:0',deleted:false,name:'Shivay',photo:'/assets/intera.webp',portrait:'/assets/ritaglio.webp',description:'Compagna'};
+    workspace.storyCharacters.set([npc]);expect(page.storyPhoto()).toBe('/assets/intera.webp');
+    workspace.storyCharacters.set([{...npc,portrait:'/assets/altro-ritaglio.webp'}]);expect(page.storyPhoto()).toBe('/assets/intera.webp');
+    workspace.storyCharacters.set([{...npc,photo:''}]);expect(page.storyPhoto()).toBe('/assets/originale.webp');
   });
   it('il master ha gli strumenti della storia; impersonare Desy lascia gli appunti in sola lettura',()=>{
     const page=create();expect(page.tools()).toEqual({master:true,notesReadOnly:false});
@@ -90,6 +101,7 @@ describe('invio dei turni della partita reale', () => {
     vi.stubGlobal('fetch',vi.fn().mockResolvedValueOnce(reply(saved,201)).mockRejectedValueOnce(new Error('offline')));
     const page=create(); page.draft('Turno salvato'); await page.send();
     expect(page.state().turns[0].id).toBe(42);
+    expect(page.state().turns[0].isMaster).toBe(true);
     expect(page.state().local.draft).toBe('');
     expect(page.state().error).toContain('aggiornare i turni');
   });

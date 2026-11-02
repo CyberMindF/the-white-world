@@ -38,24 +38,16 @@
     <button class="btn" type="button" (click)="insert('nota', sourceArea)">
       Nota
     </button>
-    @if (document()) {
-      @for (type of blockTypes; track type) {
-        @if (type !== 'image' || allowImages()) {
-        <button class="btn" type="button" (click)="insert(type, sourceArea)">
-          {{ type === 'callout' ? 'Riquadro' : snippetLabels[type] }}
-        </button>
-        }
-      }
-    } @else if (allowImages()) {
+    @if (!document() && !masterTools() && allowImages()) {
       <button class="btn" type="button" (click)="insert('image', sourceArea)">Immagine</button>
     }
   </div>
   @if (masterTools() || document()) {
     <div class="toolbar master-toolbar" role="group" aria-label="Impaginazione della storia">
       <span class="tools-label">Storia</span>
-      @if (!document()) {
-        @for (type of masterBlockTypes; track type) {
-          <button class="btn" type="button" (click)="insert(type, sourceArea)">{{ type === 'callout' ? 'Riquadro' : snippetLabels[type] }}</button>
+      @for (type of blockTypes; track type) {
+        @if (type !== 'image' || allowImages()) {
+          <button class="btn" type="button" (click)="insert(type, sourceArea)">{{ type === 'callout' ? 'Riquadro' : type === 'npc_grid' ? 'Scheda PNG' : snippetLabels[type] }}</button>
         }
       }
       <button class="btn" type="button" (click)="insert('subtitle', sourceArea)">Sottotitolo</button>
@@ -107,7 +99,7 @@
         #sourceArea
         [readOnly]="inlineEditing()"
         [id]="editorId()"
-        [rows]="document() ? 18 : 7"
+            [rows]="document() || masterTools() ? 18 : 7"
         [ngModel]="source()"
         (ngModelChange)="sourceChange.emit($event)"
         spellcheck="true"

@@ -80,5 +80,18 @@ describe('anteprima prima della pubblicazione', () => {
     expect(result.trim()).toBe('![Il castello](/assets/castello.webp)');expect(parseNarrative(result).errors).toEqual([]);
     expect(fixture.nativeElement.querySelector('.image-picker')).toBeNull();
   });
+  it('offre gli stessi strumenti per il testo iniziale e per il seguito del master',()=>{
+    const {fixture}=setup('');fixture.componentRef.setInput('allowImages',true);fixture.componentRef.setInput('document',true);fixture.detectChanges();
+    const labels=()=>Array.from(fixture.nativeElement.querySelectorAll('.toolbar button') as NodeListOf<HTMLButtonElement>).map(b=>b.textContent?.trim());
+    const documentTools=labels();fixture.componentRef.setInput('document',false);fixture.componentRef.setInput('masterTools',true);fixture.detectChanges();
+    expect(labels()).toEqual(documentTools);expect(labels()).toContain('Scheda PNG');
+  });
+  it('inserisce la scheda di un PNG con la foto intera e usa il ritratto per il dialogo', async()=>{
+    const {fixture,button}=setup('');fixture.componentRef.setInput('masterTools',true);
+    fixture.componentRef.setInput('characters',[{name:'Shivay',kind:'png',portrait:'/assets/ritaglio.webp',photo:'/assets/intera.webp',description:'Una compagna'}]);fixture.detectChanges();await fixture.whenStable();
+    let updated='';fixture.componentInstance.sourceChange.subscribe(value=>updated=value);
+    button('Scheda PNG').click();expect(updated).toContain('image: /assets/intera.webp');expect(updated).not.toContain('/assets/ritaglio.webp');expect(parseNarrative(updated).errors).toEqual([]);
+    button('Dialogo').click();expect(updated).toContain('| /assets/ritaglio.webp');
+  });
 
 });

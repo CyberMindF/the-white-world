@@ -32,7 +32,6 @@ export class GdrSourceEditor {
   protected readonly characterIndex = signal(0);
   protected readonly voiceMessage = signal('');
   protected readonly imagePickerOpen = signal(false);
-  protected readonly masterBlockTypes = ['heading', 'paragraph', 'callout', 'list', 'table'] as const;
   private readonly parsed = computed(() => parseNarrative(this.source()));
   protected readonly errors = computed(() => this.parsed().errors);
   protected readonly recognized = computed(() =>
@@ -62,7 +61,7 @@ export class GdrSourceEditor {
   }
   protected insert(type: string, area: HTMLTextAreaElement, customSnippet?: string): void {
     if (type === 'image' && !this.allowImages()) return;
-    if (this.masterBlockTypes.includes(type as typeof this.masterBlockTypes[number]) || type === 'subtitle' || type === 'emphasis') {
+    if ((type !== 'image' && BLOCK_TYPES.includes(type as typeof BLOCK_TYPES[number])) || type === 'subtitle' || type === 'emphasis') {
       if (!this.document() && !this.masterTools()) return;
     }
     if (this.inlineEditing()) {
@@ -80,7 +79,11 @@ export class GdrSourceEditor {
     const character = this.characters()[this.characterIndex()] ?? this.characters()[0];
     if (type === 'dialogo' && !character && !this.allowGeneric()) return;
     const snippet = customSnippet ?? narrativeSnippet(type, selected, character);
-    if (!snippet) return;
+    if (!snippet) {
+      if (type === 'npc_grid') this.voiceMessage.set('Scegli un PNG con una foto completa nel menu Personaggio.');
+      return;
+    }
+    this.voiceMessage.set('');
     const prefix =
       start && !text.slice(0, start).endsWith('\n\n')
         ? text[start - 1] === '\n'

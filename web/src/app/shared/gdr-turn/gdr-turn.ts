@@ -483,7 +483,10 @@ export class GdrTurn {
       this.draft().slice(start, end),
       this.characters()[this.voice()] ?? this.characters()[0],
     );
-    if (!snippet) return;
+    if (!snippet) {
+      if (type === 'npc_grid') this.message.set('Scegli un PNG con una foto completa nel menu Personaggio.');
+      return;
+    }
     this.draft.set(
       insertNarrativeBlock(this.draft().slice(0, start) + this.draft().slice(end), start, snippet),
     );

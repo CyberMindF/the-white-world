@@ -56,7 +56,7 @@ export async function onRequestGet(context) {
       ? (
           await db
             .prepare(
-              `SELECT l.source_key,c.name,c.portrait,c.profile_json,l.character_id FROM gdr_workspace_story_links l LEFT JOIN gdr_workspace_characters c ON c.id=l.character_id WHERE l.adventure_id=? AND l.source_key LIKE 'npc:%'`,
+              `SELECT l.source_key,c.name,c.portrait,c.photo,c.profile_json,l.character_id FROM gdr_workspace_story_links l LEFT JOIN gdr_workspace_characters c ON c.id=l.character_id WHERE l.adventure_id=? AND l.source_key LIKE 'npc:%'`,
             )
             .bind(adventure)
             .all()
@@ -65,6 +65,7 @@ export async function onRequestGet(context) {
           deleted: !r.character_id,
           name: r.name,
           portrait: r.portrait,
+          photo: r.photo ?? '',
           description: r.profile_json
             ? (JSON.parse(r.profile_json).appearance ?? "")
             : "",

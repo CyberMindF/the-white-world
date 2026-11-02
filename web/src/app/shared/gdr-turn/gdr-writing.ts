@@ -5,6 +5,8 @@ export interface NarrativeCharacter {
   id?: string;
   name: string;
   portrait: string;
+  photo?: string;
+  description?: string;
   kind?: 'pg' | 'png';
 }
 
@@ -25,6 +27,12 @@ export function narrativeSnippet(
   if (type === 'paragraph') return selected || 'Testo del paragrafo.';
   if (type === 'callout') return `::: callout\n${selected || 'Testo del riquadro.'}\n:::`;
   if (type === 'list' && selected) return selected.split(/\r?\n/).filter(line => line.trim()).map(line => '- ' + line).join('\n');
+  if (type === 'npc_grid') {
+    const photo = safeNarrativeImage(character?.photo ?? '');
+    if (!photo || character?.kind !== 'png') return '';
+    const description = (selected || character.description || 'Descrizione del personaggio.').replace(/[\r\n]+/g, ' ');
+    return `::: npc\n- image: ${photo}\n  alt: ${name}\n  name: ${name}\n  description: ${description}\n:::`;
+  }
   return SNIPPETS[type as keyof typeof SNIPPETS] ?? '';
 }
 

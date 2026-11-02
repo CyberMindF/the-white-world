@@ -65,6 +65,7 @@ const ADVENTURES: Adventure[] = [
 interface ExistingTurn {
   id?: number;
   isMine: boolean;
+  isMaster?: boolean;
   author: string;
   createdAt: string;
   body: string;
@@ -190,7 +191,7 @@ export class GdrLaboratorio implements OnInit {
     const data=block.data as GdrNpcGridData;
     return {...block,data:{...data,entries:data.entries.flatMap((entry,index)=>{
       const current=this.workspace.storyCharacters().find(c=>c.sourceKey===`npc:${block.id}:${index}`);
-      return current?.deleted ? [] : [{...entry,...(current ? {name:current.name,image:current.portrait,description:current.description}: {})}];
+      return current?.deleted ? [] : [{...entry,...(current ? {name:current.name,image:current.photo || entry.image,description:current.description}: {})}];
     })}};
   }));
   protected readonly rulesSearch = signal('');
@@ -255,7 +256,7 @@ export class GdrLaboratorio implements OnInit {
       .map((f) => `${f.label}: ${this.values()[f.key] ?? ''}`)
       .join('\n\n'),
   );
-  protected readonly characters = computed<NarrativeCharacter[]>(() => this.workspace.available() ? this.workspace.voices().map(c=>({id:c.id,name:c.name + (c.profile?.surname ? ' '+c.profile.surname : ''),portrait:gdrImagePath(c.portrait),kind:c.kind})) : []);
+  protected readonly characters = computed<NarrativeCharacter[]>(() => this.workspace.available() ? this.workspace.voices().map(c=>({id:c.id,name:c.name + (c.profile?.surname ? ' '+c.profile.surname : ''),portrait:gdrImagePath(c.portrait),photo:gdrImagePath(c.photo ?? ''),description:c.profile?.appearance ?? '',kind:c.kind})) : []);
   private readonly route = inject(ActivatedRoute);
   private requestVersion = 0;
   private turnsRequestVersion = 0;
@@ -467,7 +468,7 @@ export class GdrLaboratorio implements OnInit {
       // Mostra subito il turno confermato, anche se la rilettura successiva fallisce.
       if (adventure === this.selected()) {
         if (!this.turns().some(t => t.id === result.turnId)) this.turns.update(turns => [...turns, {
-          id: result.turnId, author: result.author, createdAt: result.createdAt, body: body.trim(), isMine: true,
+          id: result.turnId, author: result.author, createdAt: result.createdAt, body: body.trim(), isMine: true, isMaster: result.isMaster === true,
         }]);
         if (this.local().draft === body) {
           this.local.update(state => ({...state, draft: ''}));

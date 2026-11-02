@@ -214,19 +214,16 @@
           }
         }
 
-        <section class="gdr-turn-section" aria-label="Messaggi della partita">
-          @if (turns().length || local().turns.length) {
-            <h2>Il turno</h2>
-          }
+        <section class="gdr-turn-section" aria-label="Svolgimento della storia">
           @if (turnsError()) {
             <p class="lab-error" role="alert">{{ turnsError() }}</p>
             <button class="btn" (click)="select(selected())">Riprova la cronologia</button>
           }
           <div class="gdr-thread">
             @for (turn of turns(); track $index) {
-              <article class="gdr-turn" [class.is-mine]="turn.isMine">
+              <article class="gdr-turn" [class.is-mine]="turn.isMine" [class.is-story]="turn.isMaster">
                 <div class="gdr-turn-meta">
-                  <span class="gdr-turn-author">{{ turn.isMine ? 'Tu' : turn.author }}</span
+                  <span class="gdr-turn-author">{{ turn.isMaster ? 'Racconto · Master' : turn.isMine ? 'Tu' : turn.author }}</span
                   ><span class="gdr-turn-date">{{ formatDate(turn.createdAt) }}</span>
                 </div>
                 <app-gdr-turn [source]="turn.body" />
@@ -244,7 +241,7 @@
               </article>
             }
           </div>
-          <section class="lab-composer" aria-label="Scrivi un messaggio">
+          <section class="lab-composer" [attr.aria-label]="canPrepare() ? 'Continua la storia' : 'Scrivi un messaggio'">
             <app-gdr-source-editor
               [masterTools]="canPrepare()"
               [images]="siteImages()"
@@ -257,7 +254,7 @@
               [allowGeneric]="!workspace.available()"
               editorId="lab-turn"
               (editingChange)="turnEdit.set($event)"
-              label="Scrivi qualcosa"
+              [label]="canPrepare() ? 'Continua la storia' : 'Scrivi qualcosa'"
             />
             <div class="gdr-turn-submit-row">
               <button
@@ -265,7 +262,7 @@
                 [disabled]="invalidTurn() || turnEdit() || sendingTurn()"
                 (click)="turnPreview() ? publish() : turnComposer.openPreview()"
               >
-                {{ sendingTurn() ? 'Pubblicazione…' : !turnPreview() ? 'Anteprima' : liveGame ? 'Pubblica turno' : 'Pubblica turno di prova' }}</button
+                {{ sendingTurn() ? 'Pubblicazione…' : !turnPreview() ? 'Anteprima' : liveGame ? canPrepare() ? 'Pubblica racconto' : 'Pubblica turno' : 'Pubblica turno di prova' }}</button
               >
             </div>
           </section>

@@ -17,7 +17,7 @@ export async function onRequestGet(context) {
     const result = await context.env.DB
       .prepare(`
         SELECT gdr_turns.id, gdr_turns.author_id, users.nickname AS author_nickname,
-               gdr_turns.body, gdr_turns.created_at
+               gdr_turns.body, gdr_turns.created_at, users.role AS author_role, users.is_test AS author_is_test
         FROM gdr_turns
         INNER JOIN users ON users.id = gdr_turns.author_id
         WHERE gdr_turns.adventure = ?
@@ -30,6 +30,7 @@ export async function onRequestGet(context) {
       id: row.id,
       author: row.author_nickname,
       isMine: row.author_id === session.user.id,
+      isMaster: row.author_role === 'admin' && row.author_is_test !== 1,
       body: row.body,
       createdAt: row.created_at
     }));
@@ -74,7 +75,7 @@ export async function onRequestPost(context) {
     }));
 
     return json(
-      { saved: true, turnId: result.meta.last_row_id, author: session.user.nickname, createdAt },
+      { saved: true, turnId: result.meta.last_row_id, author: session.user.nickname, isMaster: session.user.role === 'admin' && !session.user.isTest, createdAt },
       201
     );
   } catch (error) {

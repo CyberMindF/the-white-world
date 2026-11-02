@@ -172,6 +172,18 @@ test('campi numerici della scheda unica: valori non validi non sovrascrivono il 
  await assert.rejects(()=>mutate(h.db,master,{action:'saveCharacter',characterId:c.id,revision:c.revision,name:c.name,portrait:'',sheet:'',characterFields:{mente:'6'}}),e=>e.status===400);
  assert.equal(revision(h.sqlite,'numbers'),c.revision);h.sqlite.close();
 });
+test('foto nel racconto e avatar del PNG restano indipendenti dopo il ritaglio',async()=>{
+ const h=apiHarness();h.sqlite.prepare('INSERT INTO gdr_character_schema VALUES(?,?)').run(adventureId,'[]');
+ h.sqlite.prepare('INSERT INTO gdr_blocks VALUES(1,?,?,?,0)').run('avventura','npc_grid',JSON.stringify({entries:[{name:'Shivay',image:'/assets/shivay-intera.webp',description:'Una compagna'}]}));
+ await mutate(h.db,master,{action:'syncLegacy',adventureId});
+ let npc=(await (await h.call(1)).json()).characters.find(c=>c.kind==='png');
+ await mutate(h.db,master,{action:'saveCharacter',characterId:npc.id,revision:npc.revision,name:npc.name,portrait:'/api/media/gdr-workspace/shivay/avatar/ritaglio.webp',sheet:'',profile:npc.profile});
+ const story=(await (await h.call(2)).json()).storyCharacters[0];
+ assert.equal(story.photo,'/assets/shivay-intera.webp');assert.equal(story.portrait,'/api/media/gdr-workspace/shivay/avatar/ritaglio.webp');
+ npc=(await (await h.call(1)).json()).characters.find(c=>c.kind==='png');
+ await mutate(h.db,master,{action:'saveCharacter',characterId:npc.id,revision:npc.revision,name:npc.name,portrait:npc.portrait,photo:'/assets/shivay-nuova-intera.webp',sheet:'',profile:npc.profile});
+ assert.equal((await (await h.call(2)).json()).storyCharacters[0].photo,'/assets/shivay-nuova-intera.webp');h.sqlite.close();
+});
 test('anche i vecchi pannelli leggono e scrivono sul PG canonico senza creare copie del nome',async()=>{
  const h=apiHarness();h.sqlite.prepare('INSERT INTO gdr_character_schema VALUES(?,?)').run(adventureId,JSON.stringify([{key:'name',label:'Nome',type:'text',default:''},{key:'catName',label:'Gatto',type:'text',default:''}]));
  h.sqlite.prepare('INSERT INTO gdr_character_fields VALUES(?,?,?)').run(adventureId,'name','Ada');
