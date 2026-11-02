@@ -26,11 +26,12 @@ import {
   portraitCropRect,
 } from './character-profile';
 import { GdrTurn } from '../gdr-turn/gdr-turn';
+import { GdrImageLibrary, GdrLibraryImage } from './gdr-image-library';
 
 @Component({
   selector: 'app-gdr-characters',
   standalone: true,
-  imports: [FormsModule, GdrTurn],
+  imports: [FormsModule, GdrTurn, GdrImageLibrary],
   templateUrl: './gdr-characters.html',
   styleUrl: './gdr-characters.css',
 })
@@ -132,6 +133,26 @@ export class GdrCharacters {
   readonly legacySheet = input('');
   readonly legacyName = input('Il mio personaggio');
   readonly legacyPortrait = input('');
+  readonly siteImages = input<GdrLibraryImage[]>([]);
+  protected readonly libraryImages = computed<GdrLibraryImage[]>(() => [
+    ...this.workspace.characters().flatMap(c => [
+      { src: c.photo, label: c.name + ' · foto' },
+      { src: c.portrait, label: c.name + ' · ritratto' },
+    ]),
+    ...this.siteImages(),
+    { src: this.photo(), label: 'Foto attuale' },
+    { src: this.portrait(), label: 'Ritratto attuale' },
+    { src: this.legacyPortrait(), label: 'Foto dell’avventura' },
+  ]);
+  protected async chooseLibraryImage(image: { src: string; slot: 'photo' | 'avatar' }): Promise<void> {
+    if (this.mediaBusy() || this.workspace.saving()) return;
+    if (image.slot === 'photo') {
+      this.photo.set(image.src);
+      this.dirty.set(true);
+    } else {
+      await this.cropExistingImage(image.src);
+    }
+  }
   readonly legacyNpcs = input<{ name: string; portrait: string; description: string }[]>([]);
   protected readonly profileFields = PROFILE_FIELDS;
   protected readonly playerProfileFields = computed(() =>
@@ -515,10 +536,13 @@ export class GdrCharacters {
   }
   protected async avatarFromPhoto(): Promise<void> {
     if (!this.photo()) return;
+    await this.cropExistingImage(this.photo());
+  }
+  private async cropExistingImage(src: string): Promise<void> {
     this.mediaBusy.set(true);
     this.localError.set('');
     try {
-      const response = await fetch(this.photo(), { credentials: 'same-origin' });
+      const response = await fetch(src, { credentials: 'same-origin' });
       if (!response.ok) throw new Error('Foto non disponibile.');
       await this.openCrop(await response.blob(), 'avatar');
     } catch (error) {

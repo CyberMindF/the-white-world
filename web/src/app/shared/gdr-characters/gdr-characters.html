@@ -525,6 +525,8 @@
                                 Ritaglia il ritratto dalla foto
                               </button>
                             }
+                            <app-gdr-image-library [images]="libraryImages()" [photo]="photo()" [portrait]="portrait()"
+                              (selected)="chooseLibraryImage($event)" />
                           </details>
                           <div class="player-save-bar">
                             <button class="btn" (click)="discard()">Annulla</button
@@ -596,20 +598,8 @@
                                 Ritaglia il ritratto dalla foto
                               </button>
                             }
-                            <details>
-                              <summary>Usa immagini già presenti nel sito</summary>
-                              <label for="character-photo">Percorso della foto</label
-                              ><input
-                                id="character-photo"
-                                [ngModel]="photo()"
-                                (ngModelChange)="photo.set($event); dirty.set(true)"
-                              /><label for="character-portrait">Percorso dell’avatar</label
-                              ><input
-                                id="character-portrait"
-                                [ngModel]="portrait()"
-                                (ngModelChange)="portrait.set($event); dirty.set(true)"
-                              />
-                            </details>
+                            <app-gdr-image-library [images]="libraryImages()" [photo]="photo()" [portrait]="portrait()"
+                              (selected)="chooseLibraryImage($event)" />
                           </details>
                           <h4>Descrizione e storia</h4>
                           @for (field of profileFields; track field.key) {

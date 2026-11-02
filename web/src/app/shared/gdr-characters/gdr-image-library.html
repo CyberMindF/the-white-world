@@ -1,0 +1,25 @@
+<details class="image-library">
+  <summary>Scegli dalle immagini del GDR</summary>
+  <div class="library-tools" role="group" aria-label="Usa l’immagine come">
+    <span>Usa come</span>
+    <button type="button" [attr.aria-pressed]="slot() === 'photo'" (click)="slot.set('photo')">Foto</button>
+    <button type="button" [attr.aria-pressed]="slot() === 'avatar'" (click)="slot.set('avatar')">Ritratto</button>
+  </div>
+  @if (available().length > 8) {
+    <input type="search" aria-label="Cerca un’immagine per nome" placeholder="Cerca per nome…"
+      [ngModel]="query()" (ngModelChange)="query.set($event)" />
+  }
+  <div class="image-grid" aria-label="Immagini disponibili">
+    @for (image of filtered(); track image.src) {
+      <button type="button" class="image-choice"
+        [attr.aria-label]="'Usa ' + image.label + ' come ' + (slot() === 'photo' ? 'foto' : 'ritratto')"
+        [attr.aria-pressed]="image.src === (slot() === 'photo' ? photo() : portrait())"
+        (click)="selected.emit({src: image.src, slot: slot()})">
+        <img [src]="image.src" alt="" loading="lazy" />
+        <span>{{ image.label }}</span>
+      </button>
+    } @empty {
+      <p>{{ query() ? 'Nessuna immagine con questo nome.' : 'Non ci sono ancora immagini disponibili. Puoi caricare una foto dal tuo dispositivo.' }}</p>
+    }
+  </div>
+</details>

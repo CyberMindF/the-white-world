@@ -18,6 +18,7 @@ import { serializeGdrBlocks } from '../../shared/gdr-blocks/gdr-markdown.seriali
 import { GdrWorkspaceService } from '../../core/gdr-workspace.service';
 import { GdrCharacters } from '../../shared/gdr-characters/gdr-characters';
 import { GdrPowers } from '../../shared/gdr-characters/gdr-powers';
+import { imagesFromGdrBlocks } from '../../shared/gdr-characters/gdr-image-library';
 import { splitCharacterPowers } from '../../shared/gdr-characters/character-powers';
 import { GdrNotesEditor } from '../../shared/gdr-notes/gdr-notes-editor';
 import { GdrPanel } from '../../shared/gdr-panel/gdr-panel';
@@ -204,6 +205,10 @@ export class GdrLaboratorio implements OnInit {
   protected readonly rulesBlocks = computed(() => this.referenceBlocks().rules);
   protected readonly powersBlocks = computed(() => this.referenceBlocks().powers);
   protected readonly characterBlocks = computed(() => this.forDocument(this.adventure().character));
+  protected readonly siteImages = computed(() => imagesFromGdrBlocks([
+    ...this.blocks(),
+    ...this.workspace.adventures().flatMap(a => parseNarrative(a.source).sections.flatMap(s => s.blocks)),
+  ]));
   protected readonly documentSource = computed(
     () =>
       this.local().documentDraft ??
