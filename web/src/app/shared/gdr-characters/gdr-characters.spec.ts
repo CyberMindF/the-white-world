@@ -152,6 +152,7 @@ describe('scheda unica nel pannello della giocatrice',()=>{
  afterEach(()=>TestBed.resetTestingModule());
  it('sceglie una foto dalle miniature e la salva sul PG; annulla ripristina la foto precedente',async()=>{
   const {workspace,fixture,button}=setup();
+  workspace.characters.update(cs=>cs.map(c=>c.id==='ada'?{...c,revision:2,portrait:'assets/old-avatar.webp'}:c));fixture.detectChanges();
   fixture.componentRef.setInput('siteImages',[{src:'/assets/lefira.webp',label:'Lefira'}]);
   button('Modifica scheda').click();fixture.detectChanges();
   expect(fixture.nativeElement.querySelector('#character-photo')).toBeNull();
@@ -161,7 +162,7 @@ describe('scheda unica nel pannello della giocatrice',()=>{
   expect((fixture.nativeElement.querySelector('.image-tools .photo') as HTMLImageElement).getAttribute('src')).toBe('/assets/lefira.webp');
   const save=vi.spyOn(workspace,'save').mockResolvedValue(false);
   button('Salva modifiche').click();await fixture.whenStable();
-  expect(save).toHaveBeenCalledWith(expect.objectContaining({characterId:'ada',photo:'/assets/lefira.webp'}));
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({characterId:'ada',photo:'/assets/lefira.webp',portrait:'/assets/old-avatar.webp'}));
   button('Annulla').click();fixture.detectChanges();
   expect(workspace.pendingChanges()).toBe(false);
   expect(workspace.active()?.photo).toBe('');

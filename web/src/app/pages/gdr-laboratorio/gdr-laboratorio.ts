@@ -19,6 +19,7 @@ import { GdrWorkspaceService } from '../../core/gdr-workspace.service';
 import { GdrCharacters } from '../../shared/gdr-characters/gdr-characters';
 import { GdrPowers } from '../../shared/gdr-characters/gdr-powers';
 import { imagesFromGdrBlocks } from '../../shared/gdr-characters/gdr-image-library';
+import { GDR_PORTRAITS, gdrLibraryImages, gdrImagePath } from '../../shared/gdr-characters/gdr-image-catalog';
 import { splitCharacterPowers } from '../../shared/gdr-characters/character-powers';
 import { GdrNotesEditor } from '../../shared/gdr-notes/gdr-notes-editor';
 import { GdrPanel } from '../../shared/gdr-panel/gdr-panel';
@@ -205,13 +206,17 @@ export class GdrLaboratorio implements OnInit {
   protected readonly rulesBlocks = computed(() => this.referenceBlocks().rules);
   protected readonly powersBlocks = computed(() => this.referenceBlocks().powers);
   protected readonly characterBlocks = computed(() => this.forDocument(this.adventure().character));
-  protected readonly siteImages = computed(() => imagesFromGdrBlocks([
-    ...this.blocks(),
-    ...this.workspace.adventures().flatMap(a => parseNarrative(a.source).sections.flatMap(s => s.blocks)),
-  ]).concat(this.workspace.characters().flatMap(c => [
-    { src: c.photo, label: c.name + ' · foto' },
-    { src: c.portrait, label: c.name + ' · ritratto' },
-  ])));
+  protected readonly siteImages = computed(() => gdrLibraryImages([
+    ...this.workspace.characters().flatMap(c => [
+      { src: c.photo, label: c.name + ' · foto' },
+      { src: c.portrait, label: c.name + ' · ritratto' },
+    ]),
+    ...imagesFromGdrBlocks([
+      ...this.blocks(),
+      ...this.workspace.adventures().flatMap(a => parseNarrative(a.source).sections.flatMap(s => s.blocks)),
+    ]),
+    ...GDR_PORTRAITS,
+  ]));
   protected readonly documentSource = computed(
     () =>
       this.local().documentDraft ??
@@ -250,7 +255,7 @@ export class GdrLaboratorio implements OnInit {
       .map((f) => `${f.label}: ${this.values()[f.key] ?? ''}`)
       .join('\n\n'),
   );
-  protected readonly characters = computed<NarrativeCharacter[]>(() => this.workspace.available() ? this.workspace.voices().map(c=>({id:c.id,name:c.name + (c.profile?.surname ? ' '+c.profile.surname : ''),portrait:c.portrait,kind:c.kind})) : []);
+  protected readonly characters = computed<NarrativeCharacter[]>(() => this.workspace.available() ? this.workspace.voices().map(c=>({id:c.id,name:c.name + (c.profile?.surname ? ' '+c.profile.surname : ''),portrait:gdrImagePath(c.portrait),kind:c.kind})) : []);
   private readonly route = inject(ActivatedRoute);
   private requestVersion = 0;
   private turnsRequestVersion = 0;

@@ -27,6 +27,7 @@ import {
 } from './character-profile';
 import { GdrTurn } from '../gdr-turn/gdr-turn';
 import { GdrImageLibrary, GdrLibraryImage } from './gdr-image-library';
+import { gdrImagePath } from './gdr-image-catalog';
 
 @Component({
   selector: 'app-gdr-characters',
@@ -403,9 +404,9 @@ export class GdrCharacters {
   }
   private populate(c: WorkspaceCharacter): void {
     this.profile.set({ ...emptyProfile(), ...c.profile });
-    this.photo.set(c.photo ?? '');
+    this.photo.set(gdrImagePath(c.photo ?? '') || c.photo || '');
     this.name.set(c.name);
-    this.portrait.set(c.portrait);
+    this.portrait.set(gdrImagePath(c.portrait) || c.portrait);
     this.sheet.set(c.sheet);
     this.sheetFields.set({ ...c.characterFields });
     this.statDraft.set(

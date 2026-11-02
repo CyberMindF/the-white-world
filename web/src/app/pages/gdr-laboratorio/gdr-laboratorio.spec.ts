@@ -17,6 +17,7 @@ class TurnPage extends GdrLaboratorio {
   leavePreview() { this.turnPreview.set(false); }
   send() { return this.publish(); }
   tools() { return {master: this.canPrepare(), notesReadOnly: this.notesReadOnly()}; }
+  imageNames() { return this.siteImages().map(image=>image.label); }
   state() { return { local: this.local(), turns: this.turns(), status: this.status(), error: this.turnsError() }; }
 }
 function create(live = true, player = false) {
@@ -24,7 +25,7 @@ function create(live = true, player = false) {
     {provide: AuthService, useValue: {currentUser: signal({id: 7, nickname: 'Rory'}), isAdmin: signal(!player), impersonation: signal(null)}},
     {provide: SafeModeService, useValue: {enabled: signal(false)}},
     {provide: RealtimeService, useValue: {on: () => EMPTY}},
-    {provide: GdrWorkspaceService, useValue: {adventures: signal([]), voices: assignedVoices, available: signal(true)}},
+    {provide: GdrWorkspaceService, useValue: {adventures: signal([]), characters: signal([]), voices: assignedVoices, available: signal(true)}},
     {provide: ActivatedRoute, useValue: {snapshot: {paramMap: convertToParamMap(live ? {adventureId: 'il-prezzo-della-verita'} : {})}}},
   ]});
   const page = TestBed.runInInjectionContext(() => new TurnPage());
@@ -42,6 +43,9 @@ describe('invio dei turni della partita reale', () => {
   });
   it('la giocatrice conserva gli strumenti semplici e i propri appunti modificabili',()=>{
     const page=create(true,true);expect(page.tools()).toEqual({master:false,notesReadOnly:false});
+  });
+  it('mantiene professori e PNG nella raccolta anche senza immagini nel racconto o personaggi già creati',()=>{
+    const page=create();expect(page.imageNames()).toEqual(expect.arrayContaining(['Valin Fajar','Maerath Solven','Sorenne Caldri','Shivay Lorenne','Lefira Marsan','Pyron Feddott','Dravon Tassyr']));
   });
   it('il master ha gli strumenti della storia; impersonare Desy lascia gli appunti in sola lettura',()=>{
     const page=create();expect(page.tools()).toEqual({master:true,notesReadOnly:false});
