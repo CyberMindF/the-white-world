@@ -23,6 +23,7 @@ export async function onRequestGet(context) {
   headers.set("X-Realtime-User-Id", String(session.user.id));
   headers.set("X-Realtime-Identity", session.user.identity);
   headers.set("X-Realtime-Is-Test", session.user.isTest ? "true" : "false");
+  headers.set("X-Realtime-Observer", session.impersonation ? "true" : "false");
 
   const authenticatedRequest = new Request(request, { headers });
   const room = env.REALTIME.getByName(ROOM_NAME);

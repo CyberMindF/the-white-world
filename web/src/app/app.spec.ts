@@ -53,7 +53,7 @@ describe('App', () => {
       fixture.detectChanges();await fixture.whenStable();
       expect(fixture.nativeElement.querySelector('.impersonation-banner').textContent).toContain('Stai impersonando Desy');
       expect(fixture.nativeElement.querySelector('.impersonation-banner').textContent).toContain('Torna al tuo account');
-      expect(fixture.nativeElement.querySelector('.impersonation-banner').textContent).toContain('salvati sul suo account');
+      expect(fixture.nativeElement.querySelector('.impersonation-banner').textContent).toContain('premi automatici e letture restano invariati');
       expect(connect).toHaveBeenCalled();
     }finally{vi.unstubAllGlobals();}
   });

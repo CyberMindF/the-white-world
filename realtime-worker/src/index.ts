@@ -4,6 +4,7 @@ type ConnectionAttachment = {
   userId: string;
   identity: "lui" | "lei";
   isTest: boolean;
+  observer?: boolean;
   path: string;
   visible: boolean;
   activeAt: number;
@@ -30,19 +31,20 @@ export class RealtimeRoom extends DurableObject<Env> {
     const url = new URL(request.url);
     const now = Date.now();
     const isTest = request.headers.get("X-Realtime-Is-Test") === "true";
+    const observer = request.headers.get("X-Realtime-Observer") === "true";
     const path = normalizePath(url.searchParams.get("path"));
     const visible = url.searchParams.get("visible") === "true";
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
-    const attachment: ConnectionAttachment = { userId, identity, isTest, path, visible, activeAt: now };
+    const attachment: ConnectionAttachment = { userId, identity, isTest, observer, path, visible, activeAt: now };
 
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment(attachment);
 
     if (visible) await this.saveLastSeen(attachment, now);
     server.send(JSON.stringify(await this.presenceEvent(otherIdentity(identity), isTest)));
-    await this.broadcastPresence(identity, isTest);
+    if (!observer) await this.broadcastPresence(identity, isTest);
 
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -82,7 +84,7 @@ export class RealtimeRoom extends DurableObject<Env> {
     if (!payload) return;
 
     const previous = socket.deserializeAttachment() as ConnectionAttachment | null;
-    if (!previous) return;
+    if (!previous || previous.observer) return;
     const now = Date.now();
     const attachment: ConnectionAttachment = {
       ...previous,
@@ -97,11 +99,11 @@ export class RealtimeRoom extends DurableObject<Env> {
 
   async webSocketClose(socket: WebSocket, code: number, reason: string, wasClean: boolean): Promise<void> {
     const attachment = socket.deserializeAttachment() as ConnectionAttachment | null;
-    if (attachment) {
+    if (attachment && !attachment.observer) {
       await this.saveLastSeen(attachment, Date.now());
     }
     socket.close(code, reason);
-    if (attachment) await this.broadcastPresence(attachment.identity, attachment.isTest, socket);
+    if (attachment && !attachment.observer) await this.broadcastPresence(attachment.identity, attachment.isTest, socket);
     console.log(JSON.stringify({ event: "realtime_socket_closed", code, reason, wasClean }));
   }
 
@@ -113,6 +115,7 @@ export class RealtimeRoom extends DurableObject<Env> {
   }
 
   private async saveLastSeen(attachment: ConnectionAttachment, timestamp: number): Promise<void> {
+    if (attachment.observer) return;
     await this.ctx.storage.put(lastSeenKey(attachment.identity, attachment.isTest), new Date(timestamp).toISOString());
   }
 
@@ -122,6 +125,7 @@ export class RealtimeRoom extends DurableObject<Env> {
       .map((socket) => socket.deserializeAttachment() as ConnectionAttachment | null)
       .filter((attachment): attachment is ConnectionAttachment => Boolean(
         attachment
+        && !attachment.observer
         && attachment.identity === identity
         && attachment.isTest === isTest
         && attachment.visible

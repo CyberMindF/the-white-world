@@ -1,5 +1,5 @@
 import { getAuthenticatedSession, json } from "../auth/_shared.js";
-import { recordActiveMinute } from "./_shared.js";
+import { readBustineState, recordActiveMinute } from "./_shared.js";
 
 // Il client chiama questo endpoint soltanto dopo un minuto completo con la pagina visibile.
 // recordActiveMinute deduplica lato database, quindi piu schede non producono piu minuti.
@@ -9,7 +9,9 @@ export async function onRequestPost(context) {
     const session = await getAuthenticatedSession(request, env);
     if (!session) return json({ error: "Sessione non valida o scaduta." }, 401);
 
-    const state = await recordActiveMinute(env, session.user.id);
+    const state = session.impersonation
+      ? { ...(await readBustineState(env, session.user.id)), minutoRegistrato: false }
+      : await recordActiveMinute(env, session.user.id);
     return json({
       quantitaDisponibile: state.quantitaDisponibile,
       minutiResidui: state.minutiResidui,

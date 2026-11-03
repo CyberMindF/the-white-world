@@ -174,7 +174,7 @@ export class Lettere implements OnInit, OnDestroy {
       });
     }
 
-    if (!letter.isMine && !letter.readAt) {
+    if (!letter.isMine && !letter.readAt && !this.authService.impersonation()) {
       try {
         const response = await fetch(`/api/letters/${letter.id}`, { method: 'POST', credentials: 'same-origin' });
         const result = await response.json().catch(() => ({}));

@@ -1,5 +1,5 @@
 import { getAuthenticatedSession, json } from "../auth/_shared.js";
-import { ensureBustineState } from "../carte-bustine/_shared.js";
+import { ensureBustineState, readBustineState } from "../carte-bustine/_shared.js";
 import { readOpenOffer } from "./_shared.js";
 
 export async function onRequestGet(context) {
@@ -9,8 +9,8 @@ export async function onRequestGet(context) {
     if (!session) return json({ error: "Sessione non valida o scaduta." }, 401);
 
     const [state, offerta] = await Promise.all([
-      ensureBustineState(env, session.user.id),
-      readOpenOffer(env, session.user.id)
+      session.impersonation ? readBustineState(env, session.user.id) : ensureBustineState(env, session.user.id),
+      readOpenOffer(env, session.user.id, { readOnly: !!session.impersonation })
     ]);
     return json({
       evocazioniDisponibili: state.evocazioniDisponibili,

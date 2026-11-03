@@ -98,7 +98,7 @@ export class Novita {
         if (typeof promoData.promosEnabled === 'boolean') this.promosEnabled.set(promoData.promosEnabled);
       }
       const unseenIds = this.updates().filter((update) => !update.seen && update.active && (!this.safe.enabled() || update.safe)).map((update) => update.id);
-      if (unseenIds.length > 0) {
+      if (unseenIds.length > 0 && !this.auth.impersonation()) {
         void fetch('/api/world-updates/seen', {
           method: 'POST', credentials: 'same-origin', keepalive: true,
           headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: unseenIds })

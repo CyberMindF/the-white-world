@@ -69,7 +69,7 @@ const MAX_METADATA_LENGTH = 4096;
 export async function recordEvent(env, actor, event) {
   const section = normalizeIdentifier(event.section);
   const eventType = normalizeIdentifier(event.eventType);
-  const metadata = normalizeMetadata(event.metadata);
+  let metadata = normalizeMetadata(event.metadata);
 
   if (!section || !eventType || !ALLOWED_EVENTS.has(eventType)) {
     return { error: "Tipo di evento non valido." };
@@ -77,6 +77,21 @@ export async function recordEvent(env, actor, event) {
 
   if (!metadata) {
     return { error: "Metadati non validi o troppo grandi." };
+  }
+
+  // La sessione rimane dell'admin, anche quando un waitUntil finisce dopo l'uscita.
+  // Nessun falso accesso/lettura; i salvataggi espliciti sono interventi admin, senza email.
+  const owner = actor.sessionId
+    ? await env.DB.prepare("SELECT user_id FROM sessions WHERE id = ?").bind(actor.sessionId).first()
+    : null;
+  const impersonated = owner && owner.user_id !== actor.userId;
+  if (impersonated && ["login_success", "world_unlocked", "world_page_opened", "logout", "letter_read"].includes(eventType)) {
+    return { id: null, recorded: false };
+  }
+  const actorUserId = impersonated ? owner.user_id : actor.userId;
+  if (impersonated) {
+    metadata = normalizeMetadata({ ...JSON.parse(metadata), impersonation: { actorId: actorUserId, targetId: actor.userId } });
+    if (!metadata) return { error: "Metadati non validi o troppo grandi." };
   }
 
   const result = await env.DB
@@ -90,12 +105,12 @@ export async function recordEvent(env, actor, event) {
           AND users.activity_logging_enabled = 1
       )
     `)
-    .bind(actor.userId, actor.sessionId || null, section, eventType, metadata, actor.userId)
+    .bind(actorUserId, actor.sessionId || null, section, eventType, metadata, actorUserId)
     .run();
 
   const recorded = Number(result.meta.changes || 0) > 0;
 
-  if (recorded) {
+  if (recorded && !impersonated) {
     try {
       await notifyLoggedEvent(env, { actorUserId: actor.userId, section, eventType });
     } catch (error) {

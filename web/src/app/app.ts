@@ -187,7 +187,7 @@ export class App {
   // server, cosi due schede aperte non raddoppiano le bustine.
   private restartBustinePresenceTimer(): void {
     const userId = this.authService.currentUser()?.id;
-    if (this.safe.enabled() || userId === undefined || document.visibilityState !== 'visible' || this.router.url.split('?')[0] === '/login') {
+    if (this.authService.impersonation() || this.safe.enabled() || userId === undefined || document.visibilityState !== 'visible' || this.router.url.split('?')[0] === '/login') {
       this.stopBustinePresenceTimer();
       return;
     }

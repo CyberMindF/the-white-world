@@ -21,11 +21,25 @@ const SAFE_TEST_MUTATIONS = [
   { method: "PUT", pattern: /^\/api\/crossword\/answers\/[^/]+$/ },
 ];
 
+// Guardare il sito impersonando un account non consuma letture e non ne registra l'attività.
+// Le normali modifiche ai contenuti continuano invece fino ai controlli dei singoli endpoint.
+const IMPERSONATION_PASSIVE_POSTS = [
+  /^\/api\/telemetry\/(events|word-attempts)$/,
+  /^\/api\/visits$/,
+  /^\/api\/world-updates\/seen$/,
+  /^\/api\/world-promos\/view$/,
+  /^\/api\/ponti-chat\/read$/,
+  /^\/api\/letters\/\d+$/,
+];
+
 export async function onRequest(context) {
   const method = context.request.method.toUpperCase();
   if (["GET", "HEAD", "OPTIONS"].includes(method)) return context.next();
   const path = new URL(context.request.url).pathname;
   const session = await getAuthenticatedSession(context.request, context.env);
+  if (session?.impersonation && method === "POST" && IMPERSONATION_PASSIVE_POSTS.some(pattern => pattern.test(path))) {
+    return json({ ok: true, saved: false, captured: false, readAt: null });
+  }
   if (path.startsWith("/api/auth/")) return context.next();
   if (!session?.user.isTest) return context.next();
 

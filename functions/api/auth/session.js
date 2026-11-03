@@ -48,7 +48,7 @@ export async function onRequestPost(context) {
     }
 
     // La conferma viene conservata come evento permanente e collega la visita alla sessione.
-    context.waitUntil(Promise.all([
+    if (!session.impersonation) context.waitUntil(Promise.all([
       linkVisitToSession(request, env, session.user.id, session.sessionId),
       recordEvent(env, { userId: session.user.id, sessionId: session.sessionId }, {
         section: "auth",

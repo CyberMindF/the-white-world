@@ -76,11 +76,77 @@ test('turni e appunti salvati impersonando Desy appartengono a lei e restano vis
  h.sql.close();
 });
 
-test('il realtime usa l’identità della giocatrice anche durante impersonazione',async()=>{
+test('il realtime impersonato riceve gli aggiornamenti come osservatore senza presenza',async()=>{
  const h=await fixture();await h.call('POST','admin-token',{userId:2});let forwarded;
  const realtime=new Function('getAuthenticatedSession','json',source('../realtime.js')+';return onRequestGet;')(auth.getAuthenticatedSession,auth.json);
  const response=await realtime({request:new Request('https://test/api/realtime',{headers:{Cookie:'noi_session=admin-token',Upgrade:'websocket'}}),env:{...h.env,REALTIME:{getByName(){return{fetch(request){forwarded=request;return new Response('ok');}};}}}});
- assert.equal(response.status,200);assert.equal(forwarded.headers.get('X-Realtime-User-Id'),'2');assert.equal(forwarded.headers.get('X-Realtime-Identity'),'lei');h.sql.close();
+ assert.equal(response.status,200);assert.equal(forwarded.headers.get('X-Realtime-User-Id'),'2');assert.equal(forwarded.headers.get('X-Realtime-Identity'),'lei');assert.equal(forwarded.headers.get('X-Realtime-Observer'),'true');
+ await h.call('DELETE');
+ await realtime({request:new Request('https://test/api/realtime',{headers:{Cookie:'noi_session=admin-token',Upgrade:'websocket','X-Realtime-Observer':'true'}}),env:{...h.env,REALTIME:{getByName(){return{fetch(request){forwarded=request;return new Response('ok');}};}}}});
+ assert.equal(forwarded.headers.get('X-Realtime-Observer'),'false');h.sql.close();
+});
+
+test('visite, telemetria e conferme di lettura sono inerti solo durante impersonazione; le modifiche restano abilitate',async()=>{
+ const h=await fixture();await h.call('POST','admin-token',{userId:2});
+ const paths=['/api/visits','/api/telemetry/events','/api/telemetry/word-attempts','/api/world-updates/seen','/api/world-promos/view','/api/ponti-chat/read','/api/letters/12'];
+ let writes=0;
+ for (const path of paths) {
+  const response=await middleware({env:h.env,request:h.request(path,'POST'),next(){writes++;return new Response('ok');}});
+  assert.equal(response.status,200,path);assert.equal(writes,0,path);
+ }
+ for (const [path,method] of [['/api/letters/12','PUT'],['/api/gdr/turns','PUT'],['/api/gdr/notes','POST'],['/api/gdr-workspace','POST']]) {
+  assert.equal((await middleware({env:h.env,request:h.request(path,method),next(){writes++;return new Response('ok');}})).status,200);
+ }
+ assert.equal(writes,4);
+ for (const path of paths) await middleware({env:h.env,request:h.request(path,'POST','member-token'),next(){writes++;return new Response('ok');}});
+ assert.equal(writes,4+paths.length);h.sql.close();
+});
+
+test('nessun falso accesso o email; i salvataggi restano attribuiti all’admin anche dopo l’uscita',async()=>{
+ const h=await fixture();await h.call('POST','admin-token',{userId:2});let emails=0;
+ h.sql.exec(`ALTER TABLE users ADD COLUMN activity_logging_enabled INTEGER DEFAULT 1;
+ CREATE TABLE events(id INTEGER PRIMARY KEY,user_id INTEGER,session_id INTEGER,section TEXT,event_type TEXT,event_version INTEGER,metadata TEXT);`);
+ const record=new Function('notifyLoggedEvent',source('../_shared/events.js')+';return recordEvent;')(async()=>{emails++;});
+ for (const eventType of ['world_page_opened','world_unlocked','letter_read']) {
+  assert.equal((await record(h.env,{userId:2,sessionId:1},{section:'gdr',eventType})).recorded,false);
+ }
+ assert.equal((await record(h.env,{userId:2,sessionId:1},{section:'gdr',eventType:'gdr_turn_submitted'})).recorded,true);
+ await h.call('DELETE');
+ assert.equal((await record(h.env,{userId:2,sessionId:1},{section:'gdr',eventType:'content_updated'})).recorded,true);
+ const rows=h.sql.prepare('SELECT user_id,metadata FROM events').all();assert.equal(rows.length,2);
+ for (const row of rows) {assert.equal(row.user_id,1);assert.deepEqual(JSON.parse(row.metadata).impersonation,{actorId:1,targetId:2});}
+ assert.equal(emails,0);
+ assert.equal((await record(h.env,{userId:2,sessionId:2},{section:'gdr',eventType:'world_page_opened'})).recorded,true);
+ assert.equal(emails,1);h.sql.close();
+});
+
+test('confermare la chiave in una sessione impersonata non registra un accesso della giocatrice',async()=>{
+ const h=await fixture();await h.call('POST','admin-token',{userId:2});
+ const unlock=new Function('recordEvent','linkVisitToSession','getAuthEventMetadata','getAuthenticatedSession','isWorldKeyValid','json','readJson','revokeCurrentSession',source('./session.js')+';return onRequestPost;')(
+  ()=>assert.fail('evento di accesso'),()=>assert.fail('visita attribuita al target'),()=>({}),auth.getAuthenticatedSession,()=>true,auth.json,auth.readJson,()=>{},
+ );
+ const response=await unlock({request:h.request('/api/auth/session','POST','admin-token',{worldKey:'test'}),env:h.env,waitUntil(){assert.fail('attività pianificata');}});
+ assert.equal(response.status,200);assert.equal((await response.json()).user.id,2);h.sql.close();
+});
+
+test('saldo, streak e tick bustine sono consultabili senza maturare premi; il prossimo accesso reale li assegna ancora',async()=>{
+ const h=await fixture();await h.call('POST','admin-token',{userId:2});
+ h.sql.exec(`CREATE TABLE carte_bustine(user_id INTEGER PRIMARY KEY,quantita_disponibile INTEGER DEFAULT 0,minuti_residui INTEGER DEFAULT 0,evocazioni_disponibili INTEGER DEFAULT 0,bustine_senza_evocazione INTEGER DEFAULT 0,updated_at TEXT,ultimo_minuto_attivo TEXT);
+ CREATE TABLE carte_streak(user_id INTEGER PRIMARY KEY,streak_corrente INTEGER,streak_migliore INTEGER,ultimo_giorno TEXT,updated_at TEXT);
+ INSERT INTO carte_bustine VALUES(2,7,9,0,0,'originale',NULL);
+ INSERT INTO carte_streak VALUES(2,3,5,'2020-01-01','originale');`);
+ const helpers=new Function(source('../carte-bustine/_shared.js')+';return {readBustineState,ensureBustineState,checkStreak,recordActiveMinute};')();
+ h.env.DB.batch=async statements=>Promise.all(statements.map(s=>s.run()));
+ const read=new Function('getAuthenticatedSession','json','findTradePartner',...Object.keys(helpers),source('../carte-bustine/index.js')+';return onRequestGet;')(auth.getAuthenticatedSession,auth.json,async()=>null,...Object.values(helpers));
+ const tick=new Function('getAuthenticatedSession','json',...Object.keys(helpers),source('../carte-bustine/presenza.js')+';return onRequestPost;')(auth.getAuthenticatedSession,auth.json,...Object.values(helpers));
+ const before=h.sql.prepare('SELECT * FROM carte_bustine').get(),streakBefore=h.sql.prepare('SELECT * FROM carte_streak').get();
+ const state=await (await read({env:h.env,request:h.request('/api/carte-bustine')})).json();
+ assert.equal(state.quantitaDisponibile,7);assert.equal(state.streakCorrente,3);assert.equal(state.streakBustineBonus,0);assert.equal(state.streakPrimaVisitaOggi,false);
+ assert.equal((await (await tick({env:h.env,request:h.request('/api/carte-bustine/presenza','POST')})).json()).minutoRegistrato,false);
+ assert.deepEqual(h.sql.prepare('SELECT * FROM carte_bustine').get(),before);assert.deepEqual(h.sql.prepare('SELECT * FROM carte_streak').get(),streakBefore);
+ const real=await (await read({env:h.env,request:h.request('/api/carte-bustine','GET','member-token')})).json();
+ assert.equal(real.streakPrimaVisitaOggi,true);assert.equal(real.quantitaDisponibile,8);
+ h.sql.close();
 });
 
 test('eliminare il target non restituisce privilegi admin a una pagina ancora impersonata',async()=>{

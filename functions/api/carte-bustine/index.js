@@ -13,10 +13,13 @@ export async function onRequestGet(context) {
 
     const partner = await findTradePartner(env, session.user);
     const [state, partnerState] = await Promise.all([
-      ensureBustineState(env, session.user.id),
+      session.impersonation ? readBustineState(env, session.user.id) : ensureBustineState(env, session.user.id),
       partner ? readBustineState(env, partner.id) : Promise.resolve(null)
     ]);
-    const streak = await checkStreak(env, session.user.id);
+    const storedStreak = session.impersonation ? await env.DB.prepare('SELECT streak_corrente,streak_migliore FROM carte_streak WHERE user_id=?').bind(session.user.id).first() : null;
+    const streak = session.impersonation
+      ? { streakCorrente: storedStreak?.streak_corrente ?? 0, streakMigliore: storedStreak?.streak_migliore ?? 0, bustineBonus: 0, primaVisitaOggi: false }
+      : await checkStreak(env, session.user.id);
     const quantitaDisponibile = state.quantitaDisponibile + streak.bustineBonus;
     return json({
       quantitaDisponibile,

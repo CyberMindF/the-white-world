@@ -1,13 +1,16 @@
 import { Injectable, inject } from '@angular/core';
 import { ApiService } from './api.service';
+import { AuthService } from './auth.service';
 
 // Porting fedele di assets/js/shared/telemetry.js.
 @Injectable({ providedIn: 'root' })
 export class TelemetryService {
   private readonly api = inject(ApiService);
+  private readonly auth = inject(AuthService);
 
   // Invia un evento di telemetria senza mai interrompere l'esperienza in caso di errore.
   trackEvent(section: string, eventType: string, metadata: Record<string, unknown> = {}): Promise<boolean> {
+    if (this.auth.impersonation()) return Promise.resolve(true);
     return this.api.sendAuthenticatedJson('/api/telemetry/events', { section, eventType, metadata });
   }
 

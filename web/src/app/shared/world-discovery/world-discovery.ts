@@ -96,7 +96,7 @@ export class WorldDiscovery {
     const ids = this.unseen().map((update) => update.id);
     this.updateModalOpen.set(false);
     this.updates.update((updates) => updates.map((update) => ids.includes(update.id) ? { ...update, seen: true } : update));
-    if (ids.length > 0) {
+    if (ids.length > 0 && !this.auth.impersonation()) {
       void fetch('/api/world-updates/seen', {
         method: 'POST', credentials: 'same-origin', keepalive: true,
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids })
@@ -169,7 +169,7 @@ export class WorldDiscovery {
       this.promoTimer = null;
       if (this.updateModalOpen() || this.rewardModalOpen() || !this.auth.currentUser()) return;
       this.promoVisible.set(true);
-      void fetch('/api/world-promos/view', {
+      if (!this.auth.impersonation()) void fetch('/api/world-promos/view', {
         method: 'POST', credentials: 'same-origin', keepalive: true,
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ promoId: promo.id })
       });
