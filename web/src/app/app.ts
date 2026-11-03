@@ -170,7 +170,7 @@ export class App {
         return;
       }
       this.restartBustinePresenceTimer();
-      if(this.authService.impersonation()) this.realtimeService.disconnect(); else this.realtimeService.connect();
+      this.realtimeService.connect();
       void this.globalChat.startForCurrentUser();
       if (!this.safe.enabled()) void this.carteBustineService.load(userId).catch((error) => {
         console.warn('Impossibile aggiornare la streak di accesso:', error);
@@ -187,7 +187,7 @@ export class App {
   // server, cosi due schede aperte non raddoppiano le bustine.
   private restartBustinePresenceTimer(): void {
     const userId = this.authService.currentUser()?.id;
-    if (this.authService.impersonation() || this.safe.enabled() || userId === undefined || document.visibilityState !== 'visible' || this.router.url.split('?')[0] === '/login') {
+    if (this.safe.enabled() || userId === undefined || document.visibilityState !== 'visible' || this.router.url.split('?')[0] === '/login') {
       this.stopBustinePresenceTimer();
       return;
     }

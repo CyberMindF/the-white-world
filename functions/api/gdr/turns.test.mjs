@@ -15,7 +15,7 @@ function fixture() {
   };}};}};
   const session=async request=>{
     const row=sqlite.prepare('SELECT * FROM users WHERE id=?').get(Number(request.headers.get('x-user')));
-    return row?{user:{...row,isTest:!!row.is_test},sessionId:'test',...(request.headers.has('x-impersonation')?{impersonation:{readOnly:true}}:{})}:null;
+    return row?{user:{...row,isTest:!!row.is_test},sessionId:'test',...(request.headers.has('x-impersonation')?{impersonation:{readOnly:false}}:{})}:null;
   };
   const source=readFileSync(new URL('./turns.js',import.meta.url),'utf8').replace(/^import[\s\S]*?;\s*/gm,'').replace(/export /g,'');
   const api=new Function('getAuthenticatedSession','json','readJson','recordEvent','notifyRealtime',source+';return {onRequestGet,onRequestPost,onRequestPut,onRequestDelete};')(
@@ -69,8 +69,8 @@ test('Desy modifica soltanto il proprio turno; autore, data e ordine restano inv
  const payload={id:first.turnId,adventure:'il-prezzo-della-verita',expectedBody:before.body,body:'Risposta corretta.\n\n::: azione\nAccarezzo Sally.\n:::'};
  assert.equal((await h.change(4,'PUT',payload)).status,403);
  assert.equal((await h.change(1,'PUT',payload)).status,403);
- assert.equal((await h.change(2,'PUT',payload,{'x-impersonation':'1'})).status,403);
- assert.equal((await h.change(2,'PUT',payload)).status,200);
+ assert.equal((await h.change(2,'PUT',payload,{'x-impersonation':'1'})).status,200);
+ assert.equal((await h.change(2,'DELETE',{...payload,expectedBody:payload.body},{'x-impersonation':'1'})).status,403);
  const after=h.sqlite.prepare('SELECT * FROM gdr_turns WHERE id=?').get(first.turnId);
  assert.equal(after.author_id,before.author_id);assert.equal(after.created_at,before.created_at);
  for(const user of [1,2]){

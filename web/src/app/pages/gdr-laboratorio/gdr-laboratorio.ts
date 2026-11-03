@@ -273,7 +273,7 @@ export class GdrLaboratorio implements OnInit {
   private requestVersion = 0;
   private turnsRequestVersion = 0;
   protected readonly liveGame = this.route.snapshot.paramMap.has('adventureId');
-  protected readonly notesReadOnly = computed(() => !this.liveGame || !!this.auth.impersonation());
+  protected readonly notesReadOnly = computed(() => !this.liveGame);
   async ngOnInit(): Promise<void> {
     const requested = this.route.snapshot.paramMap.get('adventureId');
     if (requested && !ADVENTURES.some((a) => a.id === requested)) {
@@ -537,7 +537,7 @@ export class GdrLaboratorio implements OnInit {
     }finally{this.contentSaving.set(false);}
   }
   protected canEditPublishedTurn(turn: ExistingTurn): boolean {
-    return this.liveGame && !!turn.id && turn.isMine && !this.safe.enabled() && !this.auth.currentUser()?.isTest && !this.auth.impersonation();
+    return this.liveGame && !!turn.id && turn.isMine && !this.safe.enabled() && !this.auth.currentUser()?.isTest;
   }
   protected publishedTurnEditable(turn: ExistingTurn): boolean {
     return this.canEditPublishedTurn(turn) && !this.contentSaving() && !this.sendingTurn() && !this.readingEdit() && !this.documentEdit() && !this.turnEdit() &&

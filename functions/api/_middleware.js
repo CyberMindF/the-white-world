@@ -26,20 +26,6 @@ export async function onRequest(context) {
   if (["GET", "HEAD", "OPTIONS"].includes(method)) return context.next();
   const path = new URL(context.request.url).pathname;
   const session = await getAuthenticatedSession(context.request, context.env);
-  if (
-    session?.impersonation &&
-    !["GET", "HEAD", "OPTIONS"].includes(method) &&
-    path !== "/api/auth/impersonation" &&
-    !(path === "/api/auth/session" && method === "DELETE")
-  ) {
-    return json(
-      {
-        error:
-          "Stai impersonando un account in sola lettura. Torna al tuo account per salvare modifiche.",
-      },
-      403,
-    );
-  }
   if (path.startsWith("/api/auth/")) return context.next();
   if (!session?.user.isTest) return context.next();
 

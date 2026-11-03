@@ -43,17 +43,18 @@ describe('App', () => {
     expect(compiled.querySelector('app-world-stars')).toBeTruthy();
     expect(compiled.querySelector('router-outlet')).toBeTruthy();
   });
-  it('shows a permanent exit banner and avoids connecting as the impersonated user',async()=>{
+  it('shows an exit banner and connects as the impersonated user',async()=>{
     vi.stubGlobal('fetch',vi.fn().mockImplementation(()=>Promise.resolve(Response.json({}))));
     try {
       const fixture=TestBed.createComponent(App),auth=TestBed.inject(AuthService);
       const connect=vi.spyOn(TestBed.inject(RealtimeService),'connect');
-      auth.impersonation.set({actorId:1,actorNickname:'Rory',readOnly:true});
+      auth.impersonation.set({actorId:1,actorNickname:'Rory',readOnly:false});
       auth.currentUser.set({id:2,nickname:'Desy',email:'test@example.test',identity:'lei',role:'member',isTest:false});
       fixture.detectChanges();await fixture.whenStable();
       expect(fixture.nativeElement.querySelector('.impersonation-banner').textContent).toContain('Stai impersonando Desy');
       expect(fixture.nativeElement.querySelector('.impersonation-banner').textContent).toContain('Torna al tuo account');
-      expect(connect).not.toHaveBeenCalled();
+      expect(fixture.nativeElement.querySelector('.impersonation-banner').textContent).toContain('salvati sul suo account');
+      expect(connect).toHaveBeenCalled();
     }finally{vi.unstubAllGlobals();}
   });
 

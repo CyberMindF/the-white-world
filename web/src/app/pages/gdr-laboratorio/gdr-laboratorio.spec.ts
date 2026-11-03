@@ -96,10 +96,11 @@ describe('invio dei turni della partita reale', () => {
     expect(page.editingPlayerState().draft).toBe('Da conservare.');expect(page.editingPlayerState().error).toContain('Il turno è cambiato.');expect(page.state().turns[0].body).toBe('Testo pubblicato.');
     page.cancelPlayerEdit();expect(page.editingPlayerState().turn).toBeNull();expect(page.editingPlayerState().id).toBeNull();expect(page.state().turns[0].body).toBe('Testo pubblicato.');
   });
-  it('i comandi di modifica restano personali e l’impersonificazione resta in sola lettura',()=>{
+  it('anche in impersonificazione si modificano soltanto i turni della giocatrice',()=>{
     const page=create(true,true);page.seedTurn({id:8,author:'Rory',isMine:false,isMaster:true,body:'Racconto.',createdAt:'2026-11-01T12:00:00Z'});expect(page.canChange()).toBe(false);
     page.seedTurn({id:9,author:'Desy',isMine:true,isMaster:false,body:'Risposta.',createdAt:'2026-11-01T12:00:00Z'});expect(page.canChange()).toBe(true);
-    TestBed.inject(AuthService).impersonation.set({actorId:1,actorNickname:'Rory',readOnly:true});expect(page.canChange()).toBe(false);
+    TestBed.inject(AuthService).impersonation.set({actorId:1,actorNickname:'Rory',readOnly:false});expect(page.canChange()).toBe(true);
+    page.beginPlayerEdit();expect(page.editingPlayerState().turn?.id).toBe(9);
   });
   it('la giocatrice conserva gli strumenti semplici e i propri appunti modificabili',()=>{
     const page=create(true,true);expect(page.tools()).toEqual({master:false,notesReadOnly:false});
@@ -115,10 +116,10 @@ describe('invio dei turni della partita reale', () => {
     workspace.storyCharacters.set([{...npc,portrait:'/assets/altro-ritaglio.webp'}]);expect(page.storyPhoto()).toBe('/assets/intera.webp');
     workspace.storyCharacters.set([{...npc,photo:''}]);expect(page.storyPhoto()).toBe('/assets/originale.webp');
   });
-  it('il master ha gli strumenti della storia; impersonare Desy lascia gli appunti in sola lettura',()=>{
-    const page=create();expect(page.tools()).toEqual({master:true,notesReadOnly:false});
-    TestBed.inject(AuthService).impersonation.set({actorId:1,actorNickname:'Rory',readOnly:true});
-    expect(page.tools().notesReadOnly).toBe(true);
+  it('impersonare Desy mantiene strumenti player e appunti modificabili',()=>{
+    const page=create(true,true);expect(page.tools()).toEqual({master:false,notesReadOnly:false});
+    TestBed.inject(AuthService).impersonation.set({actorId:1,actorNickname:'Rory',readOnly:false});
+    expect(page.tools()).toEqual({master:false,notesReadOnly:false});
   });
   it('rende disponibili alla giocatrice anche i personaggi che il master le ha assegnato',()=>{
     const page=create(true,true);

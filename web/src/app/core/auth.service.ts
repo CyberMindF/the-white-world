@@ -17,7 +17,7 @@ export interface AuthUser {
 export interface Impersonation {
   actorId: number;
   actorNickname: string;
-  readOnly: true;
+  readOnly: false;
 }
 export interface AuthSessionResponse {
   impersonation?: Impersonation | null;

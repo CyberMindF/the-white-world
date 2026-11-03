@@ -29,25 +29,58 @@ test('solo un admin in modalità admin può selezionare una giocatrice reale att
 });
 test('identità e permessi effettivi sono quelli di Desy; il login e la sessione vera di lei restano intatti',async()=>{
  const h=await fixture();assert.equal((await h.call('POST','admin-token',{userId:2})).status,200);
- const session=await h.session();assert.equal(session.user.id,2);assert.equal(session.user.role,'member');assert.equal(session.adminModeEnabled,false);assert.equal(session.impersonation.actorId,1);assert.equal(session.impersonation.readOnly,true);
+ const session=await h.session();assert.equal(session.user.id,2);assert.equal(session.user.role,'member');assert.equal(session.adminModeEnabled,false);assert.equal(session.impersonation.actorId,1);assert.equal(session.impersonation.readOnly,false);
  assert.equal(h.sql.prepare('SELECT user_id FROM sessions WHERE id=1').get().user_id,1);
  assert.equal((await h.session('member-token')).impersonation,null);
  assert.equal((await h.call('DELETE')).status,200);assert.equal((await h.session()).user.id,1);assert.equal((await h.session()).adminModeEnabled,true);h.sql.close();
 });
-test('in impersonazione il server blocca tutte le scritture, compresi autenticazione e privilegi admin',async()=>{
+test('in impersonazione le scritture raggiungono le API con identità e permessi di Desy',async()=>{
  const h=await fixture();await h.call('POST','admin-token',{userId:2});let count=0;
  for(const [method,path] of [['POST','/api/gdr/turns'],['POST','/api/gdr-workspace/mutate'],['POST','/api/auth/admin-mode'],['POST','/api/auth/profile/password'],['DELETE','/api/letters/1'],['PUT','/api/letters/draft']]){
-  const response=await middleware({env:h.env,request:h.request(path,method),next(){count++;return new Response('ok');}});assert.equal(response.status,403,path);
+  const request=h.request(path,method);
+  const response=await middleware({env:h.env,request,async next(){count++;const session=await auth.getAuthenticatedSession(request,h.env);assert.equal(session.user.id,2);assert.equal(session.user.role,'member');assert.equal(session.adminModeEnabled,false);return new Response('ok');}});assert.equal(response.status,200,path);
  }
- assert.equal(count,0);
+ assert.equal(count,6);
  for(const [method,path] of [['GET','/api/gdr-workspace'],['DELETE','/api/auth/impersonation']]){
  const response=await middleware({env:h.env,request:h.request(path,method),next(){count++;return new Response('ok');}});assert.equal(response.status,200);
  }
- assert.equal(count,2);h.sql.close();
+ assert.equal(count,8);
+ const adminMode=new Function('getAuthenticatedSession','json','readJson','recordEvent',source('./admin-mode.js')+';return onRequestPost;')(auth.getAuthenticatedSession,auth.json,auth.readJson,async()=>{});
+ assert.equal((await adminMode({env:h.env,request:h.request('/api/auth/admin-mode','POST','admin-token',{enabled:true}),waitUntil(){}})).status,403);
+ h.sql.close();
 });
 test('non continua a impersonare un account disattivato e non riacquista privilegi in silenzio',async()=>{
  const h=await fixture();await h.call('POST','admin-token',{userId:2});h.sql.prepare('UPDATE users SET is_activated=0 WHERE id=2').run();
  assert.equal(await h.session(),null);assert.equal((await h.call('DELETE')).status,200);assert.equal((await h.session()).user.id,1);h.sql.close();
+});
+
+test('turni e appunti salvati impersonando Desy appartengono a lei e restano visibili dopo l’uscita',async()=>{
+ const h=await fixture();await h.call('POST','admin-token',{userId:2});
+ h.sql.exec(`CREATE TABLE gdr_turns(id INTEGER PRIMARY KEY,author_id INTEGER,adventure TEXT,body TEXT,created_at TEXT);
+ CREATE TABLE gdr_notes(user_id INTEGER,adventure TEXT,body TEXT,updated_at TEXT,PRIMARY KEY(user_id,adventure));
+ INSERT INTO gdr_turns VALUES(1,2,'il-prezzo-della-verita','Risposta originale','2026-11-01'),(2,1,'il-prezzo-della-verita','Racconto master','2026-11-02');`);
+ const turns=new Function('getAuthenticatedSession','json','readJson','recordEvent','notifyRealtime',source('../gdr/turns.js')+';return {post:onRequestPost,put:onRequestPut};')(auth.getAuthenticatedSession,auth.json,auth.readJson,async()=>{},async()=>{});
+ const notes=new Function('getAuthenticatedSession','json',source('../gdr/notes.js')+';return onRequestPost;')(auth.getAuthenticatedSession,auth.json);
+ const run=async(request,handler)=>middleware({env:h.env,request,next:()=>handler({env:h.env,request,waitUntil(){}})});
+ const payload={id:1,expectedBody:'Risposta originale',body:'Risposta modificata impersonando Desy'};
+ assert.equal((await run(h.request('/api/gdr/turns','PUT','admin-token',payload),turns.put)).status,200);
+ assert.equal((await run(h.request('/api/gdr/turns','PUT','admin-token',{...payload,id:2,expectedBody:'Racconto master'}),turns.put)).status,403);
+ const form=new FormData();form.set('body','Nuovo turno di Desy');
+ const created=await run(new Request('https://test/api/gdr/turns',{method:'POST',headers:{Cookie:'noi_session=admin-token'},body:form}),turns.post);
+ assert.equal(created.status,201);assert.equal((await created.json()).isMaster,false);
+ const note=new FormData();note.set('body','Appunto personale di Desy');
+ assert.equal((await run(new Request('https://test/api/gdr/notes',{method:'POST',headers:{Cookie:'noi_session=admin-token'},body:note}),notes)).status,200);
+ await h.call('DELETE');assert.equal((await h.session()).user.id,1);
+ assert.deepEqual(h.sql.prepare('SELECT author_id,body FROM gdr_turns ORDER BY id').all().map(r=>({...r})),[{author_id:2,body:payload.body},{author_id:1,body:'Racconto master'},{author_id:2,body:'Nuovo turno di Desy'}]);
+ assert.equal(h.sql.prepare('SELECT user_id FROM gdr_notes').get().user_id,2);
+ h.sql.close();
+});
+
+test('il realtime usa l’identità della giocatrice anche durante impersonazione',async()=>{
+ const h=await fixture();await h.call('POST','admin-token',{userId:2});let forwarded;
+ const realtime=new Function('getAuthenticatedSession','json',source('../realtime.js')+';return onRequestGet;')(auth.getAuthenticatedSession,auth.json);
+ const response=await realtime({request:new Request('https://test/api/realtime',{headers:{Cookie:'noi_session=admin-token',Upgrade:'websocket'}}),env:{...h.env,REALTIME:{getByName(){return{fetch(request){forwarded=request;return new Response('ok');}};}}}});
+ assert.equal(response.status,200);assert.equal(forwarded.headers.get('X-Realtime-User-Id'),'2');assert.equal(forwarded.headers.get('X-Realtime-Identity'),'lei');h.sql.close();
 });
 
 test('eliminare il target non restituisce privilegi admin a una pagina ancora impersonata',async()=>{
@@ -55,7 +88,7 @@ test('eliminare il target non restituisce privilegi admin a una pagina ancora im
  assert.equal(await h.session(),null);assert.equal((await h.call('DELETE')).status,200);assert.equal((await h.session()).user.id,1);h.sql.close();
 });
 
-test('la lettura di un’offerta vuota non provoca rimborsi o eliminazioni durante impersonazione',async()=>{
+test('l’anteprima esplicita di un’offerta vuota non provoca rimborsi o eliminazioni',async()=>{
  const read=new Function(source('../carte-evocazioni/_shared.js')+';return readOpenOffer;')();let writes=0;
  const db={prepare(){return{bind(){return{async first(){return{id:1};},async all(){return{results:[]};}};}};},async batch(){writes++;}};
  assert.equal(await read({DB:db},2,{readOnly:true}),null);assert.equal(writes,0);

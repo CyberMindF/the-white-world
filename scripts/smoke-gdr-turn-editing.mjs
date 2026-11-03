@@ -23,10 +23,11 @@ harness.sqlite.prepare('INSERT INTO gdr_turns(id,author_id,adventure,body,create
 harness.sqlite.prepare('INSERT INTO gdr_turns(id,author_id,adventure,body,created_at) VALUES(?,?,?,?,?)').run(3,1,adventureId,'Il master continua la storia.','2026-11-02T12:56:00Z');
 const turnSource=(await readFile(resolve('functions/api/gdr/turns.js'),'utf8')).replace(/^import[\s\S]*?;\s*/gm,'').replace(/export /g,'');
 const turnApi=new Function('getAuthenticatedSession','json','readJson','recordEvent','notifyRealtime',turnSource+';return {GET:onRequestGet,PUT:onRequestPut,DELETE:onRequestDelete};')(
- async request=>{const id=Number(request.headers.get('x-user'));return {user:{id,nickname:id===1?'Master':'Desy',role:id===1?'admin':'member',isTest:false},sessionId:'test'};},
+ async request=>{const id=Number(request.headers.get('x-user'));return {user:{id,nickname:id===1?'Master':'Desy',role:id===1?'admin':'member',isTest:false},sessionId:'test',impersonation:impersonating?{actorId:1,actorNickname:'Master',readOnly:false}:null};},
  (body,status=200)=>Response.json(body,{status}),request=>request.json(),async()=>{},async()=>{},
 );
 let user = 1;
+let impersonating = false;
 const root = resolve('web/dist/web/browser');
 const server = createServer(async(req,res)=>{
   try {
@@ -43,7 +44,7 @@ const server = createServer(async(req,res)=>{
       res.writeHead(response.status,{'Content-Type':'application/json'});res.end(await response.text());return;
     }
     if(path.startsWith('/api/')) {
-      const body = path==='/api/auth/session' ? {authenticated:true,user:{id:user,nickname:user===1?'Master':'Desy',identity:user===1?'lui':'lei',role:user===1?'admin':'member',isTest:false},adminModeEnabled:false}
+      const body = path==='/api/auth/session' ? {authenticated:true,user:{id:user,nickname:user===1?'Master':'Desy',identity:user===1?'lui':'lei',role:user===1?'admin':'member',isTest:false},adminModeEnabled:false,impersonation:impersonating?{actorId:1,actorNickname:'Master',readOnly:false}:null}
         : path==='/api/world-settings' ? {settings:{},values:{theme:'red-of-you'}}
         : path==='/api/realtime' ? {enabled:false}
         : path==='/api/gdr/character-schema' ? {fields}
@@ -65,7 +66,7 @@ await page.addInitScript(()=>{
   sessionStorage.setItem('noi-crossword-access-session-v1',sessionStorage.getItem('gdr-test-user')||'1');
   sessionStorage.setItem('noi-crossword-access-session-touched-at-v1',String(Date.now()));
 });
-const switchUser=async id=>{user=id;await page.evaluate(id=>sessionStorage.setItem('gdr-test-user',String(id)),id);await page.reload();};
+const switchUser=async (id,impersonate=false)=>{user=id;impersonating=impersonate;await page.evaluate(id=>sessionStorage.setItem('gdr-test-user',String(id)),impersonate?1:id);await page.reload();};
 try {
   await page.goto(`${base}/tavolo-da-gioco/gdr/gioca/${adventureId}`);
   const thread=page.locator('.gdr-thread'),master=thread.locator('article.is-story');
@@ -96,8 +97,17 @@ try {
   await editing.getByLabel('Modifica il tuo turno',{exact:true}).fill('Questa modifica va annullata.');
   await editing.getByRole('button',{name:'Annulla',exact:true}).click();
   await mine.getByText('La risposta corretta di Desy.',{exact:true}).waitFor();
+  await switchUser(2,true);
+  await page.getByText('Stai impersonando Desy',{exact:true}).waitFor();
+  await mine.getByRole('button',{name:'Modifica il tuo turno',exact:true}).click();
+  await editing.getByLabel('Modifica il tuo turno',{exact:true}).fill('La risposta modificata impersonando Desy.');
+  await editing.getByRole('button',{name:'Anteprima',exact:true}).click();
+  await editing.getByRole('button',{name:'Salva modifiche',exact:true}).click();
+  await mine.getByText('La risposta modificata impersonando Desy.',{exact:true}).waitFor();
+  assert.equal(harness.sqlite.prepare('SELECT author_id FROM gdr_turns WHERE id=2').get().author_id,2);
+  assert.equal(await thread.locator('article.is-story').getByRole('button',{name:'Modifica paragrafo',exact:false}).count(),0);
   await switchUser(1);
-  await thread.getByText('La risposta corretta di Desy.',{exact:true}).waitFor();
+  await thread.getByText('La risposta modificata impersonando Desy.',{exact:true}).waitFor();
   await master.getByText('Un nuovo paragrafo nel seguito.',{exact:true}).waitFor();
   assert.equal(await thread.locator('article').count(),2);assert.equal(await thread.locator('.gdr-turn-divider').count(),2);
   for(const width of [1280,390,320]) {
@@ -105,6 +115,6 @@ try {
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     await thread.screenshot({path:join(screenshots,`turni-master-${width}.png`),animations:'disabled'});
   }
-  assert.deepEqual(errors,[]);console.log('PASS: modifica player autenticata, anteprima e annullamento, salvataggio visibile al master, aggiunta dal blocco nel seguito senza +, separatori e 3 viewport. Screenshot:',screenshots);
+  assert.deepEqual(errors,[]);console.log('PASS: modifica player e impersonificazione, anteprima e annullamento, salvataggio sul conto di Desy visibile al master, aggiunta dal blocco nel seguito senza +, separatori e 3 viewport. Screenshot:',screenshots);
 }catch(error){await page.screenshot({path:join(screenshots,'errore.png')});console.error('Screenshot:',screenshots);console.error('Browser errors:',errors);throw error;}
 finally{await browser.close();await new Promise(resolve=>server.close(resolve));harness.sqlite.close();}

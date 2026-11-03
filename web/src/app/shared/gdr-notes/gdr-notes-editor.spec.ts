@@ -59,7 +59,7 @@ describe('appunti personali della partita', () => {
     expect(fetchMock.mock.calls[2][1].body.get('body')).toBe('Appunto da ritentare');
     expect(fixture.nativeElement.textContent).toContain('Salvato nel tuo account.');
   });
-  it('in impersonificazione o anteprima legge senza consentire scritture', async () => {
+  it('in anteprima legge senza consentire scritture', async () => {
     const {fixture,editor,fetchMock} = await setup(true);vi.useFakeTimers();
     expect(editor.getAttribute('contenteditable')).toBe('false');
     expect(fixture.nativeElement.querySelector('.gdr-notes-toolbar')).toBeNull();

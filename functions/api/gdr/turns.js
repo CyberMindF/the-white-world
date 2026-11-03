@@ -96,7 +96,7 @@ async function changeTurn(context, deleting) {
   try {
     const session=await getAuthenticatedSession(context.request,context.env);
     if(!session) return json({error:'Sessione non valida o scaduta.'},401);
-    if(session.user.isTest || session.impersonation) return json({error:'Questa sessione non può modificare gli interventi.'},403);
+    if(session.user.isTest) return json({error:'Questa sessione non può modificare gli interventi.'},403);
     if(deleting && session.user.role!=='admin') return json({error:'Solo il master può eliminare il proprio racconto.'},403);
     const payload=await readJson(context.request);
     if(!Number.isSafeInteger(payload?.id) || payload.id<=0 || typeof payload.expectedBody!=='string' || payload.expectedBody.length>MAX_BODY_LENGTH) return json({error:'Intervento non valido.'},400);

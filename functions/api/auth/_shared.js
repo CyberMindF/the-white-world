@@ -185,7 +185,7 @@ export async function getAuthenticatedSession(request, env, options = {}) {
       impersonation = {
         actorId: actor.id,
         actorNickname: actor.nickname,
-        readOnly: true,
+        readOnly: false,
       };
     }
   }
