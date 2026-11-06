@@ -61,6 +61,7 @@ export interface CharacterGrant {
   canInventory: boolean;
 }
 interface WorkspaceResponse {
+  narrativeCharacters?: import('../shared/gdr-turn/gdr-writing').NarrativeCharacter[];
   pets?: AssignedPet[];
   adventures: WorkspaceAdventure[];
   characters: WorkspaceCharacter[];
@@ -78,6 +79,7 @@ interface WorkspaceResponse {
 }
 @Injectable()
 export class GdrWorkspaceService {
+  readonly narrativeCharacters = signal<NonNullable<WorkspaceResponse['narrativeCharacters']>>([]);
   readonly adventures = signal<WorkspaceAdventure[]>([]);
   readonly pets = signal<AssignedPet[]>([]);
   readonly storyCharacters = signal<NonNullable<WorkspaceResponse['storyCharacters']>>([]);
@@ -142,6 +144,7 @@ export class GdrWorkspaceService {
       this.characters.set(state.characters ?? []);
       this.pets.set(state.pets ?? []);
       this.storyCharacters.set(state.storyCharacters ?? []);
+      this.narrativeCharacters.set(state.narrativeCharacters ?? []);
       this.grants.set(state.grants ?? []);
       this.users.set(state.users ?? []);
       this.isMaster.set(state.isMaster === true);

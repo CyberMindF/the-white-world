@@ -257,7 +257,7 @@ function parseNpcEntries(
       return;
     }
 
-    const field = /^(alt|name|description):\s*(.*)$/.exec(trimmed);
+    const field = /^(alt|name|description|characterId):\s*(.*)$/.exec(trimmed);
     if (field && current) {
       (current as Record<string, string>)[field[1]] = field[2].trim();
       return;

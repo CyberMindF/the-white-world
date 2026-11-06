@@ -1,3 +1,4 @@
+import { recordEvent } from "../_shared/events.js";
 import { hasPermission } from "../_shared/permissions.js";
 import { getAuthenticatedSession, json, readJson } from "./_shared.js";
 
@@ -36,6 +37,7 @@ export async function onRequestPut(context) {
       .bind(body.enabled ? 1 : 0, new Date().toISOString(), userId)
       .run();
     if (!result.meta.changes) return json({ error: "Account non trovato." }, 404);
+    context.waitUntil(recordEvent(context.env, { userId: session.user.id, sessionId: session.sessionId }, { section: 'auth', eventType: 'account_setting_changed', metadata: { targetUserId: userId, setting: 'activity_logging_enabled', enabled: body.enabled } }));
     return json({ userId, enabled: body.enabled });
   } catch (error) {
     console.error(JSON.stringify({ event: "activity_logging_update_error", message: error.message }));

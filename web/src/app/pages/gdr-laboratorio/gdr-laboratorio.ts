@@ -1,3 +1,6 @@
+import { diagnosticAction, reportDiagnostic } from '../../core/diagnostics';
+import { gdrAdventureIcon } from '../../core/gdr-adventure-icons';
+import { TelemetryService } from '../../core/telemetry.service';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RealtimeService } from '../../core/realtime.service';
@@ -50,7 +53,7 @@ const ADVENTURES: Adventure[] = [
     rules: 'maga-regole',
     character: 'maga-personaggio',
     route: '/tavolo-da-gioco/gdr/il-prezzo-della-verita/avventura',
-    icon: '🪄',
+    icon: gdrAdventureIcon('il-prezzo-della-verita'),
   },
   {
     legacy: true,
@@ -60,7 +63,7 @@ const ADVENTURES: Adventure[] = [
     rules: 'casa-regole',
     character: 'casa-personaggio',
     route: '/tavolo-da-gioco/gdr/la-casa-che-trattiene-il-respiro',
-    icon: '📜',
+    icon: gdrAdventureIcon('la-casa-che-trattiene-il-respiro'),
   },
 ];
 interface ExistingTurn {
@@ -174,7 +177,7 @@ export class GdrLaboratorio implements OnInit {
     ...this.workspace
       .adventures()
       .filter((a) => !a.legacy)
-      .map((a) => ({ id: a.id, title: a.title, legacy: false, icon: '📖', route: '' })),
+      .map((a) => ({ id: a.id, title: a.title, legacy: false, icon: gdrAdventureIcon(a.id), route: '' })),
   ]);
   protected readonly selected = signal<string>(ADVENTURES[0].id);
   protected readonly adventure = computed(() =>
@@ -268,6 +271,7 @@ export class GdrLaboratorio implements OnInit {
       .map((f) => `${f.label}: ${this.values()[f.key] ?? ''}`)
       .join('\n\n'),
   );
+  protected readonly characterRoster = computed(() => this.workspace.narrativeCharacters().map(c => ({...c, portrait: gdrImagePath(c.portrait), photo: gdrImagePath(c.photo ?? '')})));
   protected readonly characters = computed<NarrativeCharacter[]>(() => this.workspace.available() ? this.workspace.voices().map(c=>({id:c.id,name:c.name + (c.profile?.surname ? ' '+c.profile.surname : ''),portrait:gdrImagePath(c.portrait),photo:gdrImagePath(c.photo ?? ''),description:c.profile?.appearance ?? '',kind:c.kind})) : []);
   private readonly route = inject(ActivatedRoute);
   private requestVersion = 0;
@@ -291,6 +295,12 @@ export class GdrLaboratorio implements OnInit {
     await this.select(
       this.adventures().some((a) => a.id === requested) ? requested! : this.selected(),
     );
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(async params => {
+      const id = params.get('adventureId');
+      if (!id || id === this.selected()) return;
+      if (!this.adventures().some(a => a.id === id)) await this.workspace.load(id);
+      await this.select(id);
+    });
   }
   private forDocument(key: GdrDocumentKey | undefined): GdrBlockRow[] {
     return this.blocks()
@@ -355,6 +365,8 @@ export class GdrLaboratorio implements OnInit {
     if (!response.ok) throw new Error(String(response.status));
     return response.json() as Promise<T>;
   }
+  private readonly telemetry = inject(TelemetryService);
+
   protected async select(id: string): Promise<void> {
     if (
       !this.adventures().some((a) => a.id === id) ||
@@ -366,6 +378,9 @@ export class GdrLaboratorio implements OnInit {
     const version = ++this.requestVersion;
     this.selected.set(id);
     this.adventureTitle.set(this.adventure().title);
+    void this.telemetry.trackEvent('gdr', 'gdr_adventure_opened', {
+      adventure: id, title: this.adventure().title, mode: this.liveGame ? 'play' : 'preparation'
+    });
     this.status.set('');
     this.local.set(this.restore());
     this.failedStoryChange.set(null);
@@ -537,7 +552,7 @@ export class GdrLaboratorio implements OnInit {
     }finally{this.contentSaving.set(false);}
   }
   protected canEditPublishedTurn(turn: ExistingTurn): boolean {
-    return this.liveGame && !!turn.id && turn.isMine && !this.safe.enabled() && !this.auth.currentUser()?.isTest;
+    return this.liveGame && !!turn.id && turn.isMine && (!turn.isMaster || !this.safe.enabled()) && !this.auth.currentUser()?.isTest;
   }
   protected publishedTurnEditable(turn: ExistingTurn): boolean {
     return this.canEditPublishedTurn(turn) && !this.contentSaving() && !this.sendingTurn() && !this.readingEdit() && !this.documentEdit() && !this.turnEdit() &&
@@ -593,6 +608,7 @@ export class GdrLaboratorio implements OnInit {
     }
     const adventure = this.selected();
     const body = this.local().draft;
+    diagnosticAction('gdr_publish_started', { adventure, characters: body.length });
     this.sendingTurn.set(true);
     this.status.set('Invio del turno…');
     try {
@@ -616,7 +632,9 @@ export class GdrLaboratorio implements OnInit {
         this.status.set('Turno inviato e salvato nella partita condivisa.');
       }
       await this.loadTurns(adventure);
+      diagnosticAction('gdr_publish_completed', { adventure });
     } catch (error) {
+      reportDiagnostic('gdr_publish_error', error);
       this.status.set(error instanceof Error ? error.message + ' La bozza è ancora disponibile.' : 'Invio non riuscito. La bozza è ancora disponibile.');
     } finally {
       this.sendingTurn.set(false);

@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, effect, inject, signal } from '@angular/core';
 import { WorldSettingsService } from '../core/world-settings.service';
 import { randomBetween } from './random';
 
@@ -33,8 +33,15 @@ export class WorldPearlShimmers {
   }));
 
   constructor() {
-    const interval = window.setInterval(() => this.walkMixedBands(), 1400);
-    this.destroyRef.onDestroy(() => window.clearInterval(interval));
+    const visible = signal(!document.hidden);
+    const visibility = () => visible.set(!document.hidden);
+    document.addEventListener('visibilitychange', visibility);
+    this.destroyRef.onDestroy(() => document.removeEventListener('visibilitychange', visibility));
+    effect(onCleanup => {
+      if (!visible() || !this.worldSettingsService.settings().pearlShimmers || this.auroraColor() !== 'mix') return;
+      const interval = window.setInterval(() => this.walkMixedBands(), 1400);
+      onCleanup(() => window.clearInterval(interval));
+    });
   }
 
   protected auroraColor(): string {

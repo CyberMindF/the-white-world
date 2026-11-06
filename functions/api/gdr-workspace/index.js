@@ -88,7 +88,15 @@ export async function onRequestGet(context) {
             : "",
         }))
       : [];
+    const narrativeCharacters = adventure ? (await db.prepare(
+      "SELECT id,kind,name,portrait,photo,profile_json FROM gdr_workspace_characters WHERE adventure_id=?"
+    ).bind(adventure).all()).results.map(row => ({
+      id: row.id, kind: row.kind, baseName: row.name,
+      name: [row.name, JSON.parse(row.profile_json).surname].filter(Boolean).join(' '),
+      portrait: row.portrait, photo: row.photo ?? '',
+    })) : [];
     return json({
+      narrativeCharacters,
       storyCharacters,
       pets,
       adventures: adventures.results.map((a) => ({

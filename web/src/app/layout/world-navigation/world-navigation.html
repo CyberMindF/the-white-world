@@ -50,6 +50,15 @@
                     <span aria-hidden="true">{{ place.emoji }}</span>
                     <span>{{ place.fallbackName }}</span>
                   </a>
+                  @if (place.id === 'gdr') {
+                    @for (adventure of adventures(); track adventure.id) {
+                      <a class="is-adventure" [routerLink]="['/tavolo-da-gioco/gdr/gioca', adventure.id]"
+                        [class.is-current]="isCurrent('/tavolo-da-gioco/gdr/gioca/' + adventure.id)"
+                        [attr.aria-current]="isCurrent('/tavolo-da-gioco/gdr/gioca/' + adventure.id) ? 'page' : null">
+                        <span aria-hidden="true">{{ adventureIcon(adventure.id) }}</span><span>{{ adventure.title }}</span>
+                      </a>
+                    }
+                  }
                 }
               </div>
             }

@@ -85,6 +85,12 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/novita/novita').then((m) => m.Novita),
       },
       {
+        path: 'diagnostica',
+        canActivate: [adminGuard],
+        data: { bodyClasses: ['log-page'] },
+        loadComponent: () => import('./pages/diagnostics/diagnostics').then(m => m.Diagnostics),
+      },
+      {
         path: 'log',
         canActivate: [adminGuard],
         data: { bodyClasses: ['log-page'] },

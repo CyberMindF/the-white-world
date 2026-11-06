@@ -1,3 +1,4 @@
+import { recordEvent } from "../_shared/events.js";
 import { isMaster } from "../gdr-workspace/_shared.js";
 import { getAuthenticatedSession, json } from "../auth/_shared.js";
 
@@ -132,7 +133,8 @@ export async function onRequestPost(context) {
           { error: "La scheda è cambiata. Ricarica prima di riprovare." },
           409,
         );
-      return json({ saved: true, value, updatedAt });
+      context.waitUntil(recordEvent(context.env, { userId: session.user.id, sessionId: session.sessionId }, { section: 'gdr', eventType: 'gdr_character_saved', metadata: { adventure, fieldKey } }));
+    return json({ saved: true, value, updatedAt });
     }
     await context.env.DB.prepare(
       `
@@ -144,6 +146,7 @@ export async function onRequestPost(context) {
       .bind(adventure, fieldKey, value, session.user.id, updatedAt)
       .run();
 
+    context.waitUntil(recordEvent(context.env, { userId: session.user.id, sessionId: session.sessionId }, { section: 'gdr', eventType: 'gdr_character_saved', metadata: { adventure, fieldKey } }));
     return json({ saved: true, value, updatedAt });
   } catch (error) {
     console.error(

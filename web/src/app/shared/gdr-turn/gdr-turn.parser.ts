@@ -11,6 +11,7 @@ export interface NarrativeSection {
   kind: 'document' | 'dialogo' | 'azione' | 'nota';
   text: string;
   speaker: string;
+  characterId?: string;
   portrait: string;
   blocks: GdrBlockRow[];
   ranges: GdrSourceRange[];
@@ -81,7 +82,7 @@ export function parseNarrative(source: string): NarrativeResult {
         buffer = lines.slice(start);
         break;
       }
-      const [speaker = '', portrait = ''] = (match[2] ?? '')
+      const [speaker = '', portrait = '', characterId = ''] = (match[2] ?? '')
         .split('|')
         .map((value) => value.trim());
       if (match[1] === 'dialogo' && !speaker)
@@ -99,6 +100,7 @@ export function parseNarrative(source: string): NarrativeResult {
         kind: match[1] as NarrativeSection['kind'],
         text: lines.slice(start + 1, end).join('\n'),
         speaker,
+        characterId,
         portrait: safeNarrativeImage(portrait),
         ranges: [],
         start: offsets[start],

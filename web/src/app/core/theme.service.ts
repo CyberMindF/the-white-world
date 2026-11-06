@@ -5,7 +5,7 @@ export interface ThemeDefinition {
   id: string;
   label: string;
   swatch: string;
-  icon: 'night' | 'ocean' | 'velvet' | 'letter' | 'pearl' | 'heart';
+  icon: 'night' | 'ocean' | 'velvet' | 'letter' | 'pearl' | 'heart' | 'flat';
   iconText?: string;
   description: string;
 }
@@ -28,12 +28,20 @@ const THEME_PRESET: Record<string, WorldSettingKey[]> = {
   sea: ['waves', 'fish', 'bubbles'],
   velvet: ['petals'],
   'white-world': ['silk'],
-  love: ['hearts']
+  love: ['hearts'],
+  'beige-flat': []
 };
 
 // Unico registro dei temi mostrati dal selettore; la storageKey resta invariata per non
 // perdere la scelta già salvata quando vengono aggiunti nuovi temi.
 const THEMES: ThemeDefinition[] = [
+  {
+    id: 'beige-flat',
+    label: 'Beige Flat',
+    swatch: '#e8dcc8',
+    icon: 'flat',
+    description: 'Beige chiaro, essenziale e senza effetti.'
+  },
   {
     id: 'white-world',
     label: 'White World',
@@ -89,7 +97,7 @@ const THEMES: ThemeDefinition[] = [
 
 // Temi chiari (#e13): sfondo/superfici chiare, non solo "White World" — anche Ocean e Love
 // hanno swatch chiari. Usato per decidere sole vs luna nell'angolo del cielo e in "Il Cielo".
-const LIGHT_THEME_IDS = new Set(['white-world', 'sea', 'love']);
+const LIGHT_THEME_IDS = new Set(['white-world', 'sea', 'love', 'beige-flat']);
 
 export function isLightTheme(themeId: string): boolean {
   return LIGHT_THEME_IDS.has(themeId);

@@ -54,7 +54,7 @@ describe('inserimento nel racconto', () => {
     const source = narrativeSnippet('npc_full', '', {id:'shivay',kind:'png',name:'Shivay Lorenne',photo:'/assets/intera.webp',portrait:'/assets/avatar.webp',description:'Una compagna di scuola.'});
     const result = parseNarrative(source);
     expect(result.errors).toEqual([]);
-    expect(result.sections[0].blocks[0]).toMatchObject({type:'npc_grid',data:{layout:'full',entries:[{name:'Shivay Lorenne',alt:'Shivay Lorenne',image:'/assets/intera.webp',description:'Una compagna di scuola.'}]}});
+    expect(result.sections[0].blocks[0]).toMatchObject({type:'npc_grid',data:{layout:'full',entries:[{characterId:'shivay',name:'Shivay Lorenne',alt:'Shivay Lorenne',image:'/assets/intera.webp',description:'Una compagna di scuola.'}]}});
     expect(source).not.toContain('/assets/avatar.webp');
     expect(serializeGdrBlocks(result.sections[0].blocks)).toBe(source);
     expect(narrativeSnippet('npc_full','',{kind:'pg',name:'Daisy',photo:'/assets/intera.webp',portrait:''})).toBe('');

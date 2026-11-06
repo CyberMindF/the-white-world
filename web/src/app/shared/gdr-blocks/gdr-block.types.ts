@@ -31,6 +31,7 @@ export interface GdrImageData {
 }
 
 export interface GdrNpcEntry {
+  characterId?: string;
   image: string;
   alt: string;
   name: string;

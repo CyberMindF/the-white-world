@@ -1,3 +1,4 @@
+import { recordEvent } from "../_shared/events.js";
 import { getAuthenticatedSession, json, readJson } from "../auth/_shared.js";
 import { hasPermission } from "../_shared/permissions.js";
 import { normalizeRoute, updateView } from "./index.js";
@@ -6,7 +7,8 @@ function canWrite(session, permission) {
   return session.adminModeEnabled && hasPermission(session.user.role, permission);
 }
 
-export async function onRequestPut({ request, env, params }) {
+export async function onRequestPut(context) {
+  const { request, env, params } = context;
   const session = await getAuthenticatedSession(request, env);
   if (!session) return json({ error: "Accesso richiesto." }, 401);
   if (!canWrite(session, "content.edit")) return json({ error: "Non autorizzato." }, 403);
@@ -31,16 +33,19 @@ export async function onRequestPut({ request, env, params }) {
        published_at = ?, active = ?, announce = ?, safe = ?, updated_at = ? WHERE id = ? RETURNING *, 0 AS seen`
     ).bind(kind, emoji, title, text, route, ctaLabel, publishedAt, body?.active === false ? 0 : 1,
       announce, body?.safe === true ? 1 : 0, new Date().toISOString(), id).first();
-    return row ? json(updateView(row)) : json({ error: "Novità non trovata." }, 404);
+    if (row) context.waitUntil(recordEvent(env, { userId: session.user.id, sessionId: session.sessionId }, { section: 'world-updates', eventType: 'content_updated', metadata: { id: row.id } }));
+  return row ? json(updateView(row)) : json({ error: "Novità non trovata." }, 404);
   } catch {
     return json({ error: "Non è stato possibile aggiornare la novità." }, 500);
   }
 }
 
-export async function onRequestDelete({ request, env, params }) {
+export async function onRequestDelete(context) {
+  const { request, env, params } = context;
   const session = await getAuthenticatedSession(request, env);
   if (!session) return json({ error: "Accesso richiesto." }, 401);
   if (!canWrite(session, "content.delete")) return json({ error: "Non autorizzato." }, 403);
   const result = await env.DB.prepare("DELETE FROM world_updates WHERE id = ?").bind(Number(params.id)).run();
+  if (result.meta.changes === 1) context.waitUntil(recordEvent(env, { userId: session.user.id, sessionId: session.sessionId }, { section: 'world-updates', eventType: 'content_deleted', metadata: { id: Number(params.id) } }));
   return result.meta.changes === 1 ? json({ ok: true }) : json({ error: "Novità non trovata." }, 404);
 }

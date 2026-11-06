@@ -1,6 +1,7 @@
 import { json, readAuthenticatedRequest, recordEvent } from "./_shared.js";
 
 const CLIENT_EVENT_TYPES = new Set([
+  "gdr_adventure_opened",
   "crossword_opened",
   "crossword_closed",
   "crossword_completed",

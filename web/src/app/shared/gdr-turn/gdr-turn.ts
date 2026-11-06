@@ -414,6 +414,7 @@ export class GdrTurn {
   readonly deleteBlock = output<string>();
   readonly blockChange = output<{id:string;source:string}>();
   readonly insertBlock = output<{beforeId?:string;source:string}>();
+  readonly characterRoster = input<NarrativeCharacter[]>([]);
   readonly characters = input<NarrativeCharacter[]>([]);
   readonly allowGeneric = input(true);
   protected readonly blockTypes = BLOCK_TYPES;
@@ -424,7 +425,7 @@ export class GdrTurn {
   @ViewChild('inlineArea') private area?: ElementRef<HTMLTextAreaElement>;
   protected readonly fieldId = 'inline-' + crypto.randomUUID();
   protected readonly parsed = computed(() => parseNarrative(this.source()));
-  protected readonly rendered = computed<RenderedSection[]>(() => {
+  protected readonly rawRendered = computed<RenderedSection[]>(() => {
     const originals = this.persistedBlocks().slice().sort((a,b)=>a.position-b.position);
     if (originals.length && serializeGdrBlocks(originals) === this.source()) {
       let offset = 0;
@@ -457,6 +458,24 @@ export class GdrTurn {
               }))
             : [section],
         );
+  });
+  protected readonly rendered = computed(() => {
+    const roster = this.characterRoster().length ? this.characterRoster() : this.characters();
+    const resolve = (id: string | undefined) => id ? roster.find(c => c.id === id) : undefined;
+    return this.rawRendered().map(section => {
+      if (section.kind === 'dialogo') {
+        const character = resolve(section.characterId);
+        return character ? {...section, speaker: character.name} : section;
+      }
+      return {...section, blocks: section.blocks.map(block => {
+        if (block.type !== 'npc_grid') return block;
+        const data = block.data as import('../gdr-blocks/gdr-block.types').GdrNpcGridData;
+        return {...block, data: {...data, entries: data.entries.map(entry => {
+          const character = resolve(entry.characterId);
+          return character ? {...entry, name: character.name, alt: entry.alt === entry.name ? character.name : entry.alt} : entry;
+        })}};
+      })};
+    });
   });
   protected readonly deleting = signal<(Pick<RenderedSection, 'start' | 'end' | 'ownerId' | 'ownerStart' | 'ownerEnd' | 'persistentId'> & {snapshot:string}) | null>(null);
   protected readonly canDelete = computed(() => {

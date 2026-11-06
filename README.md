@@ -419,6 +419,19 @@ Le route sconosciute sono gestite dalla route wildcard Angular, che mostra la pa
 
 ## Pubblicazione
 
+**Per questo progetto si pubblica esclusivamente tramite GitHub.** Cloudflare Pages esegue automaticamente la build del codice inviato a `main`. Non eseguire pubblicazioni dirette su Cloudflare, né dal computer né dal pannello: includerebbero potenzialmente modifiche assenti da GitHub, che una pubblicazione successiva potrebbe cancellare dal sito.
+
+Iter obbligatorio per ogni rilascio:
+
+1. Recuperare le modifiche da GitHub e integrare quelle remote senza perdere il lavoro locale.
+2. Verificare le modifiche ed eseguire build e controlli pertinenti.
+3. Se necessarie, verificare e applicare le migrazioni al database remoto nell’ordine richiesto, prima del codice che ne dipende.
+4. Registrare in Git tutte le modifiche del rilascio, compresi nuovi file e migrazioni, e inviarle su GitHub nel branch `main`.
+5. Attendere la pubblicazione automatica e verificare che `/build-version.json` sul sito riporti il commit inviato, quindi controllare le funzionalità interessate.
+
+Il rilascio non è concluso finché il codice pubblicato non è presente su GitHub e la versione online non coincide con il commit atteso. Non usare un deploy diretto come scorciatoia se la build automatica fallisce: correggere il problema e inviare la correzione su GitHub.
+
+
 Collega il repository GitHub a Cloudflare Pages usando `npm run build` come comando di build e `web/dist/web/browser` come directory di output. Prima del primo utilizzo:
 
 1. collega il database D1 al binding `DB`;

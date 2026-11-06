@@ -1,6 +1,10 @@
 import { notifyLoggedEvent } from "./email.js";
 
 const ALLOWED_EVENTS = new Set([
+  "safe_mode_changed",
+  "gdr_adventure_opened",
+  "gdr_workspace_changed",
+  "account_setting_changed",
   "register",
   "login_success",
   "logout",
@@ -53,6 +57,8 @@ const ALLOWED_EVENTS = new Set([
   "study_session_completed",
   "study_session_ended",
   "quiz_started",
+  "quiz_completed",
+  "quiz_progressed",
   "admin_log_viewed",
   "content_export_downloaded",
   "barattolo_biglietto_pescato",
@@ -85,7 +91,7 @@ export async function recordEvent(env, actor, event) {
     ? await env.DB.prepare("SELECT user_id FROM sessions WHERE id = ?").bind(actor.sessionId).first()
     : null;
   const impersonated = owner && owner.user_id !== actor.userId;
-  if (impersonated && ["login_success", "world_unlocked", "world_page_opened", "logout", "letter_read"].includes(eventType)) {
+  if (impersonated && ["login_success", "world_unlocked", "world_page_opened", "gdr_adventure_opened", "logout", "letter_read"].includes(eventType)) {
     return { id: null, recorded: false };
   }
   const actorUserId = impersonated ? owner.user_id : actor.userId;

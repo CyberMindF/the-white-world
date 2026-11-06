@@ -72,7 +72,7 @@ export class App {
   private readonly router = inject(Router);
   private readonly activatedRoute = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly themeService = inject(ThemeService);
+  protected readonly themeService = inject(ThemeService);
   private readonly worldSettingsService = inject(WorldSettingsService);
   protected readonly safe = inject(SafeModeService);
   protected readonly authService = inject(AuthService);

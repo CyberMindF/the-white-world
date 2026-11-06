@@ -1,3 +1,4 @@
+import { diagnosticAction } from '../../core/diagnostics';
 import { Component, ElementRef, computed, effect, input, output, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { updateGdrTextarea } from '../gdr-textarea';
@@ -53,13 +54,16 @@ export class GdrSourceEditor {
     effect(() => {
       if (this.characterIndex() >= this.characters().length) this.characterIndex.set(0);
     });
-    effect(() => {
+    effect(onCleanup => {
       this.source();
-      if (this.mode() === 'split' && this.previewPane())
-        requestAnimationFrame(() => this.syncScroll('source', true));
+      if (this.mode() === 'split' && this.previewPane()) {
+        const frame = requestAnimationFrame(() => this.syncScroll('source', true));
+        onCleanup(() => cancelAnimationFrame(frame));
+      }
     });
   }
   protected setMode(mode: 'split' | 'source' | 'preview'): void {
+    diagnosticAction('gdr_editor_mode', { mode, characters: this.source().length });
     const area = this.sourceArea()?.nativeElement, preview = this.previewPane()?.nativeElement;
     if (area) this.syncedPositions.delete(area);
     if (preview) this.syncedPositions.delete(preview);

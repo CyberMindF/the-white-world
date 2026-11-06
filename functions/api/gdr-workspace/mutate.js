@@ -1,3 +1,4 @@
+import { recordEvent } from "../_shared/events.js";
 import { syncLegacy, validateCharacterFields } from "./legacy.js";
 import { getAuthenticatedSession, json } from "../auth/_shared.js";
 import { notifyRealtime } from "../_shared/realtime.js";
@@ -453,7 +454,14 @@ export async function onRequestPost(context) {
     }
     const db=context.env.DB.withSession("first-primary");
     const linked=['saveCharacter','deleteCharacter','archive','grant'].includes(payload?.action) && payload.characterId ? await db.prepare('SELECT adventure_id FROM gdr_workspace_characters WHERE id=?').bind(payload.characterId).first() : null;
+    const logAdventure = linked?.adventure_id ?? (payload.characterId ? (await db.prepare('SELECT adventure_id FROM gdr_workspace_characters WHERE id=?').bind(payload.characterId).first())?.adventure_id : null);
     const result=await mutate(db,session.user,payload);
+    if (payload.action !== 'syncLegacy') context.waitUntil(recordEvent(context.env,
+      { userId: session.user.id, sessionId: session.sessionId },
+      { section: 'gdr', eventType: 'gdr_workspace_changed', metadata: {
+        action: payload.action, adventure: logAdventure ?? payload.adventureId ?? (['createAdventure','saveAdventure','publishAdventure'].includes(payload.action) ? payload.id : null),
+        characterId: payload.characterId ?? null
+      } }));
     if(linked) context.waitUntil(notifyRealtime(context.env,{type:'gdr-story:changed',action:'character_updated',actorUserId:session.user.id,adventure:linked.adventure_id}));
     return json(result);
   } catch (error) {

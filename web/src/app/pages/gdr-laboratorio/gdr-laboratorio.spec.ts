@@ -42,7 +42,7 @@ function create(live = true, player = false) {
     {provide: AuthService, useValue: {currentUser: signal({id: 7, nickname: 'Rory'}), isAdmin: signal(!player), impersonation: signal(null)}},
     {provide: SafeModeService, useValue: {enabled: signal(false)}},
     {provide: RealtimeService, useValue: {on: () => EMPTY}},
-    {provide: GdrWorkspaceService, useValue: {adventures: signal([]), characters: signal([]), storyCharacters: signal([]), voices: assignedVoices, available: signal(true)}},
+    {provide: GdrWorkspaceService, useValue: {adventures: signal([]), characters: signal([]), storyCharacters: signal([]), narrativeCharacters: signal([]), voices: assignedVoices, available: signal(true)}},
     {provide: ActivatedRoute, useValue: {snapshot: {paramMap: convertToParamMap(live ? {adventureId: 'il-prezzo-della-verita'} : {})}}},
   ]});
   const page = TestBed.runInInjectionContext(() => new TurnPage());
@@ -101,6 +101,19 @@ describe('invio dei turni della partita reale', () => {
     page.seedTurn({id:9,author:'Desy',isMine:true,isMaster:false,body:'Risposta.',createdAt:'2026-11-01T12:00:00Z'});expect(page.canChange()).toBe(true);
     TestBed.inject(AuthService).impersonation.set({actorId:1,actorNickname:'Rory',readOnly:false});expect(page.canChange()).toBe(true);
     page.beginPlayerEdit();expect(page.editingPlayerState().turn?.id).toBe(9);
+  });
+  it('in modalità sicura modifica il proprio turno sia con accesso diretto sia impersonando',()=>{
+    const page=create(true,true);
+    TestBed.inject(SafeModeService).enabled.set(true);
+    page.seedTurn({id:9,author:'Desy',isMine:true,isMaster:false,body:'Risposta.',createdAt:'2026-11-01T12:00:00Z'});
+    page.beginPlayerEdit();expect(page.editingPlayerState().turn?.id).toBe(9);
+    page.cancelPlayerEdit();
+    TestBed.inject(AuthService).impersonation.set({actorId:1,actorNickname:'Rory',readOnly:false});
+    page.beginPlayerEdit();expect(page.editingPlayerState().turn?.id).toBe(9);
+    page.cancelPlayerEdit();
+    page.seedTurn({id:10,author:'Rory',isMine:false,isMaster:true,body:'Racconto.',createdAt:'2026-11-01T12:00:00Z'});
+    expect(page.canChange()).toBe(false);
+    expect(page.tools().master).toBe(false);
   });
   it('la giocatrice conserva gli strumenti semplici e i propri appunti modificabili',()=>{
     const page=create(true,true);expect(page.tools()).toEqual({master:false,notesReadOnly:false});

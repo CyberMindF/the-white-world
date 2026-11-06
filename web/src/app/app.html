@@ -17,7 +17,7 @@
     }
   </aside>
 }
-@if (!studyFocus.active() && !safe.enabled()) {
+@if (!studyFocus.active() && !safe.enabled() && themeService.activeThemeId() !== 'beige-flat') {
   <app-world-silk />
   <app-world-stars />
   <app-world-shooting-stars />

@@ -55,6 +55,7 @@
   overflow: hidden;
   border-radius: .9rem;
   color: #fff;
+  background-color: var(--chip-color);
   isolation: isolate;
 }
 
@@ -202,3 +203,15 @@
     transition: none;
   }
 }
+
+/* I fondi pieni restano leggibili anche quando il tema elimina i gradienti. */
+.theme-chip[data-theme-id='beige-flat'] .theme-chip-preview {
+  background: #e8dcc8;
+  color: #634c30;
+  border: 1px solid #c4b293;
+  border-radius: .3rem;
+}
+.theme-chip[data-theme-id='sea'] .theme-chip-preview { background-color: #467d77; }
+.theme-chip[data-theme-id='white-world'] .theme-chip-preview { background-color: #eee9df; }
+.theme-chip-selected { background-color: #302b25; }
+:host-context(body[data-theme='beige-flat']) .theme-chip:hover { transform: none; }

@@ -1,3 +1,4 @@
+import { recordEvent } from "../_shared/events.js";
 import { getAuthenticatedSession, json, readJson } from "../auth/_shared.js";
 import {
   emptyAttemptAnswers,
@@ -27,7 +28,8 @@ export async function onRequestGet({ request, env, params }) {
   }
 }
 
-export async function onRequestPut({ request, env, params }) {
+export async function onRequestPut(context) {
+  const { request, env, params } = context;
   try {
     const session = await getAuthenticatedSession(request, env);
     if (!session) return json({ error: "Sessione non valida o scaduta." }, 401);
@@ -126,6 +128,7 @@ export async function onRequestPut({ request, env, params }) {
         row.id,
       )
       .run();
+    if (action !== 'save') context.waitUntil(recordEvent(env, { userId: session.user.id, sessionId: session.sessionId }, { section: 'aula-studio', eventType: completed ? 'quiz_completed' : 'quiz_progressed', metadata: { attemptId: row.id, mixed: true, action, correctCount: score.correctCount, assessedCount: score.assessedCount } }));
     return json({
       attempt: publicMixedAttempt({
         ...row,
@@ -148,7 +151,8 @@ export async function onRequestPut({ request, env, params }) {
   }
 }
 
-export async function onRequestDelete({ request, env, params }) {
+export async function onRequestDelete(context) {
+  const { request, env, params } = context;
   try {
     const session = await getAuthenticatedSession(request, env);
     if (!session) return json({ error: "Sessione non valida o scaduta." }, 401);
@@ -160,6 +164,7 @@ export async function onRequestDelete({ request, env, params }) {
       .run();
     if (!Number(result.meta.changes || 0))
       return json({ error: "Bozza non trovata." }, 404);
+    context.waitUntil(recordEvent(env, { userId: session.user.id, sessionId: session.sessionId }, { section: 'aula-studio', eventType: 'content_deleted', metadata: { resource: 'quiz_attempt', attemptId: params.id, mixed: true } }));
     return json({ deleted: true });
   } catch {
     return json({ error: "Non è stato possibile eliminare la bozza." }, 500);

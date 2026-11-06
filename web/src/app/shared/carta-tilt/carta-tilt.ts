@@ -61,6 +61,9 @@ export class CartaTilt implements AfterViewChecked, OnChanges, OnDestroy {
     return this.variante !== 'normale';
   }
 
+  private pointerFrame: number | undefined;
+  private pendingPointer: PointerEvent | undefined;
+
   private imageAspectRatio: string | null = null;
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -137,6 +140,7 @@ export class CartaTilt implements AfterViewChecked, OnChanges, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.cancelPointerFrame();
     this.cancelFoilAnimation();
     this.fragmentElements = [];
   }
@@ -202,6 +206,25 @@ export class CartaTilt implements AfterViewChecked, OnChanges, OnDestroy {
 
   @HostListener('pointermove', ['$event'])
   protected onPointerMove(event: PointerEvent): void {
+    this.pendingPointer = event;
+    if (this.pointerFrame !== undefined) return;
+    this.zone.runOutsideAngular(() => {
+      this.pointerFrame = requestAnimationFrame(() => {
+        this.pointerFrame = undefined;
+        const latest = this.pendingPointer;
+        this.pendingPointer = undefined;
+        if (latest) this.applyPointerMove(latest);
+      });
+    });
+  }
+
+  private cancelPointerFrame(): void {
+    if (this.pointerFrame !== undefined) cancelAnimationFrame(this.pointerFrame);
+    this.pointerFrame = undefined;
+    this.pendingPointer = undefined;
+  }
+
+  private applyPointerMove(event: PointerEvent): void {
     const [px, py] = cartaPointerPosition(event, this.host.nativeElement);
 
     this.zone.runOutsideAngular(() => {
@@ -224,6 +247,7 @@ export class CartaTilt implements AfterViewChecked, OnChanges, OnDestroy {
 
   @HostListener('pointerleave')
   protected onPointerLeave(): void {
+    this.cancelPointerFrame();
     this.zone.runOutsideAngular(() => {
       const frame = this.frameRef.nativeElement;
       // --mx/--my pilotano anche .carta-tilt-gloss (vernice lucida, background-position):

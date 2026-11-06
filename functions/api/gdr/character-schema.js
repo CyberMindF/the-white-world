@@ -1,3 +1,4 @@
+import { recordEvent } from "../_shared/events.js";
 import { getAuthenticatedSession, json, readJson } from "../auth/_shared.js";
 import { hasPermission } from "../_shared/permissions.js";
 
@@ -58,6 +59,7 @@ export async function onRequestPost(context) {
       .bind(adventure, fieldsJson, session.user.id, updatedAt)
       .run();
 
+    context.waitUntil(recordEvent(context.env, { userId: session.user.id, sessionId: session.sessionId }, { section: 'gdr', eventType: 'content_updated', metadata: { adventure, resource: 'character_schema' } }));
     return json({ saved: true, fields });
   } catch (error) {
     console.error(JSON.stringify({ event: "gdr_character_schema_post_error", message: error.message }));

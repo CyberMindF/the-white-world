@@ -301,3 +301,51 @@ body.safe-mode[data-theme], body.safe-mode {
   }
   body:has(app-world-navigation) { padding-bottom: calc(var(--mobile-tools-bottom) + 4.5rem); }
 }
+
+/* Preset essenziale: superfici opache e nessun effetto di compositing. */
+body[data-theme="beige-flat"] {
+  --bg-color: #e8dcc8;
+  --panel-color: #f5efE4;
+  --panel-border-color: #c4b293;
+  --text-color: #39342d;
+  --muted-color: #71685b;
+  --modal-overlay-bg: #6c645bcc;
+  --modal-text-color: #39342d;
+  --modal-muted-color: #71685b;
+  --border-color: #c4b293;
+  --selection-color: #e6dccb;
+  --active-color: #d9cbb4;
+  --correct-color: #dce5d2;
+  --error-color: #efd9d1;
+  --focus-color: #786044;
+  --accent-color: #735b3d;
+  --danger-text-color: #963e32;
+  --success-text-color: #46623b;
+  --input-bg: #fffdf8;
+  --complete-clue-bg: #e5eadc;
+  --complete-clue-border: #869878;
+  --button-bg: #dfceb2;
+  --button-hover-bg: #d3bd9c;
+  --grid-scroll-bg: #e8dcc8;
+  --cell-bg: #fffdf8;
+  --clue-bg: #f5efE4;
+  --drawer-bg: #f5efE4;
+  --shadow: none;
+  background: #e8dcc8 !important;
+  color-scheme: light;
+}
+
+body[data-theme="beige-flat"],
+body[data-theme="beige-flat"] *,
+body[data-theme="beige-flat"] *::before,
+body[data-theme="beige-flat"] *::after {
+  animation: none !important;
+  transition: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  filter: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  background-image: none !important;
+  scroll-behavior: auto !important;
+}

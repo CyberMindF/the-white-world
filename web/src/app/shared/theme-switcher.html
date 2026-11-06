@@ -14,7 +14,7 @@
       [attr.aria-pressed]="themeService.activeThemeId() === theme.id"
       (click)="themeService.applyPreset(theme.id)"
     >
-      <span class="theme-chip-preview" aria-hidden="true">
+      <span class="theme-chip-preview" [style.background-color]="theme.swatch" aria-hidden="true">
         <span class="theme-chip-icon">
           @switch (theme.icon) {
             @case ('night') {
@@ -25,6 +25,9 @@
             }
             @case ('velvet') {
               <svg viewBox="0 0 64 64"><path class="theme-icon-fill" d="M13 10h38v37c-4-4-8-5-12-2-5 4-9 5-14 1-4-3-8-2-12 1V10Z"/><path class="theme-icon-fold" d="M23 11c0 13-2 24-6 34M41 11c0 13 2 24 6 34M32 11v38"/></svg>
+            }
+            @case ('flat') {
+              <svg viewBox="0 0 64 64"><rect class="theme-icon-stroke" x="11" y="13" width="42" height="38" rx="3"/><path class="theme-icon-stroke" d="M11 25h42M26 25v26"/></svg>
             }
             @case ('letter') {
               <span class="theme-icon-letter">{{ theme.iconText }}</span>

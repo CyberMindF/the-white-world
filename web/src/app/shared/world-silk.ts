@@ -1,3 +1,4 @@
+import { setDiagnosticGraphics } from '../core/diagnostics';
 import { AfterViewInit, Component, DestroyRef, ElementRef, effect, inject, viewChild } from '@angular/core';
 import { WorldSettingsService } from '../core/world-settings.service';
 
@@ -55,82 +56,121 @@ export class WorldSilk implements AfterViewInit {
   private animationFrame = 0;
   private gl: WebGLRenderingContext | null = null;
   private program: WebGLProgram | null = null;
+  private buffer: WebGLBuffer | null = null;
+  private timeUniform: WebGLUniformLocation | null = null;
+  private aspectUniform: WebGLUniformLocation | null = null;
   private startedAt = performance.now();
   private reducedMotion = false;
+  private ready = false;
+  private destroyed = false;
+  private failed = false;
 
   constructor() {
     effect(() => {
-      const enabled = this.worldSettingsService.settings().silk;
-      queueMicrotask(() => enabled ? this.start() : this.stop());
+      this.worldSettingsService.settings().silk;
+      queueMicrotask(() => this.reconcile());
     });
   }
 
   ngAfterViewInit(): void {
+    this.ready = true;
     const canvas = this.canvas()?.nativeElement;
     if (!canvas) return;
-    this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    this.gl = canvas.getContext('webgl', { alpha: true, antialias: false, powerPreference: 'low-power' });
-    if (!this.gl) {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    this.reducedMotion = media.matches;
+    const resize = () => { if (this.enabled()) this.resize(canvas); };
+    const visibility = () => this.reconcile();
+    const motion = () => { this.reducedMotion = media.matches; this.stop(); this.reconcile(); };
+    const lost = (event: Event) => {
+      event.preventDefault();
+      this.stop();
+      this.failed = true;
       canvas.classList.add('is-fallback');
-      return;
-    }
-
-    this.program = this.createProgram(this.gl);
-    if (!this.program) {
-      canvas.classList.add('is-fallback');
-      return;
-    }
-
-    const buffer = this.gl.createBuffer();
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
-    this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), this.gl.STATIC_DRAW);
-    const position = this.gl.getAttribLocation(this.program, 'aPosition');
-    this.gl.enableVertexAttribArray(position);
-    this.gl.vertexAttribPointer(position, 2, this.gl.FLOAT, false, 0, 0);
-
-    const resize = () => this.resize(canvas);
-    const visibility = () => document.hidden ? this.stop() : this.start();
+      setDiagnosticGraphics({ contextLost: true, effect: 'silk' });
+    };
+    const restored = () => {
+      this.gl = null; this.program = null; this.buffer = null; this.failed = false;
+      this.reconcile();
+    };
     window.addEventListener('resize', resize, { passive: true });
     document.addEventListener('visibilitychange', visibility);
+    media.addEventListener('change', motion);
+    canvas.addEventListener('webglcontextlost', lost);
+    canvas.addEventListener('webglcontextrestored', restored);
     this.destroyRef.onDestroy(() => {
+      this.destroyed = true;
       this.stop();
       window.removeEventListener('resize', resize);
       document.removeEventListener('visibilitychange', visibility);
-      if (buffer) this.gl?.deleteBuffer(buffer);
+      media.removeEventListener('change', motion);
+      canvas.removeEventListener('webglcontextlost', lost);
+      canvas.removeEventListener('webglcontextrestored', restored);
+      if (this.buffer) this.gl?.deleteBuffer(this.buffer);
       if (this.program) this.gl?.deleteProgram(this.program);
+      this.gl?.getExtension('WEBGL_lose_context')?.loseContext();
+      this.gl = null;
     });
+    this.reconcile();
+  }
 
-    resize();
-    if (this.worldSettingsService.settings().silk) this.start();
+  private enabled(): boolean {
+    return this.ready && !this.destroyed && !document.hidden && this.worldSettingsService.settings().silk;
+  }
+
+  private reconcile(): void {
+    if (!this.enabled()) { this.stop(); return; }
+    const canvas = this.canvas()?.nativeElement;
+    if (!canvas || this.failed) return;
+    if (!this.gl && !this.initialize(canvas)) return;
+    this.resize(canvas);
+    this.start();
+  }
+
+  private initialize(canvas: HTMLCanvasElement): boolean {
+    const gl = canvas.getContext('webgl', { alpha: true, antialias: false, powerPreference: 'low-power' });
+    this.gl = gl;
+    if (!gl) { this.failed = true; canvas.classList.add('is-fallback'); return false; }
+    this.program = this.createProgram(gl);
+    if (!this.program) { this.failed = true; canvas.classList.add('is-fallback'); return false; }
+    this.buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+    const position = gl.getAttribLocation(this.program, 'aPosition');
+    gl.enableVertexAttribArray(position);
+    gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+    this.timeUniform = gl.getUniformLocation(this.program, 'uTime');
+    this.aspectUniform = gl.getUniformLocation(this.program, 'uAspect');
+    const debug = gl.getExtension('WEBGL_debug_renderer_info');
+    setDiagnosticGraphics({ effect: 'silk', renderer: gl.getParameter(debug ? debug.UNMASKED_RENDERER_WEBGL : gl.RENDERER), vendor: gl.getParameter(debug ? debug.UNMASKED_VENDOR_WEBGL : gl.VENDOR), version: gl.getParameter(gl.VERSION) });
+    canvas.classList.remove('is-fallback');
+    return true;
   }
 
   private createProgram(gl: WebGLRenderingContext): WebGLProgram | null {
     const compile = (type: number, source: string): WebGLShader | null => {
       const shader = gl.createShader(type);
       if (!shader) return null;
-      gl.shaderSource(shader, source);
-      gl.compileShader(shader);
+      gl.shaderSource(shader, source); gl.compileShader(shader);
       if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        console.warn('Impossibile compilare lo shader della seta:', gl.getShaderInfoLog(shader));
-        gl.deleteShader(shader);
-        return null;
+        console.error('Impossibile compilare lo shader della seta:', gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader); return null;
       }
       return shader;
     };
     const vertex = compile(gl.VERTEX_SHADER, VERTEX_SHADER);
     const fragment = compile(gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
-    if (!vertex || !fragment) return null;
-    const program = gl.createProgram();
-    if (!program) return null;
-    gl.attachShader(program, vertex);
-    gl.attachShader(program, fragment);
-    gl.linkProgram(program);
-    gl.deleteShader(vertex);
-    gl.deleteShader(fragment);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.warn('Impossibile collegare lo shader della seta:', gl.getProgramInfoLog(program));
-      gl.deleteProgram(program);
+    if (!vertex || !fragment) {
+      if (vertex) gl.deleteShader(vertex);
+      if (fragment) gl.deleteShader(fragment);
       return null;
+    }
+    const program = gl.createProgram();
+    if (program) { gl.attachShader(program, vertex); gl.attachShader(program, fragment); gl.linkProgram(program); }
+    gl.deleteShader(vertex); gl.deleteShader(fragment);
+    if (!program) return null;
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.error('Impossibile collegare lo shader della seta:', gl.getProgramInfoLog(program));
+      gl.deleteProgram(program); return null;
     }
     return program;
   }
@@ -141,22 +181,20 @@ export class WorldSilk implements AfterViewInit {
     const width = Math.max(1, Math.round(window.innerWidth * ratio));
     const height = Math.max(1, Math.round(window.innerHeight * ratio));
     if (canvas.width !== width || canvas.height !== height) {
-      canvas.width = width;
-      canvas.height = height;
+      canvas.width = width; canvas.height = height;
       this.gl.viewport(0, 0, width, height);
+      if (this.reducedMotion) this.render(0);
     }
-    if (this.reducedMotion) this.render(0);
   }
 
   private start(): void {
-    if (this.animationFrame || !this.gl || !this.program) return;
-    if (this.reducedMotion) {
-      this.render(0);
-      return;
-    }
+    if (!this.enabled() || this.failed || this.animationFrame || !this.gl || !this.program) return;
+    if (this.reducedMotion) { this.render(0); return; }
     const frame = (now: number) => {
-      this.animationFrame = requestAnimationFrame(frame);
+      this.animationFrame = 0;
+      if (!this.enabled() || this.failed) return;
       this.render((now - this.startedAt) / 1000 * 0.1);
+      this.animationFrame = requestAnimationFrame(frame);
     };
     this.animationFrame = requestAnimationFrame(frame);
   }
@@ -169,8 +207,8 @@ export class WorldSilk implements AfterViewInit {
   private render(time: number): void {
     if (!this.gl || !this.program) return;
     this.gl.useProgram(this.program);
-    this.gl.uniform1f(this.gl.getUniformLocation(this.program, 'uTime'), time);
-    this.gl.uniform1f(this.gl.getUniformLocation(this.program, 'uAspect'), this.gl.canvas.width / this.gl.canvas.height);
+    this.gl.uniform1f(this.timeUniform, time);
+    this.gl.uniform1f(this.aspectUniform, this.gl.canvas.width / this.gl.canvas.height);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
   }
 }

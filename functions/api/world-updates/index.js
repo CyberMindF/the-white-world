@@ -1,3 +1,4 @@
+import { recordEvent } from "../_shared/events.js";
 import { getAuthenticatedSession, json, readJson } from "../auth/_shared.js";
 import { hasPermission } from "../_shared/permissions.js";
 
@@ -48,7 +49,8 @@ export async function onRequestGet({ request, env }) {
   }
 }
 
-export async function onRequestPost({ request, env }) {
+export async function onRequestPost(context) {
+  const { request, env } = context;
   const session = await getAuthenticatedSession(request, env);
   if (!session) return json({ error: "Accesso richiesto." }, 401);
   if (!adminCanWrite(session, "content.create")) return json({ error: "Attiva la Modalità admin per aggiungere una novità." }, 403);
@@ -72,6 +74,7 @@ export async function onRequestPost({ request, env }) {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *, 0 AS seen`
     ).bind(kind, emoji, title, text, route, ctaLabel, publishedAt, body?.active === false ? 0 : 1,
       announce, body?.safe === true ? 1 : 0, session.user.id, now, now).first();
+    context.waitUntil(recordEvent(env, { userId: session.user.id, sessionId: session.sessionId }, { section: 'world-updates', eventType: 'content_created', metadata: { id: row.id } }));
     return json(updateView(row), 201);
   } catch {
     return json({ error: "Non è stato possibile creare la novità." }, 500);

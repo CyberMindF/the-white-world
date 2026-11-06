@@ -1,3 +1,4 @@
+import { RouterLink } from '@angular/router';
 import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -49,7 +50,7 @@ export function formatLogDate(value: string): string {
 @Component({
   selector: 'app-log',
   standalone: true,
-  imports: [AppShell, CommonModule, FormsModule],
+  imports: [AppShell, CommonModule, FormsModule, RouterLink],
   styleUrls: ['../../../styles/pages/log.css'],
   templateUrl: './log.html'
 })

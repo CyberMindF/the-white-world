@@ -22,18 +22,19 @@ export function fixture() {
 }
 
 export function apiHarness() {
+  const events=[];
   const {db,sqlite}=fixture();
   const session=async request=>{const id=Number(request.headers.get('x-user') || 1);return id?{user:{id,nickname:id===1?'Master':'Giocatrice',role:id===1?'admin':'member',isTest:request.headers.has('x-test')}}:null;};
   const json=(body,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
   const get=new Function('getAuthenticatedSession','json',...Object.keys(helpers),loadSource('./index.js')+';return onRequestGet;')(session,json,...Object.values(helpers));
-  const post=new Function('getAuthenticatedSession','json','notifyRealtime',...Object.keys(legacy),...Object.keys(helpers),loadSource('./mutate.js')+';return onRequestPost;')(session,json,async()=>{},...Object.values(legacy),...Object.values(helpers));
+  const post=new Function('getAuthenticatedSession','json','notifyRealtime','recordEvent',...Object.keys(legacy),...Object.keys(helpers),loadSource('./mutate.js')+';return onRequestPost;')(session,json,async()=>{},async(env,actor,event)=>{events.push({actor,...event});},...Object.values(legacy),...Object.values(helpers));
   const call=(user=1,method='GET',body,adventure='il-prezzo-della-verita',extra={})=>(method==='GET'?get:post)({env:{DB:db},waitUntil(){},request:new Request('https://test/api/gdr-workspace?adventure='+adventure,{method,headers:{'x-user':String(user),...extra},body:body===undefined?undefined:JSON.stringify(body)})});
   const media=new Map();
   const bucket={async put(key,data,options){media.set(key,{data:new Uint8Array(data),type:options.httpMetadata.contentType});}};
   const mediaPost=new Function('getAuthenticatedSession','json',...Object.keys(helpers),loadSource('./media.js')+';return onRequestPost;')(session,json,...Object.values(helpers));
   const upload=(user,characterId,slot,body,extra={})=>mediaPost({env:{DB:db,MEDIA:bucket},request:new Request(`https://test/api/gdr-workspace/media?character=${characterId}&slot=${slot}`,{method:'POST',headers:{'x-user':String(user),'Content-Type':'image/webp',...extra},body})});
   const oldGet=new Function('getAuthenticatedSession','json',...Object.keys(helpers),loadSource('../gdr/character-fields.js')+';return onRequestGet;')(session,json,...Object.values(helpers));
-  const oldPost=new Function('getAuthenticatedSession','json',...Object.keys(helpers),loadSource('../gdr/character-fields.js')+';return onRequestPost;')(session,json,...Object.values(helpers));
-  const oldFields=(user,key,value)=>{const form=new FormData();form.set('adventure','il-prezzo-della-verita');if(key){form.set('fieldKey',key);form.set('value',value);}return (key?oldPost:oldGet)({env:{DB:db},request:new Request('https://test/api/gdr/character-fields?adventure=il-prezzo-della-verita',{method:key?'POST':'GET',headers:{'x-user':String(user)},...(key?{body:form}:{})})});};
-  return {db,sqlite,call,upload,media,oldFields};
+  const oldPost=new Function('getAuthenticatedSession','json','recordEvent',...Object.keys(helpers),loadSource('../gdr/character-fields.js')+';return onRequestPost;')(session,json,async()=>{},...Object.values(helpers));
+  const oldFields=(user,key,value)=>{const form=new FormData();form.set('adventure','il-prezzo-della-verita');if(key){form.set('fieldKey',key);form.set('value',value);}return (key?oldPost:oldGet)({env:{DB:db},waitUntil(){},request:new Request('https://test/api/gdr/character-fields?adventure=il-prezzo-della-verita',{method:key?'POST':'GET',headers:{'x-user':String(user)},...(key?{body:form}:{})})});};
+  return {db,sqlite,call,upload,media,oldFields,events};
 }

@@ -7,6 +7,7 @@ export interface NarrativeCharacter {
   portrait: string;
   photo?: string;
   description?: string;
+  baseName?: string;
   kind?: 'pg' | 'png';
 }
 
@@ -18,7 +19,7 @@ export function narrativeSnippet(
   const name = (character?.name || 'Il mio personaggio').replace(/[|\r\n]/g, ' ').trim();
   const portrait = safeNarrativeImage(character?.portrait ?? '');
   if (type === 'dialogo')
-    return `::: dialogo ${name}${portrait ? ' | ' + portrait : ''}\n${selected || 'Scrivi qui le sue parole.'}\n:::`;
+    return `::: dialogo ${name}${portrait || character?.id ? ' | ' + portrait : ''}${character?.id ? ' | ' + character.id : ''}\n${selected || 'Scrivi qui le sue parole.'}\n:::`;
   if (type === 'azione' || type === 'nota')
     return `::: ${type}\n${selected || (type === 'azione' ? 'Descrivi cosa fa il personaggio.' : 'Scrivi la nota fuori personaggio.')}\n:::`;
   if (type === 'heading') return `## ${selected || 'Titolo'}`;
@@ -31,7 +32,7 @@ export function narrativeSnippet(
     const photo = safeNarrativeImage(character?.photo ?? '');
     if (!photo || character?.kind !== 'png') return '';
     const description = (selected || character.description || 'Descrizione del personaggio.').replace(/[\r\n]+/g, ' ');
-    return `::: npc${type === 'npc_full' ? ' full' : ''}\n- image: ${photo}\n  alt: ${name}\n  name: ${name}\n  description: ${description}\n:::`;
+    return `::: npc${type === 'npc_full' ? ' full' : ''}\n- image: ${photo}\n  alt: ${name}\n  name: ${name}\n  description: ${description}${character.id ? '\n  characterId: ' + character.id : ''}\n:::`;
   }
   return SNIPPETS[type as keyof typeof SNIPPETS] ?? '';
 }

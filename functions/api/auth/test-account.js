@@ -1,3 +1,4 @@
+import { recordEvent } from "../_shared/events.js";
 import { hasPermission } from "../_shared/permissions.js";
 import {
   getAuthenticatedSession,
@@ -63,6 +64,7 @@ export async function onRequestPost(context) {
       .bind(email, nickname, password, identity)
       .run();
 
+    context.waitUntil(recordEvent(context.env, { userId: session.user.id, sessionId: session.sessionId }, { section: 'auth', eventType: 'content_created', metadata: { resource: 'test_account', targetUserId: result.meta.last_row_id } }));
     return json({
       user: { id: result.meta.last_row_id, email, nickname, identity, role: "member", isTest: true }
     }, 201);

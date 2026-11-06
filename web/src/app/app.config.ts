@@ -1,3 +1,4 @@
+import { reportDiagnostic } from './core/diagnostics';
 import { registerLocaleData } from '@angular/common';
 import localeIt from '@angular/common/locales/it';
 import { ApplicationConfig, LOCALE_ID, provideBrowserGlobalErrorListeners } from '@angular/core';
@@ -21,6 +22,7 @@ export const appConfig: ApplicationConfig = {
       routes,
       withInMemoryScrolling({ scrollPositionRestoration: 'enabled', anchorScrolling: 'enabled' }),
       withNavigationErrorHandler((error: NavigationError) => {
+        reportDiagnostic('navigation_error', error.error);
         void recoverFromLazyChunkError(error.error);
       }),
     ),

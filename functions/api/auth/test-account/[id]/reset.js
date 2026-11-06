@@ -1,3 +1,4 @@
+import { recordEvent } from "../../../_shared/events.js";
 import { hasPermission } from "../../../_shared/permissions.js";
 import { getAuthenticatedSession, json } from "../../_shared.js";
 import { clearTestAccountData, getTestAccount } from "../_cleanup.js";
@@ -14,6 +15,7 @@ export async function onRequestPost(context) {
     if (!target) return json({ error: "Account di prova non trovato." }, 404);
 
     const result = await clearTestAccountData(context.env, userId);
+    context.waitUntil(recordEvent(context.env, { userId: session.user.id, sessionId: session.sessionId }, { section: 'auth', eventType: 'content_updated', metadata: { resource: 'test_account', action: 'reset', targetUserId: userId } }));
     return json({ reset: true, user: target, ...result });
   } catch (error) {
     console.error(JSON.stringify({ event: "test_account_reset_error", message: error.message }));

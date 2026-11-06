@@ -1,3 +1,4 @@
+import { gdrAdventureIcon } from '../../core/gdr-adventure-icons';
 import { Component, DestroyRef, HostListener, Input, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
@@ -20,12 +21,14 @@ const FALLBACK_AREA_BY_GROUP: Record<WorldPlaceGroup, HomeAreaId> = {
   styleUrl: './world-navigation.css'
 })
 export class WorldNavigation {
+  protected readonly adventureIcon = gdrAdventureIcon;
   @Input() parentHref = '/';
   @Input() parentLabel = 'Torna indietro';
   @Input() showBack = true;
 
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  protected readonly adventures = signal<{id: string; title: string}[]>([]);
   protected readonly navigationOpen = signal(false);
   protected readonly currentPath = signal(this.pathFromUrl(this.router.url));
   protected readonly safe = inject(SafeModeService);
@@ -62,8 +65,18 @@ export class WorldNavigation {
     return route === this.currentPath();
   }
 
+  private async loadAdventures(): Promise<void> {
+    try {
+      const response = await fetch('/api/gdr-workspace', { credentials: 'same-origin' });
+      if (!response.ok) return;
+      const data = await response.json();
+      this.adventures.set(data.adventures ?? []);
+    } catch { /* La navigazione generale resta disponibile. */ }
+  }
+
   protected open(): void {
     this.navigationOpen.set(true);
+    void this.loadAdventures();
   }
 
   protected close(): void {
@@ -71,7 +84,8 @@ export class WorldNavigation {
   }
 
   protected toggle(): void {
-    this.navigationOpen.update((open) => !open);
+    if (this.navigationOpen()) this.close();
+    else this.open();
   }
 
   @HostListener('document:keydown.escape')

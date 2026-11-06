@@ -37,7 +37,7 @@
             ? '/tavolo-da-gioco/gdr/il-prezzo-della-verita/avventura'
             : '/tavolo-da-gioco/gdr/gioca/il-prezzo-della-verita'
         "
-        ><span class="tavolo-game-emoji">🪄</span><strong>Il Prezzo della Verità</strong
+        ><span class="tavolo-game-emoji">{{ adventureIcon('il-prezzo-della-verita') }}</span><strong>Il Prezzo della Verità</strong
         ><small>Entra</small></a
       >
       <a
@@ -47,7 +47,7 @@
             ? '/tavolo-da-gioco/gdr/la-casa-che-trattiene-il-respiro'
             : '/tavolo-da-gioco/gdr/gioca/la-casa-che-trattiene-il-respiro'
         "
-        ><span class="tavolo-game-emoji">📜</span><strong>La casa che trattiene il respiro</strong
+        ><span class="tavolo-game-emoji">{{ adventureIcon('la-casa-che-trattiene-il-respiro') }}</span><strong>La casa che trattiene il respiro</strong
         ><small>Entra</small></a
       >
       @if (!classic) {
@@ -55,7 +55,7 @@
           <a
             class="tavolo-game-card card glass-surface is-available"
             [routerLink]="['/tavolo-da-gioco/gdr/gioca', a.id]"
-            ><span class="tavolo-game-emoji">📖</span><strong>{{ a.title }}</strong
+            ><span class="tavolo-game-emoji">{{ adventureIcon(a.id) }}</span><strong>{{ a.title }}</strong
             ><small>{{ a.published ? 'Entra' : 'Bozza · solo admin' }}</small></a
           >
         }

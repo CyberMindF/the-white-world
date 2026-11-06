@@ -1,3 +1,4 @@
+import { gdrAdventureIcon } from '../../core/gdr-adventure-icons';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -16,6 +17,7 @@ import { EditorialText } from '../../shared/editorial-text/editorial-text';
   templateUrl: './gdr.html',
 })
 export class Gdr implements OnInit {
+  protected readonly adventureIcon = gdrAdventureIcon;
   protected readonly safe = inject(SafeModeService);
   protected readonly classic = inject(ActivatedRoute).snapshot.data['classic'] === true;
   private readonly auth = inject(AuthService);

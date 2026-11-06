@@ -275,3 +275,5 @@
 /* Il contenitore chiuso non deve intercettare i controlli della pagina. */
 .world-navigation-drawer { pointer-events: none; }
 .world-navigation-rail, .world-navigation-sheet { pointer-events: auto; }
+
+.world-navigation-links a.is-adventure { margin-inline-start: 2.5rem; font-size: .85rem; }

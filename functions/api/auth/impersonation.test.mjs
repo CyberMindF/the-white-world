@@ -107,7 +107,7 @@ test('nessun falso accesso o email; i salvataggi restano attribuiti all’admin 
  h.sql.exec(`ALTER TABLE users ADD COLUMN activity_logging_enabled INTEGER DEFAULT 1;
  CREATE TABLE events(id INTEGER PRIMARY KEY,user_id INTEGER,session_id INTEGER,section TEXT,event_type TEXT,event_version INTEGER,metadata TEXT);`);
  const record=new Function('notifyLoggedEvent',source('../_shared/events.js')+';return recordEvent;')(async()=>{emails++;});
- for (const eventType of ['world_page_opened','world_unlocked','letter_read']) {
+ for (const eventType of ['world_page_opened','world_unlocked','letter_read','gdr_adventure_opened']) {
   assert.equal((await record(h.env,{userId:2,sessionId:1},{section:'gdr',eventType})).recorded,false);
  }
  assert.equal((await record(h.env,{userId:2,sessionId:1},{section:'gdr',eventType:'gdr_turn_submitted'})).recorded,true);
@@ -159,4 +159,20 @@ test('l’anteprima esplicita di un’offerta vuota non provoca rimborsi o elimi
  const db={prepare(){return{bind(){return{async first(){return{id:1};},async all(){return{results:[]};}};}};},async batch(){writes++;}};
  assert.equal(await read({DB:db},2,{readOnly:true}),null);assert.equal(writes,0);
  assert.equal(await read({DB:db},2),null);assert.equal(writes,1);
+});
+
+test('i nuovi eventi rispettano la preferenza di logging e registrano solo utenti abilitati',async()=>{
+ const h=await fixture();let emails=0;
+ try {
+  h.sql.exec(`ALTER TABLE users ADD COLUMN activity_logging_enabled INTEGER DEFAULT 0;
+   CREATE TABLE events(id INTEGER PRIMARY KEY,user_id INTEGER,session_id INTEGER,section TEXT,event_type TEXT,event_version INTEGER,metadata TEXT);`);
+  const record=new Function('notifyLoggedEvent',source('../_shared/events.js')+';return recordEvent;')(async()=>{emails++;});
+  const actor={userId:2,sessionId:2};
+  const types=['safe_mode_changed','gdr_adventure_opened','gdr_workspace_changed','account_setting_changed','quiz_completed','quiz_progressed'];
+  for(const eventType of types) assert.equal((await record(h.env,actor,{section:'gdr',eventType})).recorded,false);
+  assert.equal(emails,0);
+  h.sql.exec('UPDATE users SET activity_logging_enabled=1 WHERE id=2');
+  for(const eventType of types) assert.equal((await record(h.env,actor,{section:'gdr',eventType})).recorded,true);
+  assert.equal(h.sql.prepare('SELECT COUNT(*) n FROM events').get().n,types.length);
+ } finally {h.sql.close();}
 });

@@ -1,3 +1,4 @@
+import { recordEvent } from "../../_shared/events.js";
 import { hasPermission } from "../../_shared/permissions.js";
 import { getAuthenticatedSession, json } from "../_shared.js";
 import { clearTestAccountData, getTestAccount } from "./_cleanup.js";
@@ -22,6 +23,7 @@ export async function onRequestDelete(context) {
     const cleanup = await clearTestAccountData(context.env, userId);
     await context.env.DB.prepare("DELETE FROM users WHERE id = ? AND is_test = 1").bind(userId).run();
 
+    context.waitUntil(recordEvent(context.env, { userId: session.user.id, sessionId: session.sessionId }, { section: 'auth', eventType: 'content_deleted', metadata: { resource: 'test_account', targetUserId: userId } }));
     return json({ deleted: true, user: target, ...cleanup });
   } catch (error) {
     console.error(JSON.stringify({ event: "test_account_rollback_error", message: error.message }));

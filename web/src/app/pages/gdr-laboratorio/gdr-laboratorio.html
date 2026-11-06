@@ -95,11 +95,11 @@
                 <p class="lab-help">Queste modifiche erano rimaste nel tuo browser. Controlla il pezzo da recuperare e salvalo nella partita.</p>
                 @for (change of recoveredChanges(); track change.id) {
                   <section class="recovered-change">
-                    <app-gdr-turn [source]="change.source" />
+                    <app-gdr-turn [characterRoster]="characterRoster()" [source]="change.source" />
                     <button class="btn" [disabled]="contentSaving()" (click)="saveStoryBlock(change)">Salva questa modifica per entrambi</button>
                   </section>
                 } @empty {<p class="lab-help">Non ci sono modifiche recuperabili automaticamente. La copia precedente è conservata qui sotto.</p>}
-                <details><summary>Leggi la copia precedente</summary><app-gdr-turn [source]="local().documentDraft || ''" /></details>
+                <details><summary>Leggi la copia precedente</summary><app-gdr-turn [characterRoster]="characterRoster()" [source]="local().documentDraft || ''" /></details>
               </section>
             } @else if (documentEditor()) {
               <section
@@ -181,7 +181,7 @@
               }
             </div>
           }
-          <app-gdr-turn
+          <app-gdr-turn [characterRoster]="characterRoster()"
             [source]="sharedStorySource()"
             [persistedBlocks]="adventure().legacy ? narrativeBlocks() : []"
             [sharedDocument]="liveGame && adventure().legacy"
@@ -198,7 +198,7 @@
           />
           @if (canPrepare() && failedStoryChange(); as change) {
             <section class="lab-document-editor" aria-label="Modifica non salvata">
-              <h3>Modifica non salvata</h3><app-gdr-turn [source]="change.source" />
+              <h3>Modifica non salvata</h3><app-gdr-turn [characterRoster]="characterRoster()" [source]="change.source" />
               <button class="btn" [disabled]="contentSaving()" (click)="change.id ? saveStoryBlock(change) : insertStoryBlock(change)">Riprova salvataggio per entrambi</button>
             </section>
           }
@@ -241,7 +241,7 @@
                     </div>
                   </fieldset>
                 } @else {
-                  <app-gdr-turn [source]="turn.body"
+                  <app-gdr-turn [characterRoster]="characterRoster()" [source]="turn.body"
                     [editable]="canPrepare() && !!turn.isMaster && publishedTurnEditable(turn)"
                     [insertable]="canPrepare() && turn.isMine && !!turn.isMaster"
                     [deletable]="canPrepare() && turn.isMine && !!turn.isMaster"
@@ -265,7 +265,7 @@
                   <span class="gdr-turn-author">{{ turn.author }} · prova locale</span
                   ><span class="gdr-turn-date">{{ formatDate(turn.createdAt) }}</span>
                 </div>
-                <app-gdr-turn [source]="turn.source" /><button class="btn" (click)="editTurn(turn)">
+                <app-gdr-turn [characterRoster]="characterRoster()" [source]="turn.source" /><button class="btn" (click)="editTurn(turn)">
                   Riprendi questo turno di prova
                 </button>
               </article>

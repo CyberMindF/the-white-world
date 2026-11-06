@@ -1,4 +1,5 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { setDiagnosticIdentity } from './diagnostics';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { ApiService } from './api.service';
 
 export type UserIdentity = 'lui' | 'lei';
@@ -69,6 +70,10 @@ export class AuthService {
   readonly adminModeEnabled = signal(false);
   readonly impersonation = signal<Impersonation | null>(null);
   readonly isAdmin = computed(() => this.currentUser()?.role === 'admin');
+
+  constructor() {
+    effect(() => setDiagnosticIdentity({ actorId: this.impersonation()?.actorId ?? this.currentUser()?.id ?? null, effectiveUserId: this.currentUser()?.id ?? null, impersonating: !!this.impersonation() }));
+  }
 
   // Chiede al backend se il cookie HttpOnly identifica ancora una sessione valida.
   async loadAuthSession(): Promise<AuthSessionResponse> {

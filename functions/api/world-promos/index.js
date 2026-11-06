@@ -1,3 +1,4 @@
+import { recordEvent } from "../_shared/events.js";
 import { getAuthenticatedSession, json, readJson } from "../auth/_shared.js";
 import { hasPermission } from "../_shared/permissions.js";
 
@@ -81,7 +82,8 @@ export async function onRequestGet({ request, env }) {
   }
 }
 
-export async function onRequestPut({ request, env }) {
+export async function onRequestPut(context) {
+  const { request, env } = context;
   const session = await getAuthenticatedSession(request, env);
   if (!session) return json({ error: "Accesso richiesto." }, 401);
   if (!session.adminModeEnabled || !hasPermission(session.user.role, "content.edit")) {
@@ -102,13 +104,15 @@ export async function onRequestPut({ request, env }) {
          updated_by = excluded.updated_by,
          updated_at = excluded.updated_at`
     ).bind(enabled, session.user.id, now).run();
+    context.waitUntil(recordEvent(env, { userId: session.user.id, sessionId: session.sessionId }, { section: 'world-promos', eventType: 'world_setting_changed', metadata: { setting: 'promos_enabled', enabled: body.enabled } }));
     return json({ promosEnabled: body.enabled });
   } catch {
     return json({ error: "Non è stato possibile aggiornare le pubblicità." }, 500);
   }
 }
 
-export async function onRequestPost({ request, env }) {
+export async function onRequestPost(context) {
+  const { request, env } = context;
   const session = await getAuthenticatedSession(request, env);
   if (!session) return json({ error: "Accesso richiesto." }, 401);
   if (!session.adminModeEnabled || !hasPermission(session.user.role, "content.create")) {
@@ -124,6 +128,7 @@ export async function onRequestPost({ request, env }) {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
     ).bind(value.label, value.emoji, value.title, value.text, value.route, value.ctaLabel, value.placement,
       value.targetIdentity, value.cooldownDays, value.active, session.user.id, now, now).first();
+    context.waitUntil(recordEvent(env, { userId: session.user.id, sessionId: session.sessionId }, { section: 'world-promos', eventType: 'content_created', metadata: { id: row.id } }));
     return json(promoView(row), 201);
   } catch {
     return json({ error: "Non è stato possibile creare la pubblicità." }, 500);

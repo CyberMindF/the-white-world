@@ -142,3 +142,37 @@ describe('eliminazione dei blocchi della storia',()=>{
   expect(insert).toHaveBeenCalledWith({beforeId:undefined,source:'Un nuovo inizio.'});expect(privateCopy).not.toHaveBeenCalled();
  });
 });
+
+describe('nomi correnti nei blocchi esistenti', () => {
+ afterEach(() => TestBed.resetTestingModule());
+ it('aggiorna Daisy e i PNG senza creare blocchi o cambiare il testo', () => {
+  const source = 'Daisy parla con Sally.\n\n::: dialogo Daisy | | daisy\nCiao Sally.\n:::\n\n::: npc\n- image: /assets/sally.webp\n  alt: Sally\n  name: Sally\n  characterId: sally\n  description: La gatta.\n:::';
+  const {fixture} = setup(source);
+  const change = vi.fn(); fixture.componentInstance.sourceChange.subscribe(change);
+  fixture.componentRef.setInput('characterRoster', [
+   {id:'daisy',name:'Daisy Bodegard',baseName:'Daisy Bodegard',kind:'pg',portrait:''},
+   {id:'sally',name:'Sally Nuova',baseName:'Sally',kind:'png',portrait:'',photo:'/assets/sally.webp'}
+  ]); fixture.detectChanges();
+  expect(fixture.nativeElement.querySelector('.speaker').textContent).toContain('Daisy Bodegard');
+  expect(fixture.nativeElement.querySelector('.npc-card').textContent).toContain('Sally Nuova');
+  expect(fixture.nativeElement.querySelectorAll('.dialogue')).toHaveLength(1);
+  expect(fixture.nativeElement.querySelector('.dialogue p').textContent).toBe('Ciao Sally.');
+  expect(fixture.componentInstance.source()).toBe(source); expect(change).not.toHaveBeenCalled();
+ });
+ it('segue un riferimento stabile anche cambiando nome e ritratto', () => {
+  const {fixture} = setup('::: dialogo Vecchio | /assets/old.webp | pg-1\nCiao.\n:::');
+  fixture.componentRef.setInput('characterRoster', [{id:'pg-1',name:'Nuovo',portrait:'/assets/new.webp'}]); fixture.detectChanges();
+  expect(fixture.nativeElement.querySelector('.speaker').textContent).toContain('Nuovo');
+ });
+ it('non associa per nome un blocco privo di ID, nemmeno con una corrispondenza univoca', () => {
+  const {fixture} = setup('::: dialogo Daisy\nCiao.\n:::');
+  fixture.componentRef.setInput('characterRoster', [{id:'1',baseName:'Daisy',name:'Daisy Nuova',portrait:''}]); fixture.detectChanges();
+  expect(fixture.nativeElement.querySelector('.speaker').textContent).not.toContain('Daisy Nuova');
+ });
+ it('conserva il nome in caso di omonimi senza indizi univoci', () => {
+  const {fixture} = setup('::: dialogo Daisy\nCiao.\n:::');
+  fixture.componentRef.setInput('characterRoster', [{id:'1',baseName:'Daisy',name:'Daisy Uno',portrait:''},{id:'2',baseName:'Daisy',name:'Daisy Due',portrait:''}]); fixture.detectChanges();
+  expect(fixture.nativeElement.querySelector('.speaker').textContent).not.toContain('Daisy Uno');
+  expect(fixture.nativeElement.querySelector('.speaker').textContent).not.toContain('Daisy Due');
+ });
+});
