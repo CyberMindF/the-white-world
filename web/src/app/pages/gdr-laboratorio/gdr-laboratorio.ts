@@ -537,7 +537,7 @@ export class GdrLaboratorio implements OnInit {
     }finally{this.contentSaving.set(false);}
   }
   protected canEditPublishedTurn(turn: ExistingTurn): boolean {
-    return this.liveGame && !!turn.id && turn.isMine && !this.safe.enabled() && !this.auth.currentUser()?.isTest;
+    return this.liveGame && !!turn.id && turn.isMine && (!turn.isMaster || !this.safe.enabled()) && !this.auth.currentUser()?.isTest;
   }
   protected publishedTurnEditable(turn: ExistingTurn): boolean {
     return this.canEditPublishedTurn(turn) && !this.contentSaving() && !this.sendingTurn() && !this.readingEdit() && !this.documentEdit() && !this.turnEdit() &&
