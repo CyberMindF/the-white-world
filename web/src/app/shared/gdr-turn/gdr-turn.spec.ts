@@ -150,10 +150,11 @@ describe('nomi correnti nei blocchi esistenti', () => {
   const {fixture} = setup(source);
   const change = vi.fn(); fixture.componentInstance.sourceChange.subscribe(change);
   fixture.componentRef.setInput('characterRoster', [
-   {id:'daisy',name:'Daisy Bodegard',baseName:'Daisy Bodegard',kind:'pg',portrait:''},
+   {id:'daisy',name:'Daisy Bodegard',baseName:'Daisy Bodegard',kind:'pg',portrait:'/assets/daisy.webp'},
    {id:'sally',name:'Sally Nuova',baseName:'Sally',kind:'png',portrait:'',photo:'/assets/sally.webp'}
   ]); fixture.detectChanges();
   expect(fixture.nativeElement.querySelector('.speaker').textContent).toContain('Daisy Bodegard');
+  expect(fixture.nativeElement.querySelector('.speaker img').getAttribute('src')).toBe('/assets/daisy.webp');
   expect(fixture.nativeElement.querySelector('.npc-card').textContent).toContain('Sally Nuova');
   expect(fixture.nativeElement.querySelectorAll('.dialogue')).toHaveLength(1);
   expect(fixture.nativeElement.querySelector('.dialogue p').textContent).toBe('Ciao Sally.');
@@ -163,6 +164,9 @@ describe('nomi correnti nei blocchi esistenti', () => {
   const {fixture} = setup('::: dialogo Vecchio | /assets/old.webp | pg-1\nCiao.\n:::');
   fixture.componentRef.setInput('characterRoster', [{id:'pg-1',name:'Nuovo',portrait:'/assets/new.webp'}]); fixture.detectChanges();
   expect(fixture.nativeElement.querySelector('.speaker').textContent).toContain('Nuovo');
+  expect(fixture.nativeElement.querySelector('.speaker img').getAttribute('src')).toBe('/assets/new.webp');
+  fixture.componentRef.setInput('characterRoster', [{id:'pg-1',name:'Nuovo',portrait:''}]); fixture.detectChanges();
+  expect(fixture.nativeElement.querySelector('.speaker img')).toBeNull();
  });
  it('non associa per nome un blocco privo di ID, nemmeno con una corrispondenza univoca', () => {
   const {fixture} = setup('::: dialogo Daisy\nCiao.\n:::');

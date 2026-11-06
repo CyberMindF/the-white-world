@@ -5,7 +5,7 @@ import { updateGdrTextarea } from '../gdr-textarea';
 import { GdrBlocks } from '../gdr-blocks/gdr-blocks';
 import { BLOCK_TYPES, SNIPPET_LABELS } from '../gdr-blocks/gdr-snippets';
 import { NarrativeCharacter, insertNarrativeBlock, narrativeSnippet, replaceNarrativeSelection } from './gdr-writing';
-import { NarrativeSection, parseNarrative } from './gdr-turn.parser';
+import { NarrativeSection, parseNarrative, safeNarrativeImage } from './gdr-turn.parser';
 import { GdrBlockRow, GdrParagraphData } from '../gdr-blocks/gdr-block.types';
 import { serializeGdrBlocks } from '../gdr-blocks/gdr-markdown.serializer';
 
@@ -465,7 +465,7 @@ export class GdrTurn {
     return this.rawRendered().map(section => {
       if (section.kind === 'dialogo') {
         const character = resolve(section.characterId);
-        return character ? {...section, speaker: character.name} : section;
+        return character ? {...section, speaker: character.name, portrait: safeNarrativeImage(character.portrait)} : section;
       }
       return {...section, blocks: section.blocks.map(block => {
         if (block.type !== 'npc_grid') return block;
