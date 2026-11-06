@@ -10,7 +10,7 @@
       }
     </select>
   }
-  <header><h3>Abilità e incantesimi</h3><p>{{ c.name }} {{ c.profile?.surname }}</p></header>
+  <header><h3>Abilità e incantesimi</h3></header>
   @if (c.profile.abilities) {
     <app-gdr-turn [source]="c.profile.abilities" />
   }
