@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, inject } from '@angular/core';
+import { Component, Input, Output, EventEmitter, inject, signal } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { renderInlineLinks } from '../inline-text';
 import {
@@ -32,6 +32,12 @@ export class GdrBlocks {
   @Input() continuation = false;
   @Output() editBlock = new EventEmitter<number>();
 
+  @Output() characterOpen = new EventEmitter<import('./gdr-block.types').GdrNpcEntry>();
+  protected readonly preview = signal<{src:string;alt:string}|null>(null);
+  protected openNpc(entry: import('./gdr-block.types').GdrNpcEntry): void {
+    if (this.characterOpen.observed) this.characterOpen.emit(entry);
+    else this.preview.set({src:entry.image,alt:entry.name});
+  }
   private readonly sanitizer = inject(DomSanitizer);
 
   protected asHeading(data: unknown): GdrHeadingData {

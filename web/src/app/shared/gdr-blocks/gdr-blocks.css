@@ -221,3 +221,11 @@
 :host h3.has-preceding-content:first-child {
   margin-top: clamp(1.5rem, 4vw, 2.25rem);
 }
+
+.image-trigger { display:block; border:0; padding:0; margin:0; background:transparent; color:inherit; font:inherit; text-align:inherit; cursor:zoom-in; max-width:100%; }
+.image-trigger img { display:block; }
+.image-overlay { position:fixed; inset:0; z-index:1600; display:grid; place-items:center; padding:24px; background:rgb(20 18 16 / .72); backdrop-filter:blur(6px); }
+.image-modal { position:relative; max-width:min(1100px,100%); max-height:90dvh; overflow:auto; padding:16px; border-radius:16px; background:var(--bg-color); color:var(--text-color); box-shadow:0 24px 80px #0005; }
+.image-modal > img { display:block; max-width:100%; max-height:78dvh; object-fit:contain; border-radius:8px; margin:auto; }
+.image-modal p { text-align:center; margin:12px 0 0; }
+.image-close { position:sticky; top:0; display:block; margin:0 0 10px auto; width:36px; height:36px; border:1px solid var(--border-color); border-radius:50%; background:var(--bg-color); color:inherit; cursor:pointer; padding:0; }

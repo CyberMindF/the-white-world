@@ -56,7 +56,7 @@ interface RenderedSection extends NarrativeSection {
         <ng-container *ngTemplateOutlet="inlineEditor" />
       } @else if (section.kind === 'document') {
         <app-gdr-blocks
-          [blocks]="section.blocks"
+          [blocks]="section.blocks" (characterOpen)="openNpc($event)"
           [editable]="editable() && editBlocks()"
           [continuation]="sectionIndex > 0"
           (editBlock)="startEditing(section)"
@@ -196,7 +196,7 @@ interface RenderedSection extends NarrativeSection {
     <ng-template #content let-section let-canEdit="canEdit">
       @switch (section.kind) {
         @case ('document') {
-          <app-gdr-blocks [blocks]="section.blocks" />
+          <app-gdr-blocks [blocks]="section.blocks" (characterOpen)="openNpc($event)" />
         }
         @case ('dialogo') {
           <div class="dialogue">
@@ -465,6 +465,11 @@ export class GdrTurn {
     {key:'personality',label:'Personalità'}, {key:'history',label:'Storia'},
     {key:'goal',label:'Obiettivo'}, {key:'abilities',label:'Abilità'}
   ];
+  protected openNpc(entry: import('../gdr-blocks/gdr-block.types').GdrNpcEntry): void {
+    const roster = this.characterRoster().length ? this.characterRoster() : this.characters();
+    const character = roster.find(c => entry.characterId ? c.id === entry.characterId : c.name === entry.name);
+    this.viewedCharacter.set(character ?? {name:entry.name,portrait:'',photo:entry.image,description:entry.description});
+  }
   protected openCharacter(section: NarrativeSection): void {
     const roster = this.characterRoster().length ? this.characterRoster() : this.characters();
     const character = roster.find(c => section.characterId ? c.id === section.characterId : c.name === section.speaker);

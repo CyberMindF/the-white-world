@@ -1,3 +1,12 @@
+@if (preview(); as image) {
+  <div class="image-overlay" (click)="preview.set(null)">
+    <section class="image-modal" role="dialog" aria-modal="true" aria-label="Immagine" tabindex="-1" (keydown.escape)="preview.set(null)" (click)="$event.stopPropagation()">
+      <button class="image-close" type="button" aria-label="Chiudi immagine" (click)="preview.set(null)">✕</button>
+      <img [src]="image.src" [alt]="image.alt" />
+      @if (image.alt) { <p>{{ image.alt }}</p> }
+    </section>
+  </div>
+}
 @for (block of blocks; track block.id; let blockIndex = $index) {
   @if (editable && block.type !== 'heading') {
     <button class="gdr-edit-start" type="button" (click)="editBlock.emit(blockIndex)">
@@ -68,7 +77,7 @@
     }
     @case ('image') {
       <figure class="avventura-figure">
-        <a [href]="asImage(block.data).src" target="_blank" rel="noopener"><img [src]="asImage(block.data).src" [alt]="asImage(block.data).alt" loading="lazy" /></a>
+        <button class="image-trigger" type="button" aria-label="Apri immagine" (click)="preview.set(asImage(block.data))"><img [src]="asImage(block.data).src" [alt]="asImage(block.data).alt" loading="lazy" /></button>
         @if (asImage(block.data).caption) {
           <figcaption>{{ asImage(block.data).caption }}</figcaption>
         }
@@ -78,8 +87,8 @@
       <div class="npc-grid" [class.npc-full]="asNpcGrid(block.data).layout === 'full'">
         @for (entry of asNpcGrid(block.data).entries; track entry.name) {
           <article class="npc-card card glass-surface">
-            <img [src]="entry.image" [alt]="entry.alt" loading="lazy" />
-            <h4>{{ entry.name }}</h4>
+            <button class="image-trigger" type="button" [attr.aria-label]="'Apri scheda di ' + entry.name" (click)="openNpc(entry)"><img [src]="entry.image" [alt]="entry.alt" loading="lazy" /></button>
+            <h4><button class="image-trigger" type="button" (click)="openNpc(entry)">{{ entry.name }}</button></h4>
             <p>{{ entry.description }}</p>
           </article>
         }
