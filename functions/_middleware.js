@@ -11,6 +11,8 @@ export async function onRequest(context) {
   let response, failure;
   try { response = await context.next(); }
   catch (error) { failure = error; response = Response.json({ error: 'Errore interno del server.', requestId }, { status: 500 }); }
+  // L'upgrade deve conservare il WebSocket: ricostruire una normale Response con 101 fallisce.
+  if (response.status === 101) return response;
   if (response.status >= 500) {
     const diagnosticResponse = failure ? null : response.clone();
     context.waitUntil((async () => {
