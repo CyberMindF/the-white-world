@@ -184,6 +184,9 @@ summary {
 .roster-entry .avatar-initial {
   width: 38px;
   height: 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
   font-size: 1.1rem;
 }
 .roster-entry strong {
