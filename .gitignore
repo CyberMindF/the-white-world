@@ -12,3 +12,11 @@ audio-youtube/
 youtube-audio.sh
 backups/
 .generated/
+
+# Cache, collegamenti locali e risultati delle verifiche
+.angular/
+node_modules
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo

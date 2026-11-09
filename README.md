@@ -429,6 +429,10 @@ Iter obbligatorio per ogni rilascio:
 4. Registrare in Git tutte le modifiche del rilascio, compresi nuovi file e migrazioni, e inviarle su GitHub nel branch `main`.
 5. Attendere la pubblicazione automatica e verificare che `/build-version.json` sul sito riporti il commit inviato, quindi controllare le funzionalità interessate.
 
+Le build pubblicano il commit con cui sono state avviate, non il contenuto corrente di `main`. Riavviare una build storica può quindi sostituire il sito con codice precedente, anche se GitHub è aggiornato. Non riprovare rilasci di commit superati: inviare la correzione su `main` e attendere la build di quel commit. Prima di intervenire su una build, confrontare il suo SHA con `origin/main`.
+
+Quando più chat lavorano contemporaneamente, possono preparare modifiche separate, ma occorre coordinare il rilascio: una sola attività segue la pubblicazione fino alla verifica online. Il workflow di notifica segnala la versione pubblicata; non serializza né annulla le build di Cloudflare Pages. Al termine rimuovere le copie di lavoro temporanee solo dopo aver verificato che non contengano modifiche o commit da recuperare.
+
 Il rilascio non è concluso finché il codice pubblicato non è presente su GitHub e la versione online non coincide con il commit atteso. Non usare un deploy diretto come scorciatoia se la build automatica fallisce: correggere il problema e inviare la correzione su GitHub.
 
 
