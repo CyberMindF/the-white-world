@@ -35,6 +35,7 @@ interface RenderedSection extends NarrativeSection {
               </div>
               <div class="character-details">
                 <h3>Informazioni conosciute</h3>
+                @if (!hasPublicInformation(character)) { <p class="character-empty">Sembra che qui non ci siano ancora informazioni.</p> }
                 @if (character.profile; as profile) {
                   <dl class="character-facts">
                     @for (field of identityFields; track field.key) {
@@ -474,6 +475,12 @@ export class GdrTurn {
   readonly deleteBlock = output<string>();
   readonly blockChange = output<{id:string;source:string}>();
   readonly insertBlock = output<{beforeId?:string;source:string}>();
+  protected hasPublicInformation(character: NarrativeCharacter): boolean {
+    const profile = character.profile;
+    return profile
+      ? [...this.identityFields, ...this.profileFields].some(field => (field.key === 'history' ? this.knownHistory(profile) : profile[field.key] ?? '').trim().length > 0)
+      : !!character.description?.trim();
+  }
   protected knownHistory(profile: import('../../core/gdr-workspace.service').CharacterProfile): string { return [profile.history, profile.personality].filter(Boolean).join('\n\n'); }
   protected readonly identityFields = PROFILE_FIELDS.filter(field => ['surname','race','age'].includes(field.key));
   protected readonly profileFields = PROFILE_FIELDS.filter(field => ['appearance','history'].includes(field.key));
