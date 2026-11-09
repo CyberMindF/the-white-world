@@ -25,10 +25,14 @@ interface RenderedSection extends NarrativeSection {
     @if (viewedCharacter(); as character) {
       <div class="character-backdrop" (click)="viewedCharacter.set(null)">
         <section class="character-modal" role="dialog" aria-modal="true" aria-label="Scheda personaggio" tabindex="-1" (keydown.escape)="viewedCharacter.set(null)" (click)="$event.stopPropagation()">
-          <header><h2>{{ character.name }}</h2><button type="button" autofocus (click)="viewedCharacter.set(null)" aria-label="Chiudi scheda">✕</button></header>
-          <div class="character-content">
-            <div class="character-summary">
-              @if (character.portrait) { <img class="character-avatar-large" [src]="character.portrait" [alt]="'Avatar di ' + character.name" /> }
+          <header><span>Scheda personaggio</span><button type="button" autofocus (click)="viewedCharacter.set(null)" aria-label="Chiudi scheda">✕</button></header>
+          <div class="character-content" [class.with-artwork]="!!character.photo">
+            @if (character.photo) { <div class="character-images"><img class="character-artwork" [src]="character.photo" [alt]="'Artwork di ' + character.name" /></div> }
+            <div class="character-info">
+              <div class="character-summary">
+                @if (character.portrait) { <img class="character-avatar-large" [src]="character.portrait" [alt]="'Avatar di ' + character.name" /> }
+                <h2>{{ character.name }}</h2>
+              </div>
               <div class="character-details">
                 <h3>Informazioni conosciute</h3>
                 @if (character.profile; as profile) {
@@ -43,7 +47,6 @@ interface RenderedSection extends NarrativeSection {
                 } @else if (character.description) { <p>{{ character.description }}</p> }
               </div>
             </div>
-            @if (character.photo) { <div class="character-images"><img class="character-artwork" [src]="character.photo" [alt]="'Artwork di ' + character.name" /></div> }
           </div>
         </section>
       </div>
@@ -271,6 +274,9 @@ interface RenderedSection extends NarrativeSection {
     .character-modal h2 { margin:0; font-size:1.4rem; }
     .character-modal header button { border:1px solid var(--border-color); background:transparent; color:inherit; border-radius:50%; width:36px; height:36px; padding:0; cursor:pointer; }
     .character-content { padding:24px; }
+    .character-content.with-artwork { display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr); gap:28px; align-items:start; }
+    .character-info { min-width:0; }
+    .character-summary h2 { align-self:center; overflow-wrap:anywhere; }
     .character-summary { display:grid; grid-template-columns:120px minmax(0,1fr); gap:24px; align-items:start; margin-bottom:24px; }
     .character-avatar-large { width:120px; height:120px; object-fit:cover; border-radius:50%; }
     .character-facts { display:flex; flex-wrap:wrap; gap:12px; margin:12px 0; }
@@ -279,13 +285,13 @@ interface RenderedSection extends NarrativeSection {
     .character-facts dd { margin:4px 0 0; }
     @media(max-width:600px) { .character-summary { grid-template-columns:80px minmax(0,1fr); gap:16px; } .character-avatar-large { width:80px; height:80px; } }
     .character-images { display:flex; flex-direction:column; align-items:center; gap:16px; }
-    .character-artwork { display:block; max-width:100%; max-height:58dvh; width:auto; height:auto; object-fit:contain; border-radius:12px; }
+    .character-artwork { display:block; max-width:100%; max-height:72dvh; width:auto; height:auto; object-fit:contain; border-radius:12px; }
     .character-avatar { display:flex; align-items:center; gap:12px; color:var(--muted-color); font-size:.85rem; text-decoration:none; }
     .character-avatar img { width:56px; height:56px; border-radius:50%; object-fit:cover; }
     .character-details:empty { display:none; }
     .character-details h3 { font-size:1rem; margin:20px 0 6px; color:var(--accent-color); }
     .character-details p { margin:8px 0; }
-    @media(max-width:600px) { .character-backdrop { padding:12px; } .character-content { padding:16px; } }
+    @media(max-width:600px) { .character-backdrop { padding:12px; } .character-content { padding:16px; } .character-content.with-artwork { display:flex; flex-direction:column; } .character-info { order:-1; width:100%; } }
     .speaker img,
     .initial {
       grid-column: 1;
@@ -471,14 +477,18 @@ export class GdrTurn {
   protected knownHistory(profile: import('../../core/gdr-workspace.service').CharacterProfile): string { return [profile.history, profile.personality].filter(Boolean).join('\n\n'); }
   protected readonly identityFields = PROFILE_FIELDS.filter(field => ['surname','race','age'].includes(field.key));
   protected readonly profileFields = PROFILE_FIELDS.filter(field => ['appearance','history'].includes(field.key));
+  private findCharacter(roster: NarrativeCharacter[], id: string | undefined, name: string): NarrativeCharacter | undefined {
+    const normalize = (value: string) => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+    return roster.find(c => !!id && c.id === id) ?? roster.find(c => normalize(c.name) === normalize(name) || (!!c.baseName && normalize(c.baseName) === normalize(name)));
+  }
   protected openNpc(entry: import('../gdr-blocks/gdr-block.types').GdrNpcEntry): void {
     const roster = this.characterRoster().length ? this.characterRoster() : this.characters();
-    const character = roster.find(c => entry.characterId ? c.id === entry.characterId : c.name === entry.name);
+    const character = this.findCharacter(roster, entry.characterId, entry.name);
     this.viewedCharacter.set(character ?? {name:entry.name,portrait:'',photo:entry.image,description:entry.description});
   }
   protected openCharacter(section: NarrativeSection): void {
     const roster = this.characterRoster().length ? this.characterRoster() : this.characters();
-    const character = roster.find(c => section.characterId ? c.id === section.characterId : c.name === section.speaker);
+    const character = this.findCharacter(roster, section.characterId, section.speaker);
     this.viewedCharacter.set(character ?? { name: section.speaker, portrait: section.portrait });
   }
   protected readonly viewedCharacter = signal<NarrativeCharacter | null>(null);
