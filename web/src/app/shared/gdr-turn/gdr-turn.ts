@@ -22,19 +22,30 @@ interface RenderedSection extends NarrativeSection {
   imports: [GdrBlocks, FormsModule, NgTemplateOutlet],
   template: `
     @if (viewedCharacter(); as character) {
-      <dialog open style="position:fixed;inset:0;z-index:1000;max-width:90vw;max-height:90vh;overflow:auto" aria-label="Scheda personaggio">
-        <button type="button" (click)="viewedCharacter.set(null)">Chiudi</button>
-        <h2>{{ character.name }}</h2>
-        <p>{{ character.description }}</p>
-        @if (character.profile; as profile) {
-          @for (field of profileFields; track field.key) {
-            @if (profile[field.key]) { <h3>{{ field.label }}</h3><p style="white-space:pre-wrap">{{ profile[field.key] }}</p> }
-          }
-        }
-        @if (character.sheet) { <p style="white-space:pre-wrap">{{ character.sheet }}</p> }
-        @if (character.photo) { <a [href]="character.photo" target="_blank" rel="noopener"><img [src]="character.photo" alt="Artwork" style="max-width:100%;max-height:65vh" /></a> }
-        @if (character.portrait && character.portrait !== character.photo) { <a [href]="character.portrait" target="_blank" rel="noopener"><img [src]="character.portrait" alt="Avatar" style="max-width:100%;max-height:40vh" /></a> }
-      </dialog>
+      <div class="character-backdrop" (click)="viewedCharacter.set(null)">
+        <section class="character-modal" role="dialog" aria-modal="true" aria-label="Scheda personaggio" tabindex="-1" (keydown.escape)="viewedCharacter.set(null)" (click)="$event.stopPropagation()">
+          <header><h2>{{ character.name }}</h2><button type="button" autofocus (click)="viewedCharacter.set(null)" aria-label="Chiudi scheda">✕</button></header>
+          <div class="character-content">
+            <div class="character-images">
+              @if (character.photo || character.portrait) {
+                <a [href]="character.photo || character.portrait" target="_blank" rel="noopener"><img class="character-artwork" [src]="character.photo || character.portrait" [alt]="character.name" /></a>
+              }
+              @if (character.photo && character.portrait && character.portrait !== character.photo) {
+                <a class="character-avatar" [href]="character.portrait" target="_blank" rel="noopener"><img [src]="character.portrait" alt="Avatar" /><span>Avatar</span></a>
+              }
+            </div>
+            <div class="character-details">
+              @if (character.description) { <p>{{ character.description }}</p> }
+              @if (character.profile; as profile) {
+                @for (field of profileFields; track field.key) {
+                  @if (profile[field.key]) { <h3>{{ field.label }}</h3><p>{{ profile[field.key] }}</p> }
+                }
+              }
+              @if (character.sheet) { <p>{{ character.sheet }}</p> }
+            </div>
+          </div>
+        </section>
+      </div>
     }
 
     @for (section of rendered(); track section.id; let sectionIndex = $index) {
@@ -190,7 +201,7 @@ interface RenderedSection extends NarrativeSection {
         @case ('dialogo') {
           <div class="dialogue">
             <div class="speaker">
-              <button type="button" class="view-character" (click)="openCharacter(section)">
+              <button type="button" class="view-character portrait-trigger" aria-label="Apri scheda personaggio" (click)="openCharacter(section)">
               @if (section.portrait) {
                 <img [src]="section.portrait" alt="" loading="lazy" />
               } @else {
@@ -204,7 +215,7 @@ interface RenderedSection extends NarrativeSection {
                   {{ section.speaker || 'Personaggio' }} <span aria-hidden="true">✎</span>
                 </button>
               } @else {
-                <button type="button" class="view-character" (click)="openCharacter(section)">{{ section.speaker || 'Personaggio' }}</button>
+                <button type="button" class="view-character name-trigger" (click)="openCharacter(section)">{{ section.speaker || 'Personaggio' }}</button>
               }
             </div>
             <p>{{ section.text }}</p>
@@ -251,7 +262,22 @@ interface RenderedSection extends NarrativeSection {
       font-size: 0.9rem;
     }
     .view-character { background: transparent; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; }
-    .speaker > .view-character:first-child { grid-column: 1; grid-row: 1 / span 2; }
+    .speaker > .portrait-trigger { grid-column: 1; grid-row: 1 / span 2; width:40px; height:40px; min-width:0; min-height:0; border-radius:50%; }
+    .speaker > .name-trigger { grid-column:2; font-weight:600; line-height:1.4; }
+    .character-backdrop { position:fixed; inset:0; z-index:1500; background:rgb(20 18 16 / .65); backdrop-filter:blur(6px); display:grid; place-items:center; padding:24px; }
+    .character-modal { width:min(900px,100%); max-height:90dvh; overflow:auto; background:var(--bg-color, #f7f4ee); color:var(--text-color); border:1px solid var(--border-color); border-radius:20px; box-shadow:0 24px 80px #0005; }
+    .character-modal header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:20px 24px; border-bottom:1px solid var(--border-color); }
+    .character-modal h2 { margin:0; font-size:1.4rem; }
+    .character-modal header button { border:1px solid var(--border-color); background:transparent; color:inherit; border-radius:50%; width:36px; height:36px; padding:0; cursor:pointer; }
+    .character-content { padding:24px; }
+    .character-images { display:flex; flex-direction:column; align-items:center; gap:16px; }
+    .character-artwork { display:block; max-width:100%; max-height:58dvh; width:auto; height:auto; object-fit:contain; border-radius:12px; }
+    .character-avatar { display:flex; align-items:center; gap:12px; color:var(--muted-color); font-size:.85rem; text-decoration:none; }
+    .character-avatar img { width:56px; height:56px; border-radius:50%; object-fit:cover; }
+    .character-details:empty { display:none; }
+    .character-details h3 { font-size:1rem; margin:20px 0 6px; color:var(--accent-color); }
+    .character-details p { margin:8px 0; }
+    @media(max-width:600px) { .character-backdrop { padding:12px; } .character-content { padding:16px; } }
     .speaker img,
     .initial {
       grid-column: 1;
