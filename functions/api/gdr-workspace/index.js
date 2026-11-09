@@ -94,6 +94,7 @@ export async function onRequestGet(context) {
       id: row.id, kind: row.kind, baseName: row.name,
       name: [row.name, JSON.parse(row.profile_json).surname].filter(Boolean).join(' '),
       portrait: row.portrait, photo: row.photo ?? '',
+      profile: Object.fromEntries(['surname','race','age','appearance','history','personality'].map(key => [key, JSON.parse(row.profile_json)[key] ?? ''])),
     })) : [];
     return json({
       narrativeCharacters,

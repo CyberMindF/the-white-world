@@ -2,6 +2,7 @@ import { Component, ElementRef, ViewChild, computed, effect, input, output, sign
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { updateGdrTextarea } from '../gdr-textarea';
+import { PROFILE_FIELDS } from '../gdr-characters/character-profile';
 import { GdrBlocks } from '../gdr-blocks/gdr-blocks';
 import { BLOCK_TYPES, SNIPPET_LABELS } from '../gdr-blocks/gdr-snippets';
 import { NarrativeCharacter, insertNarrativeBlock, narrativeSnippet, replaceNarrativeSelection } from './gdr-writing';
@@ -26,23 +27,23 @@ interface RenderedSection extends NarrativeSection {
         <section class="character-modal" role="dialog" aria-modal="true" aria-label="Scheda personaggio" tabindex="-1" (keydown.escape)="viewedCharacter.set(null)" (click)="$event.stopPropagation()">
           <header><h2>{{ character.name }}</h2><button type="button" autofocus (click)="viewedCharacter.set(null)" aria-label="Chiudi scheda">✕</button></header>
           <div class="character-content">
-            <div class="character-images">
-              @if (character.photo || character.portrait) {
-                <a [href]="character.photo || character.portrait" target="_blank" rel="noopener"><img class="character-artwork" [src]="character.photo || character.portrait" [alt]="character.name" /></a>
-              }
-              @if (character.photo && character.portrait && character.portrait !== character.photo) {
-                <a class="character-avatar" [href]="character.portrait" target="_blank" rel="noopener"><img [src]="character.portrait" alt="Avatar" /><span>Avatar</span></a>
-              }
+            <div class="character-summary">
+              @if (character.portrait) { <img class="character-avatar-large" [src]="character.portrait" [alt]="'Avatar di ' + character.name" /> }
+              <div class="character-details">
+                <h3>Informazioni conosciute</h3>
+                @if (character.profile; as profile) {
+                  <dl class="character-facts">
+                    @for (field of identityFields; track field.key) {
+                      @if (profile[field.key]) { <div><dt>{{ field.label }}</dt><dd>{{ profile[field.key] }}</dd></div> }
+                    }
+                  </dl>
+                  @for (field of profileFields; track field.key) {
+                    @if (field.key === 'history' ? knownHistory(profile) : profile[field.key]) { <h3>{{ field.label }}</h3><p>{{ field.key === 'history' ? knownHistory(profile) : profile[field.key] }}</p> }
+                  }
+                } @else if (character.description) { <p>{{ character.description }}</p> }
+              </div>
             </div>
-            <div class="character-details">
-              @if (character.description) { <p>{{ character.description }}</p> }
-              @if (character.profile; as profile) {
-                @for (field of profileFields; track field.key) {
-                  @if (profile[field.key]) { <h3>{{ field.label }}</h3><p>{{ profile[field.key] }}</p> }
-                }
-              }
-              @if (character.sheet) { <p>{{ character.sheet }}</p> }
-            </div>
+            @if (character.photo) { <div class="character-images"><img class="character-artwork" [src]="character.photo" [alt]="'Artwork di ' + character.name" /></div> }
           </div>
         </section>
       </div>
@@ -270,6 +271,13 @@ interface RenderedSection extends NarrativeSection {
     .character-modal h2 { margin:0; font-size:1.4rem; }
     .character-modal header button { border:1px solid var(--border-color); background:transparent; color:inherit; border-radius:50%; width:36px; height:36px; padding:0; cursor:pointer; }
     .character-content { padding:24px; }
+    .character-summary { display:grid; grid-template-columns:120px minmax(0,1fr); gap:24px; align-items:start; margin-bottom:24px; }
+    .character-avatar-large { width:120px; height:120px; object-fit:cover; border-radius:50%; }
+    .character-facts { display:flex; flex-wrap:wrap; gap:12px; margin:12px 0; }
+    .character-facts > div { border:1px solid var(--border-color); border-radius:10px; padding:10px 14px; min-width:80px; }
+    .character-facts dt { font-size:.8rem; color:var(--muted-color); }
+    .character-facts dd { margin:4px 0 0; }
+    @media(max-width:600px) { .character-summary { grid-template-columns:80px minmax(0,1fr); gap:16px; } .character-avatar-large { width:80px; height:80px; } }
     .character-images { display:flex; flex-direction:column; align-items:center; gap:16px; }
     .character-artwork { display:block; max-width:100%; max-height:58dvh; width:auto; height:auto; object-fit:contain; border-radius:12px; }
     .character-avatar { display:flex; align-items:center; gap:12px; color:var(--muted-color); font-size:.85rem; text-decoration:none; }
@@ -460,11 +468,9 @@ export class GdrTurn {
   readonly deleteBlock = output<string>();
   readonly blockChange = output<{id:string;source:string}>();
   readonly insertBlock = output<{beforeId?:string;source:string}>();
-  protected readonly profileFields: {key: keyof import('../../core/gdr-workspace.service').CharacterProfile; label: string}[] = [
-    {key:'surname',label:'Cognome'}, {key:'appearance',label:'Aspetto'},
-    {key:'personality',label:'Personalità'}, {key:'history',label:'Storia'},
-    {key:'goal',label:'Obiettivo'}, {key:'abilities',label:'Abilità'}
-  ];
+  protected knownHistory(profile: import('../../core/gdr-workspace.service').CharacterProfile): string { return [profile.history, profile.personality].filter(Boolean).join('\n\n'); }
+  protected readonly identityFields = PROFILE_FIELDS.filter(field => ['surname','race','age'].includes(field.key));
+  protected readonly profileFields = PROFILE_FIELDS.filter(field => ['appearance','history'].includes(field.key));
   protected openNpc(entry: import('../gdr-blocks/gdr-block.types').GdrNpcEntry): void {
     const roster = this.characterRoster().length ? this.characterRoster() : this.characters();
     const character = roster.find(c => entry.characterId ? c.id === entry.characterId : c.name === entry.name);

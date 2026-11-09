@@ -18,7 +18,7 @@ harness.sqlite.prepare('INSERT INTO gdr_character_schema VALUES(?,?)').run(adven
 for (const [id,name,kind] of [['daisy','Daisy','pg']]) {
   await mutate(harness.db,master,{action:'createCharacter',id,adventureId,name,kind,profile:{}});
 }
-await mutate(harness.db,master,{action:'createCharacter',id:'shivay',adventureId,kind:'png',name:'Shivay Lorenne',photo,portrait:avatar,profile:{appearance:'La compagna di Daisy.'}});
+await mutate(harness.db,master,{action:'createCharacter',id:'shivay',adventureId,kind:'png',name:'Shivay Lorenne',photo,portrait:avatar,profile:{race:'Umana',age:'21',appearance:'La compagna di Daisy.',history:'Passato conosciuto',personality:'Carattere conosciuto',abilities:'SEGRETO ABILITA',goal:'SEGRETO OBIETTIVO'}});
 harness.sqlite.prepare('INSERT INTO gdr_blocks VALUES(?,?,?,?,?)').run(123,'avventura','npc_grid',JSON.stringify(blocks[0].data),0);
 await mutate(harness.db,master,{action:'grant',characterId:'daisy',revision:1,userId:2,canSpeak:true,canEditSheet:true,canInventory:false});
 // Impedisce al sync storico di creare un secondo PG di prova.
@@ -70,6 +70,12 @@ try {
     await page.locator('.npc-card .image-trigger').first().click();
     await page.locator('.character-modal').waitFor();
     assert.equal(await page.locator('.character-artwork').count(),1);
+    const modalText=await page.locator('.character-modal').innerText();
+    assert.ok(modalText.includes('Ciò che si sa'));
+    assert.ok(modalText.includes('Passato conosciuto'));
+    assert.ok(modalText.includes('Carattere conosciuto'));
+    assert.ok(!modalText.includes('SEGRETO'));
+    await page.screenshot({path:join(screenshots,`character-public-${width}.png`)});
     await page.getByRole('button',{name:'Chiudi scheda',exact:true}).click();
     await page.locator('.npc-card h4 button').click();
     await page.locator('.character-modal').waitFor();

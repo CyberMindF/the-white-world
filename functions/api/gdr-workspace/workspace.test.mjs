@@ -91,6 +91,14 @@ test('profilo strutturato e inventario importato: campi validati, scheda PNG pro
   const h=apiHarness();
   await mutate(h.db,master,{action:'createCharacter',id:'profile-npc',adventureId,kind:'png',name:'Ada',profile:{surname:'Neri',race:'Elfa',age:'120 anni',appearance:'Alta',personality:'Riservata',history:'Una lunga storia',goal:'Ritrovare un amico',abilities:'Osservazione'},items:[{id:'item-a',name:'Chiave',quantity:2,notes:''}]});
   let data=await (await h.call(1)).json();const c=data.characters.find(c=>c.id==='profile-npc');assert.equal(c.profile.surname,'Neri');assert.equal(c.profile.race,'Elfa');assert.equal(c.profile.age,'120 anni');assert.equal(c.inventory[0].quantity,2);
+  const publicState=await (await h.call(2)).json();
+  const publicNpc=publicState.narrativeCharacters.find(c=>c.id==='profile-npc');
+  assert.equal(publicNpc.profile.history,'Una lunga storia');
+  assert.equal(publicNpc.profile.personality,'Riservata');
+  assert.equal(publicNpc.profile.race,'Elfa');
+  assert.equal('abilities' in publicNpc.profile,false);
+  assert.equal('goal' in publicNpc.profile,false);
+  assert.equal('sheet' in publicNpc,false);
   await grant(h.db,h.sqlite,'profile-npc',{canInventory:true});
   await denied(()=>mutate(h.db,member,{action:'saveCharacter',characterId:c.id,revision:revision(h.sqlite,c.id),name:'Ada',sheet:'',portrait:'',profile:{history:'Spoof'}}));
   await assert.rejects(()=>mutate(h.db,master,{action:'saveCharacter',characterId:c.id,revision:revision(h.sqlite,c.id),name:'Ada',sheet:'',portrait:'',profile:{history:'x'.repeat(6001)}}),e=>e.status===400);

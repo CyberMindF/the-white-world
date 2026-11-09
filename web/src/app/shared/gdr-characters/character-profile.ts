@@ -10,10 +10,10 @@ export const PROFILE_FIELDS: { key: keyof CharacterProfile; label: string; rows:
   { key: 'race', label: 'Razza', rows: 1 },
   { key: 'age', label: 'Età', rows: 1 },
   { key: 'appearance', label: 'Aspetto', rows: 3 },
-  { key: 'personality', label: 'Carattere', rows: 3 },
-  { key: 'history', label: 'Storia', rows: 5 },
-  { key: 'goal', label: 'Obiettivo attuale', rows: 3 },
-  { key: 'abilities', label: 'Abilità e incantesimi', rows: 4 },
+  { key: 'personality', label: 'Come si presenta agli altri', rows: 3 },
+  { key: 'history', label: 'Ciò che si sa', rows: 5 },
+  { key: 'goal', label: 'Obiettivi conosciuti', rows: 3 },
+  { key: 'abilities', label: 'Abilità conosciute', rows: 4 },
 ];
 export const emptyProfile = (): CharacterProfile => ({
   surname: '',

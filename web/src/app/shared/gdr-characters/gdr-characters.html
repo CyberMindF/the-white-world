@@ -535,7 +535,7 @@
                         </div>
                       } @else {
                         <div class="profile-form">
-                          <h4>Identità e descrizione</h4>
+                          <h4>Informazioni conosciute</h4>
                           <label for="character-name">Nome completo</label
                           ><input
                             id="character-name"
@@ -613,6 +613,7 @@
                               (selected)="chooseLibraryImage($event)" />
                           </details>
                           <h4>Descrizione e storia</h4>
+                          <p class="hint">Inserisci solo ciò che vuoi far conoscere agli altri giocatori: queste informazioni compariranno nella scheda aperta dal racconto.</p>
                           <div class="profile-fields-grid">
                           @for (field of profileFields; track field.key) {
                             <div class="profile-field" [class.profile-field-compact]="field.key === 'race' || field.key === 'age'">
@@ -636,6 +637,14 @@
                             </div>
                           }
                           </div>
+                          @if (canManage()) {
+                            <details class="form-group">
+                              <summary>Abilità · riservato al master</summary>
+                              <label for="master-abilities">Abilità e incantesimi</label>
+                              <textarea id="master-abilities" rows="4" maxlength="6000" [ngModel]="profile().abilities" (ngModelChange)="changeProfile('abilities', $event)"></textarea>
+                              <p class="hint">Non compare nella scheda pubblica aperta dal racconto.</p>
+                            </details>
+                          }
                           <details>
                             <summary>Altri dettagli della scheda</summary>
                             <label for="character-sheet">Scheda del personaggio</label
@@ -690,10 +699,10 @@
                       }
                       <dl class="profile-details">
                         @for (field of profileFields; track field.key) {
-                          @if (c.profile?.[field.key]) {
+                          @if (field.key === 'history' ? knownHistory(c.profile) : c.profile?.[field.key]) {
                             <div [class.profile-detail-compact]="field.key === 'race' || field.key === 'age'">
                               <dt>{{ field.label }}</dt>
-                              <dd>{{ c.profile[field.key] }}</dd>
+                              <dd>{{ field.key === 'history' ? knownHistory(c.profile) : c.profile[field.key] }}</dd>
                             </div>
                           }
                         }

@@ -161,12 +161,13 @@ export class GdrCharacters {
     }
   }
   readonly legacyNpcs = input<{ name: string; portrait: string; description: string }[]>([]);
-  protected readonly profileFields = PROFILE_FIELDS.filter(field => field.key !== 'surname');
+  protected knownHistory(profile: CharacterProfile): string { return [profile.history, profile.personality].filter(Boolean).join('\n\n'); }
+  protected readonly profileFields = PROFILE_FIELDS.filter(field => !['surname', 'personality', 'goal', 'abilities'].includes(field.key));
   protected readonly playerProfileFields = computed(() =>
     PROFILE_FIELDS.filter(
       (f) =>
         f.key !== 'surname' &&
-        f.key !== 'abilities' &&
+        !['abilities', 'personality', 'goal'].includes(f.key) &&
         !(
           f.key === 'appearance' && this.extraFields().some((field) => field.key === 'description')
         ),
@@ -424,7 +425,7 @@ export class GdrCharacters {
   private populate(c: WorkspaceCharacter): void {
     this.isPet.set(c.isPet === true);
     this.petOwnerId.set(c.petOwnerId ?? '');
-    this.profile.set({ ...emptyProfile(), ...c.profile });
+    this.profile.set({ ...emptyProfile(), ...c.profile, history: [c.profile?.history, c.profile?.personality].filter(Boolean).join('\n\n'), personality: '' });
     this.photo.set(gdrImagePath(c.photo ?? '') || c.photo || '');
     this.name.set([c.name, c.profile?.surname].filter(Boolean).join(' '));
     this.portrait.set(gdrImagePath(c.portrait) || c.portrait);
