@@ -71,6 +71,8 @@ export function profile(value = {}) {
   const result = {};
   for (const key of [
     "surname",
+    "race",
+    "age",
     "appearance",
     "personality",
     "history",

@@ -14,6 +14,8 @@ export interface InventoryItem {
   notes: string;
 }
 export interface CharacterProfile {
+  race?: string;
+  age?: string;
   surname: string;
   appearance: string;
   personality: string;

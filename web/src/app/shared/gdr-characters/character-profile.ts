@@ -7,6 +7,8 @@ import { safeNarrativeImage } from '../gdr-turn/gdr-turn.parser';
 
 export const PROFILE_FIELDS: { key: keyof CharacterProfile; label: string; rows: number }[] = [
   { key: 'surname', label: 'Cognome', rows: 1 },
+  { key: 'race', label: 'Razza', rows: 1 },
+  { key: 'age', label: 'Età', rows: 1 },
   { key: 'appearance', label: 'Aspetto', rows: 3 },
   { key: 'personality', label: 'Carattere', rows: 3 },
   { key: 'history', label: 'Storia', rows: 5 },
@@ -15,6 +17,8 @@ export const PROFILE_FIELDS: { key: keyof CharacterProfile; label: string; rows:
 ];
 export const emptyProfile = (): CharacterProfile => ({
   surname: '',
+  race: '',
+  age: '',
   appearance: '',
   personality: '',
   history: '',
