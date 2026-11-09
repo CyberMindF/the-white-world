@@ -613,7 +613,9 @@
                               (selected)="chooseLibraryImage($event)" />
                           </details>
                           <h4>Descrizione e storia</h4>
+                          <div class="profile-fields-grid">
                           @for (field of profileFields; track field.key) {
+                            <div class="profile-field" [class.profile-field-compact]="field.key === 'race' || field.key === 'age'">
                             <label [for]="'profile-' + field.key">{{ field.label }}</label>
                             @if (field.rows === 1) {
                               <input
@@ -631,7 +633,9 @@
                                 (ngModelChange)="changeProfile(field.key, $event)"
                               ></textarea>
                             }
+                            </div>
                           }
+                          </div>
                           <details>
                             <summary>Altri dettagli della scheda</summary>
                             <label for="character-sheet">Scheda del personaggio</label
@@ -687,7 +691,7 @@
                       <dl class="profile-details">
                         @for (field of profileFields; track field.key) {
                           @if (c.profile?.[field.key]) {
-                            <div>
+                            <div [class.profile-detail-compact]="field.key === 'race' || field.key === 'age'">
                               <dt>{{ field.label }}</dt>
                               <dd>{{ c.profile[field.key] }}</dd>
                             </div>
