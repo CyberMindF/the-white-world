@@ -7,6 +7,8 @@ export interface NarrativeCharacter {
   portrait: string;
   photo?: string;
   description?: string;
+  profile?: import('../../core/gdr-workspace.service').CharacterProfile;
+  sheet?: string;
   baseName?: string;
   kind?: 'pg' | 'png';
 }

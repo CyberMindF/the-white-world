@@ -21,6 +21,22 @@ interface RenderedSection extends NarrativeSection {
   standalone: true,
   imports: [GdrBlocks, FormsModule, NgTemplateOutlet],
   template: `
+    @if (viewedCharacter(); as character) {
+      <dialog open style="position:fixed;inset:0;z-index:1000;max-width:90vw;max-height:90vh;overflow:auto" aria-label="Scheda personaggio">
+        <button type="button" (click)="viewedCharacter.set(null)">Chiudi</button>
+        <h2>{{ character.name }}</h2>
+        <p>{{ character.description }}</p>
+        @if (character.profile; as profile) {
+          @for (field of profileFields; track field.key) {
+            @if (profile[field.key]) { <h3>{{ field.label }}</h3><p style="white-space:pre-wrap">{{ profile[field.key] }}</p> }
+          }
+        }
+        @if (character.sheet) { <p style="white-space:pre-wrap">{{ character.sheet }}</p> }
+        @if (character.photo) { <a [href]="character.photo" target="_blank" rel="noopener"><img [src]="character.photo" alt="Artwork" style="max-width:100%;max-height:65vh" /></a> }
+        @if (character.portrait && character.portrait !== character.photo) { <a [href]="character.portrait" target="_blank" rel="noopener"><img [src]="character.portrait" alt="Avatar" style="max-width:100%;max-height:40vh" /></a> }
+      </dialog>
+    }
+
     @for (section of rendered(); track section.id; let sectionIndex = $index) {
       @if (isInsertingBeside(section, 'above')) {
         <ng-container *ngTemplateOutlet="inlineEditor" />
@@ -174,6 +190,7 @@ interface RenderedSection extends NarrativeSection {
         @case ('dialogo') {
           <div class="dialogue">
             <div class="speaker">
+              <button type="button" class="edit-speaker" (click)="openCharacter(section)">
               @if (section.portrait) {
                 <img [src]="section.portrait" alt="" loading="lazy" />
               } @else {
@@ -181,12 +198,13 @@ interface RenderedSection extends NarrativeSection {
                   section.speaker.slice(0, 1) || '?'
                 }}</span>
               }
+              </button>
               @if (canEdit) {
                 <button type="button" class="edit-speaker" (click)="startEditing(section)">
                   {{ section.speaker || 'Personaggio' }} <span aria-hidden="true">✎</span>
                 </button>
               } @else {
-                <strong>{{ section.speaker || 'Personaggio' }}</strong>
+                <button type="button" class="edit-speaker" (click)="openCharacter(section)">{{ section.speaker || 'Personaggio' }}</button>
               }
             </div>
             <p>{{ section.text }}</p>
@@ -414,6 +432,17 @@ export class GdrTurn {
   readonly deleteBlock = output<string>();
   readonly blockChange = output<{id:string;source:string}>();
   readonly insertBlock = output<{beforeId?:string;source:string}>();
+  protected readonly profileFields: {key: keyof import('../../core/gdr-workspace.service').CharacterProfile; label: string}[] = [
+    {key:'surname',label:'Cognome'}, {key:'appearance',label:'Aspetto'},
+    {key:'personality',label:'Personalità'}, {key:'history',label:'Storia'},
+    {key:'goal',label:'Obiettivo'}, {key:'abilities',label:'Abilità'}
+  ];
+  protected openCharacter(section: NarrativeSection): void {
+    const roster = this.characterRoster().length ? this.characterRoster() : this.characters();
+    const character = roster.find(c => section.characterId ? c.id === section.characterId : c.name === section.speaker);
+    this.viewedCharacter.set(character ?? { name: section.speaker, portrait: section.portrait });
+  }
+  protected readonly viewedCharacter = signal<NarrativeCharacter | null>(null);
   readonly characterRoster = input<NarrativeCharacter[]>([]);
   readonly characters = input<NarrativeCharacter[]>([]);
   readonly allowGeneric = input(true);

@@ -68,7 +68,7 @@
     }
     @case ('image') {
       <figure class="avventura-figure">
-        <img [src]="asImage(block.data).src" [alt]="asImage(block.data).alt" loading="lazy" />
+        <a [href]="asImage(block.data).src" target="_blank" rel="noopener"><img [src]="asImage(block.data).src" [alt]="asImage(block.data).alt" loading="lazy" /></a>
         @if (asImage(block.data).caption) {
           <figcaption>{{ asImage(block.data).caption }}</figcaption>
         }
