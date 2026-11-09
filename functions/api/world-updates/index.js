@@ -1,3 +1,4 @@
+import { deliverWorldUpdateEmails } from '../_shared/world-update-emails.js';
 import { recordEvent } from "../_shared/events.js";
 import { getAuthenticatedSession, json, readJson } from "../auth/_shared.js";
 import { hasPermission } from "../_shared/permissions.js";
@@ -30,7 +31,7 @@ function updateView(row) {
   };
 }
 
-export async function onRequestGet({ request, env }) {
+export async function onRequestGet({ request, env, waitUntil }) {
   const session = await getAuthenticatedSession(request, env);
   if (!session) return json({ error: "Accesso richiesto." }, 401);
   try {
@@ -43,6 +44,7 @@ export async function onRequestGet({ request, env }) {
        AND (? = 0 OR wu.safe = 1)
        ORDER BY datetime(wu.published_at) DESC, wu.id DESC`
     ).bind(session.user.id, includeInactive ? 1 : 0, session.user.safeMode ? 1 : 0).all();
+    waitUntil(deliverWorldUpdateEmails(env));
     return json({ updates: results.map(updateView) });
   } catch {
     return json({ error: "Non è stato possibile leggere le novità." }, 500);
@@ -75,6 +77,7 @@ export async function onRequestPost(context) {
     ).bind(kind, emoji, title, text, route, ctaLabel, publishedAt, body?.active === false ? 0 : 1,
       announce, body?.safe === true ? 1 : 0, session.user.id, now, now).first();
     context.waitUntil(recordEvent(env, { userId: session.user.id, sessionId: session.sessionId }, { section: 'world-updates', eventType: 'content_created', metadata: { id: row.id } }));
+    context.waitUntil(deliverWorldUpdateEmails(env));
     return json(updateView(row), 201);
   } catch {
     return json({ error: "Non è stato possibile creare la novità." }, 500);

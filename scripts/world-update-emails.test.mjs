@@ -1,0 +1,54 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
+import {readFileSync} from 'node:fs';
+const emailSource = readFileSync('functions/api/_shared/email.js','utf8').replace(/export /g,'');
+const sendEmail = new Function(emailSource + ';return sendEmail;')();
+const queueSource = readFileSync('functions/api/_shared/world-update-emails.js','utf8').replace(/^import .*;\n/gm,'').replace(/export /g,'');
+const deliverWorldUpdateEmails = new Function('sendEmail', queueSource + ';return deliverWorldUpdateEmails;')(sendEmail);
+function setup(){
+ const sql=new DatabaseSync(':memory:');
+ sql.exec(`CREATE TABLE users(id INTEGER PRIMARY KEY,identity TEXT,email TEXT,is_test INTEGER DEFAULT 0,notify_email_updates INTEGER DEFAULT 1,admin_email_updates INTEGER DEFAULT 0,safe_mode INTEGER DEFAULT 0);
+ INSERT INTO users(id,identity,email) VALUES(1,'lui','master@example.test'),(2,'lei','player@example.test');`);
+ sql.exec(readFileSync('migrations/0132_add_world_updates_and_promos.sql','utf8').split('CREATE TABLE world_promos')[0]);
+ sql.exec('ALTER TABLE world_updates ADD COLUMN announce INTEGER DEFAULT 1; ALTER TABLE world_updates ADD COLUMN safe INTEGER DEFAULT 1;');
+ const insert=()=>Number(sql.prepare(`INSERT INTO world_updates(kind,title,body,route,published_at,created_by,created_at,updated_at) VALUES('mondo','Titolo <test>','Testo & dettagli','/novita',CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`).run().lastInsertRowid);
+ const old=insert();sql.exec(readFileSync('migrations/0156_world_update_email_queue.sql','utf8'));
+ const db={prepare(query){const statement=sql.prepare(query);let args=[];return {bind(...v){args=v;return this},async all(){return {results:statement.all(...args)}},async first(){return statement.get(...args)??null},async run(){return {meta:{changes:Number(statement.run(...args).changes)}}}}}};
+ const env={DB:db,RESEND_API_KEY:'fake-key'};return {sql,env,insert,old};
+}
+test('nuova novità: un solo invio anche con concorrenza e modifiche; nessun recupero dell’archivio',async()=>{
+ const h=setup(),original=globalThis.fetch,calls=[];
+ globalThis.fetch=async(url,init)=>{calls.push(init);return Response.json({id:'email-1'})};
+ try{
+  const id=h.insert();await Promise.all([deliverWorldUpdateEmails(h.env),deliverWorldUpdateEmails(h.env)]);
+  assert.equal(calls.length,1);assert.equal(calls[0].headers['Idempotency-Key'],`world-update/${id}`);
+  assert.match(JSON.parse(calls[0].body).html,/Testo &amp; dettagli/);
+  h.sql.prepare("UPDATE world_updates SET body='Correzione' WHERE id=?").run(id);
+  await deliverWorldUpdateEmails(h.env);assert.equal(calls.length,1);
+  assert.equal(h.sql.prepare('SELECT count(*) AS n FROM world_update_emails WHERE update_id=?').get(h.old).n,0);
+ }finally{globalThis.fetch=original;h.sql.close()}
+});
+test('preferenze, safe mode, bozza, data futura e announce disattivato impediscono invii',async()=>{
+ const h=setup(),original=globalThis.fetch;let count=0;globalThis.fetch=async()=>{count++;return Response.json({})};
+ try{
+  h.sql.exec('UPDATE users SET notify_email_updates=0 WHERE id=2');h.insert();await deliverWorldUpdateEmails(h.env);assert.equal(count,0);
+  h.sql.exec('UPDATE users SET notify_email_updates=1,safe_mode=1 WHERE id=2');const unsafe=h.insert();h.sql.prepare('UPDATE world_updates SET safe=0 WHERE id=?').run(unsafe);await deliverWorldUpdateEmails(h.env);assert.equal(count,0);
+  const draft=h.insert(),future=h.insert(),quiet=h.insert();
+  h.sql.prepare('UPDATE world_updates SET active=0 WHERE id=?').run(draft);
+  h.sql.prepare("UPDATE world_updates SET published_at='2099-01-01' WHERE id=?").run(future);
+  h.sql.prepare('UPDATE world_updates SET announce=0 WHERE id=?').run(quiet);
+  await deliverWorldUpdateEmails(h.env);assert.equal(count,0);
+  h.sql.prepare('UPDATE world_updates SET active=1 WHERE id=?').run(draft);await deliverWorldUpdateEmails(h.env);assert.equal(count,1);
+ }finally{globalThis.fetch=original;h.sql.close()}
+});
+test('errore del provider: retry con stesso contenuto e chiave, poi stato definitivo',async()=>{
+ const h=setup(),original=globalThis.fetch,calls=[];globalThis.fetch=async(url,init)=>{calls.push(init);return calls.length===1?new Response('temporaneo',{status:503}):Response.json({id:'ok'})};
+ try{
+  const id=h.insert();assert.equal((await deliverWorldUpdateEmails(h.env)).failed,1);
+  h.sql.prepare("UPDATE world_updates SET body='Nuovo testo' WHERE id=?").run(id);
+  assert.equal((await deliverWorldUpdateEmails(h.env)).sent,1);
+  assert.equal(calls[0].body,calls[1].body);assert.deepEqual(calls[0].headers,calls[1].headers);
+  await deliverWorldUpdateEmails(h.env);assert.equal(calls.length,2);
+ }finally{globalThis.fetch=original;h.sql.close()}
+});

@@ -1,3 +1,4 @@
+import { deliverWorldUpdateEmails } from '../_shared/world-update-emails.js';
 import { recordEvent } from "../_shared/events.js";
 import { getAuthenticatedSession, json, readJson } from "../auth/_shared.js";
 import { hasPermission } from "../_shared/permissions.js";
@@ -34,6 +35,7 @@ export async function onRequestPut(context) {
     ).bind(kind, emoji, title, text, route, ctaLabel, publishedAt, body?.active === false ? 0 : 1,
       announce, body?.safe === true ? 1 : 0, new Date().toISOString(), id).first();
     if (row) context.waitUntil(recordEvent(env, { userId: session.user.id, sessionId: session.sessionId }, { section: 'world-updates', eventType: 'content_updated', metadata: { id: row.id } }));
+  if (row) context.waitUntil(deliverWorldUpdateEmails(env));
   return row ? json(updateView(row)) : json({ error: "Novità non trovata." }, 404);
   } catch {
     return json({ error: "Non è stato possibile aggiornare la novità." }, 500);

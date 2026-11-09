@@ -1,3 +1,4 @@
+import { deliverWorldUpdateEmails } from './_shared/world-update-emails.js';
 import { json } from './auth/_shared.js';
 import { notifyRealtime } from './_shared/realtime.js';
 
@@ -24,5 +25,6 @@ export async function onRequestPost(context) {
     type: 'site-version:changed',
     version
   });
-  return json({ ok: true, delivered });
+  const emails = await deliverWorldUpdateEmails(context.env);
+  return json({ ok: true, delivered, emails });
 }

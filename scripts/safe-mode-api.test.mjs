@@ -19,7 +19,7 @@ function setup() {
  const json=(body,status=200)=>Response.json(body,{status});
  const events=[];
  const readJson=request=>request.json().catch(()=>null);
- const load=(path,names)=>new Function('getAuthenticatedSession','json','readJson','hasPermission','recordEvent',source(path).replace(/^import .*;\n/gm,'').replace(/export /g,'')+'\nreturn {'+names+'};')(session,json,readJson,()=>true,async(env,actor,event)=>{events.push({actor,...event});});
+ const load=(path,names)=>new Function('getAuthenticatedSession','json','readJson','hasPermission','recordEvent','deliverWorldUpdateEmails',source(path).replace(/^import .*;\n/gm,'').replace(/export /g,'')+'\nreturn {'+names+'};')(session,json,readJson,()=>true,async(env,actor,event)=>{events.push({actor,...event});},async()=>({sent:0}));
  const safe=load('functions/api/auth/safe-mode.js','onRequestPost');
  const admin=load('functions/api/auth/admin-mode.js','onRequestPost');
  const news=load('functions/api/world-updates/index.js','onRequestGet,onRequestPost');
@@ -54,7 +54,7 @@ test('novità: default non safe, tag esplicito e filtro lato server anche per ad
 
 test('novità automatiche richiedono una classificazione safe esplicita', async()=>{
  const h=setup();try {
-  const add=new Function(source('functions/api/_shared/world-updates.js').replace('export async function','async function')+';return addWorldUpdate;')();
+  const add=new Function('deliverWorldUpdateEmails',source('functions/api/_shared/world-updates.js').replace(/^import .*;\n/gm,'').replace('export async function','async function')+';return addWorldUpdate;')(async()=>({sent:0}));
   await add({DB:h.db},{title:'Contenuto personale'});
   await add({DB:h.db},{title:'Nuovo quiz',safe:true});
   assert.deepEqual(h.sql.prepare('SELECT title,safe FROM world_updates ORDER BY id').all().map(r=>[r.title,r.safe]),[['Contenuto personale',0],['Nuovo quiz',1]]);

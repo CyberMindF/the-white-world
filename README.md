@@ -553,3 +553,9 @@ La lista delle destinazioni consentite vive in `web/src/app/core/safe-mode.servi
 Ogni novità ha il tag Safe nell’editor admin. Le voci esistenti e quelle create automaticamente sono non safe per impostazione predefinita; `addWorldUpdate` accetta `safe: true` per contenuti verificati. Il filtro viene applicato anche dal server e dal popup. Le novità nascoste non vengono segnate come lette.
 
 Prima di distribuire il frontend applicare la migrazione `0139_add_safe_mode.sql`, che aggiunge anche `world_updates.safe`. Verifica locale: `npm run build` e `npm run test:safe-mode` (API con SQLite in memoria e browser con risposte simulate; nessun dato remoto).
+
+### Email delle Novità
+
+Le nuove voci in `world_updates` entrano nella coda `world_update_emails`: solo se attive, con `announce=1` e data di pubblicazione raggiunta possono essere inviate all’altra identità. Si rispettano preferenze personali/amministrative e safe mode; gli account test sono esclusi. I normali commit e le correzioni a voci già inviate non generano email. L’archivio precedente all’attivazione della coda non viene notificato retroattivamente.
+
+Creazione, aggiornamento e lettura delle Novità, aggiunte automatiche di contenuti e conferma di un nuovo rilascio elaborano la coda. Una voce futura viene elaborata alla prima di queste attività dopo la sua data, senza un timer indipendente. Gli errori temporanei restano in coda; un claim atomico e la chiave di idempotenza del provider evitano invii concorrenti. Dopo 23 ore dal primo tentativo, un invio ancora incerto passa a `review` per controllo manuale, senza riprovare oltre la finestra di deduplicazione del provider. `sent` indica l’accettazione da parte del servizio email, non la lettura o la consegna nella posta in arrivo.

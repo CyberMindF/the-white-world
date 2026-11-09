@@ -47,6 +47,7 @@
           <label class="check"><input type="checkbox" name="updateActive" [(ngModel)]="updateActive" /> Pubblicata</label>
           <label class="check wide"><input type="checkbox" name="updateSafe" [(ngModel)]="updateSafe" /> Safe: visibile anche in safe mode</label>
           <label class="check wide"><input type="checkbox" name="updateAnnounce" [(ngModel)]="updateAnnounce" /> Mostra anche nel popup “Cosa ti sei persa?”</label>
+          <p class="wide hint">Una nuova voce attiva, con annuncio abilitato, invia anche un’email secondo le preferenze di notifica. Le modifiche successive non ripetono l’invio.</p>
           <div class="wide form-actions"><button class="btn btn-submit" type="submit" [disabled]="saving()">{{ editingUpdateId() ? 'Salva modifiche' : 'Pubblica novità' }}</button></div>
         </form>
       </section>

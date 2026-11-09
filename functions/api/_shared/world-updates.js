@@ -1,3 +1,4 @@
+import { deliverWorldUpdateEmails } from './world-update-emails.js';
 // Registra le aggiunte di contenuti che meritano di comparire nelle Novita. Non deve mai far
 // fallire l'azione principale: una lettera o una storia devono essere salvate anche se il
 // changelog avesse temporaneamente un problema.
@@ -44,6 +45,7 @@ export async function addWorldUpdate(env, {
          VALUES (?, ?, ?)`
       ).bind(createdBy, created.id, now).run();
     }
+    await deliverWorldUpdateEmails(env);
     return { created: true };
   } catch (error) {
     console.error(JSON.stringify({ event: "world_update_auto_create_error", message: error.message }));

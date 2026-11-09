@@ -4,7 +4,7 @@ const EVENT_NOTIFICATION_COOLDOWN_MS = 2 * 60 * 60 * 1000;
 
 // Invia una singola email tramite l'API HTTP di Resend. Non lancia mai: un fallimento nell'invio
 // non deve mai far fallire l'azione che lo ha innescato (es. pubblicare una ricetta).
-export async function sendEmail(env, { to, subject, html, text }) {
+export async function sendEmail(env, { to, subject, html, text, idempotencyKey }) {
   if (!env.RESEND_API_KEY) {
     console.error(JSON.stringify({ event: "email_send_skipped", reason: "missing_api_key" }));
     return { sent: false };
@@ -15,7 +15,8 @@ export async function sendEmail(env, { to, subject, html, text }) {
       method: "POST",
       headers: {
         Authorization: `Bearer ${env.RESEND_API_KEY}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {})
       },
       body: JSON.stringify({
         from: FROM_ADDRESS,
