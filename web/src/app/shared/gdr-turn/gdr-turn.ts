@@ -190,7 +190,7 @@ interface RenderedSection extends NarrativeSection {
         @case ('dialogo') {
           <div class="dialogue">
             <div class="speaker">
-              <button type="button" class="edit-speaker" (click)="openCharacter(section)">
+              <button type="button" class="view-character" (click)="openCharacter(section)">
               @if (section.portrait) {
                 <img [src]="section.portrait" alt="" loading="lazy" />
               } @else {
@@ -204,7 +204,7 @@ interface RenderedSection extends NarrativeSection {
                   {{ section.speaker || 'Personaggio' }} <span aria-hidden="true">✎</span>
                 </button>
               } @else {
-                <button type="button" class="edit-speaker" (click)="openCharacter(section)">{{ section.speaker || 'Personaggio' }}</button>
+                <button type="button" class="view-character" (click)="openCharacter(section)">{{ section.speaker || 'Personaggio' }}</button>
               }
             </div>
             <p>{{ section.text }}</p>
@@ -250,6 +250,8 @@ interface RenderedSection extends NarrativeSection {
       color: var(--accent-color);
       font-size: 0.9rem;
     }
+    .view-character { background: transparent; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; }
+    .speaker > .view-character:first-child { grid-column: 1; grid-row: 1 / span 2; }
     .speaker img,
     .initial {
       grid-column: 1;
