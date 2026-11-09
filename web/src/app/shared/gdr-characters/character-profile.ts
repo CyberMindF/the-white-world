@@ -11,7 +11,7 @@ export const PROFILE_FIELDS: { key: keyof CharacterProfile; label: string; rows:
   { key: 'age', label: 'Età', rows: 1 },
   { key: 'appearance', label: 'Aspetto', rows: 3 },
   { key: 'personality', label: 'Come si presenta agli altri', rows: 3 },
-  { key: 'history', label: 'Ciò che si sa', rows: 5 },
+  { key: 'history', label: 'Ciò che sai', rows: 5 },
   { key: 'goal', label: 'Obiettivi conosciuti', rows: 3 },
   { key: 'abilities', label: 'Abilità conosciute', rows: 4 },
 ];

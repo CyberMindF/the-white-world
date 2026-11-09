@@ -71,7 +71,7 @@ try {
     await page.locator('.character-modal').waitFor();
     assert.equal(await page.locator('.character-artwork').count(),1);
     const modalText=await page.locator('.character-modal').innerText();
-    assert.ok(modalText.includes('Ciò che si sa'));
+    assert.ok(modalText.includes('Ciò che sai'));
     assert.ok(modalText.includes('Passato conosciuto'));
     assert.ok(modalText.includes('Carattere conosciuto'));
     assert.ok(!modalText.includes('SEGRETO'));
