@@ -119,6 +119,12 @@ export class CoseInsieme {
   );
   protected readonly statusLabel = STATUS_LABEL;
   protected readonly categoryLabel = CATEGORY_LABEL;
+  protected readonly categoryOptions = computed<AppSelectOption[]>(() =>
+    [...new Set([...Object.keys(CATEGORY_LABEL), ...this.categories()])].map((value) => ({
+      value,
+      label: CATEGORY_LABEL[value] || value
+    }))
+  );
   protected readonly statusOptions: readonly AppSelectOption[] = [
     { value: 'todo', label: '○ Da fare' },
     { value: 'done', label: '✓ Fatto' },
@@ -129,6 +135,7 @@ export class CoseInsieme {
   protected readonly editingId = signal<number | 'new' | null>(null);
   protected readonly draft = signal<ActivityDraft>(emptyDraft());
   protected readonly formError = signal('');
+  protected readonly savingActivity = signal(false);
   protected readonly deleteTargetId = signal<number | null>(null);
 
   constructor() {
@@ -253,6 +260,8 @@ export class CoseInsieme {
   }
 
   protected async submitEdit(): Promise<void> {
+    if (this.savingActivity()) return;
+    this.formError.set('');
     const d = this.draft();
     if (!d.text.trim() && !d.privateText.trim()) {
       this.formError.set('Serve almeno un testo pubblico o privato.');
@@ -273,14 +282,26 @@ export class CoseInsieme {
 
     const isNew = this.editingId() === 'new';
     const endpoint = isNew ? '/api/together/activities' : `/api/together/activities/${this.editingId()}`;
-    const ok = await this.api.sendAuthenticatedJson(endpoint, payload, isNew ? 'POST' : 'PUT');
-    if (!ok) {
-      this.formError.set('Non è stato possibile salvare l\'attività.');
-      return;
+    this.savingActivity.set(true);
+    try {
+      const response = await fetch(endpoint, {
+        method: isNew ? 'POST' : 'PUT',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const result = await this.api.readApiResponse<{ error?: string }>(response);
+      if (!response.ok) {
+        this.formError.set(result.error || 'Non è stato possibile salvare l\'attività.');
+        return;
+      }
+      this.editingId.set(null);
+      await this.load();
+    } catch {
+      this.formError.set('Non è stato possibile contattare il server. Controlla la connessione e riprova.');
+    } finally {
+      this.savingActivity.set(false);
     }
-
-    this.editingId.set(null);
-    await this.load();
   }
 
   protected requestDelete(id: number): void {

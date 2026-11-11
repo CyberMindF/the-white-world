@@ -20,32 +20,41 @@
     </header>
 
     @if (editingId() !== null) {
-      <form class="activity-form card glass-surface" (ngSubmit)="submitEdit()">
+      <form class="activity-form card glass-surface" (ngSubmit)="submitEdit()" [attr.aria-busy]="savingActivity()">
         <h2>{{ editingId() === 'new' ? 'Nuova attività' : 'Modifica attività' }}</h2>
         <label class="form-field">
           <span>Testo pubblico <small>lascia vuoto se è un'idea solo privata</small></span>
-          <textarea rows="3" [ngModel]="draft().text" (ngModelChange)="updateDraft({ text: $event })" name="text"></textarea>
+          <textarea rows="3" maxlength="2000" [ngModel]="draft().text" (ngModelChange)="updateDraft({ text: $event })" name="text" [disabled]="savingActivity()"></textarea>
         </label>
         <label class="form-field">
           <span>Testo privato (NSFW) <small>facoltativo</small></span>
-          <textarea rows="3" [ngModel]="draft().privateText" (ngModelChange)="updateDraft({ privateText: $event })" name="privateText"></textarea>
+          <textarea rows="3" maxlength="2000" [ngModel]="draft().privateText" (ngModelChange)="updateDraft({ privateText: $event })" name="privateText" [disabled]="savingActivity()"></textarea>
         </label>
-        <label class="form-field">
+        <div class="form-field">
           <span>Categoria</span>
-          <input type="text" required [ngModel]="draft().category" (ngModelChange)="updateDraft({ category: $event })" name="category" placeholder="es. giochi, ricordi, uscite…" />
-        </label>
+          <app-select
+            [options]="categoryOptions()"
+            [value]="draft().category"
+            (valueChange)="updateDraft({ category: $event })"
+            name="category"
+            ariaLabel="Categoria"
+            placeholder="Scegli una categoria…"
+            [required]="true"
+            [disabled]="savingActivity()"
+          />
+        </div>
         <label class="form-field">
           <span>Data indicativa</span>
-          <input type="text" required [ngModel]="draft().approximateDate" (ngModelChange)="updateDraft({ approximateDate: $event })" name="approximateDate" placeholder="es. GEN–LUG 2026" />
+          <input type="text" required maxlength="40" [ngModel]="draft().approximateDate" (ngModelChange)="updateDraft({ approximateDate: $event })" name="approximateDate" placeholder="es. GEN–LUG 2026" [disabled]="savingActivity()" />
         </label>
         <label class="form-field">
           <span>Link <small>facoltativo</small></span>
-          <input type="text" [ngModel]="draft().link" (ngModelChange)="updateDraft({ link: $event })" name="link" />
+          <input type="text" maxlength="500" [ngModel]="draft().link" (ngModelChange)="updateDraft({ link: $event })" name="link" [disabled]="savingActivity()" />
         </label>
-        <p class="activity-form-error">{{ formError() }}</p>
+        <p class="activity-form-error" role="alert">{{ formError() }}</p>
         <div class="activity-form-actions">
-          <button type="button" class="btn" (click)="cancelEdit()">Annulla</button>
-          <button type="submit" class="btn btn-submit">Salva</button>
+          <button type="button" class="btn" (click)="cancelEdit()" [disabled]="savingActivity()">Annulla</button>
+          <button type="submit" class="btn btn-submit" [disabled]="savingActivity()">{{ savingActivity() ? 'Salvataggio…' : 'Salva' }}</button>
         </div>
       </form>
     }
