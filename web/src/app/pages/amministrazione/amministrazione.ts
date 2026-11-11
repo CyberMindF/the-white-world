@@ -28,6 +28,7 @@ interface ActivityLoggingUser {
   activity_logging_enabled: number;
   admin_email_updates: number;
   notify_email_updates: number;
+  notify_email_copies: number;
 }
 
 @Component({
@@ -174,19 +175,21 @@ export class Amministrazione {
     }
   }
 
-  protected async setAutomaticEmails(user: ActivityLoggingUser, input: HTMLInputElement): Promise<void> {
+  protected async setAutomaticEmails(user: ActivityLoggingUser, input: HTMLInputElement, setting: 'updates' | 'copies' = 'updates'): Promise<void> {
     const enabled = input.checked;
     input.disabled = true;
     this.automaticEmailMessage.set('');
     try {
       const response = await fetch('/api/auth/automatic-emails', {
         method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, enabled })
+        body: JSON.stringify({ userId: user.id, enabled, setting })
       });
       if (!response.ok) throw new Error('Aggiornamento non riuscito');
       this.activityLoggingUsers.update((users) => users.map((item) => item.id === user.id
-        ? { ...item, admin_email_updates: enabled ? 1 : 0 } : item));
-      this.automaticEmailMessage.set(enabled
+        ? { ...item, [setting === 'copies' ? 'notify_email_copies' : 'admin_email_updates']: enabled ? 1 : 0 } : item));
+      this.automaticEmailMessage.set(setting === 'copies'
+        ? `Copie degli avvisi ${enabled ? 'attivate' : 'disattivate'} per ${user.nickname}.`
+        : enabled
         ? `Invii automatici abilitati per ${user.nickname}.`
         : `Abilitazione admin rimossa per ${user.nickname}: vale la preferenza personale.`);
     } catch {

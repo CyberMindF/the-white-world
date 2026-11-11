@@ -115,7 +115,74 @@ export async function notifyOtherIdentity(env, actorUserId, { subject, html, for
     return { sent: false };
   }
 
-  return sendEmail(env, { to: recipient.email, subject, html });
+  const payload = { to: recipient.email, subject, html };
+  const result = await sendEmail(env, payload);
+  if (result.sent) {
+    await queueNotificationEmailCopy(env, actorUserId, payload, `notification/${crypto.randomUUID()}`);
+    await deliverNotificationEmailCopies(env);
+  }
+  return result;
+}
+
+// Solo gli avvisi condivisi passano qui: le email di recupero password non generano copie.
+export async function queueNotificationEmailCopy(env, actorUserId, payload, sourceKey, safe = false) {
+  try {
+    await env.DB.prepare(`INSERT OR IGNORE INTO notification_email_copies (id, recipient_id, safe, payload)
+      SELECT ? || '/copy/' || id, id, ?, json_set(?, '$.to', email) FROM users
+      WHERE id=? AND is_test=0 AND notify_email_copies=1 AND email!=?`)
+      .bind(sourceKey, safe ? 1 : 0, JSON.stringify(payload), actorUserId, payload.to).run();
+  } catch (error) {
+    console.error(JSON.stringify({ event: 'email_copy_queue_failed', message: error.message }));
+  }
+}
+
+export async function deliverNotificationEmailCopies(env) {
+  const totals = { sent: 0, skipped: 0, failed: 0 };
+  try {
+    const { results } = await env.DB.prepare(`SELECT * FROM notification_email_copies
+      WHERE state='pending' OR (state='sending' AND datetime(claimed_at)<datetime('now','-5 minutes'))
+      ORDER BY id LIMIT 10`).all();
+    for (const copy of results) {
+      const now = new Date().toISOString();
+      const claim = await env.DB.prepare(`UPDATE notification_email_copies SET state='sending',claimed_at=?
+        WHERE id=? AND (state='pending' OR (state='sending' AND datetime(claimed_at)<datetime('now','-5 minutes')))`)
+        .bind(now, copy.id).run();
+      if (!claim.meta.changes) continue;
+      try {
+        if (copy.first_attempt_at && Date.now() - Date.parse(copy.first_attempt_at) > 23 * 60 * 60 * 1000) {
+          await env.DB.prepare("UPDATE notification_email_copies SET state='review' WHERE id=? AND claimed_at=?")
+            .bind(copy.id, now).run();
+          totals.failed++; continue;
+        }
+        const recipient = await env.DB.prepare(`SELECT email FROM users WHERE id=? AND is_test=0
+          AND notify_email_copies=1 AND (admin_email_updates=1 OR
+            (notify_email_updates=1 AND (safe_mode=0 OR ?=1)))`)
+          .bind(copy.recipient_id, copy.safe).first();
+        if (!recipient) {
+          await env.DB.prepare("UPDATE notification_email_copies SET state='skipped' WHERE id=? AND claimed_at=?")
+            .bind(copy.id, now).run();
+          totals.skipped++; continue;
+        }
+        const payload = JSON.parse(copy.payload);
+        if (payload.to !== recipient.email) throw new Error('Destinatario della copia modificato');
+        await env.DB.prepare(`UPDATE notification_email_copies SET first_attempt_at=COALESCE(first_attempt_at,?)
+          WHERE id=? AND claimed_at=?`).bind(now, copy.id, now).run();
+        const result = await sendEmail(env, { ...payload, idempotencyKey: copy.id });
+        await env.DB.prepare(`UPDATE notification_email_copies SET state=?,sent_at=? WHERE id=? AND claimed_at=?`)
+          .bind(result.sent ? 'sent' : 'pending', result.sent ? now : null, copy.id, now).run();
+        totals[result.sent ? 'sent' : 'failed']++;
+      } catch (error) {
+        await env.DB.prepare("UPDATE notification_email_copies SET state='pending' WHERE id=? AND claimed_at=?")
+          .bind(copy.id, now).run();
+        totals.failed++;
+        console.error(JSON.stringify({ event: 'email_copy_failed', id: copy.id, message: error.message }));
+      }
+    }
+  } catch (error) {
+    totals.failed++;
+    console.error(JSON.stringify({ event: 'email_copy_delivery_failed', message: error.message }));
+  }
+  return totals;
 }
 
 // Avvisa l'admin della prima attivita di un account monitorato e silenzia gli avvisi successivi

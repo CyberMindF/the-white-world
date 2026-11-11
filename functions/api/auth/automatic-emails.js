@@ -11,15 +11,17 @@ export async function onRequestPut(context) {
     }
     const body = await readJson(request);
     const userId = Number(body?.userId);
-    if (!Number.isInteger(userId) || userId <= 0 || typeof body?.enabled !== "boolean") {
+    const setting = body?.setting ?? 'updates';
+    const column = setting === 'updates' ? 'admin_email_updates' : setting === 'copies' ? 'notify_email_copies' : null;
+    if (!Number.isInteger(userId) || userId <= 0 || typeof body?.enabled !== "boolean" || !column) {
       return json({ error: "Dati non validi." }, 400);
     }
     const result = await env.DB.prepare(
-      "UPDATE users SET admin_email_updates = ?, updated_at = ? WHERE id = ? AND is_activated = 1 AND is_test = 0"
+      `UPDATE users SET ${column} = ?, updated_at = ? WHERE id = ? AND is_activated = 1 AND is_test = 0`
     ).bind(body.enabled ? 1 : 0, new Date().toISOString(), userId).run();
     if (!result.meta.changes) return json({ error: "Account non trovato." }, 404);
-    context.waitUntil(recordEvent(context.env, { userId: session.user.id, sessionId: session.sessionId }, { section: 'auth', eventType: 'account_setting_changed', metadata: { targetUserId: userId, setting: 'admin_email_updates', enabled: body.enabled } }));
-    return json({ userId, enabled: body.enabled });
+    context.waitUntil(recordEvent(context.env, { userId: session.user.id, sessionId: session.sessionId }, { section: 'auth', eventType: 'account_setting_changed', metadata: { targetUserId: userId, setting: column, enabled: body.enabled } }));
+    return json({ userId, enabled: body.enabled, setting });
   } catch {
     return json({ error: "Non è stato possibile aggiornare gli invii automatici." }, 500);
   }

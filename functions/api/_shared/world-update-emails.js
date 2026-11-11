@@ -1,4 +1,4 @@
-import { sendEmail } from './email.js';
+import { sendEmail, deliverNotificationEmailCopies } from './email.js';
 
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -64,5 +64,5 @@ export async function deliverWorldUpdateEmails(env) {
     console.error(JSON.stringify({event:'world_update_email_queue_failed',message:error.message}));
     totals.failed++;
   }
-  return totals;
+  return { ...totals, copies: await deliverNotificationEmailCopies(env) };
 }

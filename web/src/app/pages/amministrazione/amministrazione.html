@@ -56,6 +56,17 @@
                       (change)="setAutomaticEmails(user, $any($event.target))" />
                     <span class="settings-toggle-switch" aria-hidden="true"></span>
                   </label>
+                  <label class="settings-toggle">
+                    <span class="settings-toggle-info">
+                      <span class="settings-toggle-title">Copie degli avvisi inviati</span>
+                      <span class="settings-toggle-description">Riceve lo stesso contenuto delle Novità e degli avvisi che invia all’altra persona. Richiede le email abilitate. Le email di recupero password restano personali.</span>
+                    </span>
+                    <input class="settings-toggle-input" type="checkbox"
+                      [attr.aria-label]="'Ricevi copie degli avvisi inviati da ' + user.nickname"
+                      [checked]="user.notify_email_copies === 1"
+                      (change)="setAutomaticEmails(user, $any($event.target), 'copies')" />
+                    <span class="settings-toggle-switch" aria-hidden="true"></span>
+                  </label>
                 }
               </article>
             } @empty {
