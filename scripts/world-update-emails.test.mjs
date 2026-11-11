@@ -42,6 +42,55 @@ test('preferenze, safe mode, bozza, data futura e announce disattivato impedisco
   h.sql.prepare('UPDATE world_updates SET active=1 WHERE id=?').run(draft);await deliverWorldUpdateEmails(h.env);assert.equal(count,1);
  }finally{globalThis.fetch=original;h.sql.close()}
 });
+test('l’override admin invia anche senza consenso personale e con Safe attiva, una sola volta',async()=>{
+ const h=setup(),original=globalThis.fetch,calls=[];
+ globalThis.fetch=async(url,init)=>{calls.push(JSON.parse(init.body));return Response.json({id:'forced'})};
+ try{
+  h.sql.exec('UPDATE users SET notify_email_updates=0,admin_email_updates=1,safe_mode=1 WHERE id=2');
+  const id=h.insert();h.sql.prepare('UPDATE world_updates SET safe=0 WHERE id=?').run(id);
+  const totals=await Promise.all([deliverWorldUpdateEmails(h.env),deliverWorldUpdateEmails(h.env)]);
+  assert.equal(totals.reduce((n,t)=>n+t.sent,0),1);
+  assert.equal(calls.length,1);assert.deepEqual(calls[0].to,['player@example.test']);
+  assert.equal(h.sql.prepare('SELECT state FROM world_update_emails WHERE update_id=?').get(id).state,'sent');
+  await deliverWorldUpdateEmails(h.env);assert.equal(calls.length,1);
+  h.sql.exec('UPDATE users SET admin_email_updates=0 WHERE id=2');
+  const normal=h.insert();h.sql.prepare('UPDATE world_updates SET safe=0 WHERE id=?').run(normal);
+  await deliverWorldUpdateEmails(h.env);assert.equal(calls.length,1);
+ }finally{globalThis.fetch=original;h.sql.close()}
+});
+test('l’override non invia bozze, novità future, voci senza annuncio o email di account test',async()=>{
+ const original=globalThis.fetch;let count=0;globalThis.fetch=async()=>{count++;return Response.json({})};
+ try{
+  for(const query of [
+   'UPDATE world_updates SET active=0',
+   "UPDATE world_updates SET published_at='2099-01-01'",
+   'UPDATE world_updates SET announce=0',
+   'UPDATE users SET is_test=1 WHERE id=1',
+   'UPDATE users SET is_test=1 WHERE id=2'
+  ]){
+   const h=setup();try{
+    h.sql.exec('UPDATE users SET notify_email_updates=0,admin_email_updates=1,safe_mode=1 WHERE id=2');
+    h.insert();h.sql.exec('UPDATE world_updates SET safe=0');h.sql.exec(query);
+    await deliverWorldUpdateEmails(h.env);assert.equal(count,0,query);
+   }finally{h.sql.close()}
+  }
+ }finally{globalThis.fetch=original}
+});
+test('una novità saltata si recupera solo rimettendola esplicitamente in coda, senza duplicati',async()=>{
+ const h=setup(),original=globalThis.fetch;let count=0;globalThis.fetch=async()=>{count++;return Response.json({id:'recovered'})};
+ try{
+  h.sql.exec('UPDATE users SET notify_email_updates=1,safe_mode=1 WHERE id=2');
+  const id=h.insert();h.sql.prepare('UPDATE world_updates SET safe=0 WHERE id=?').run(id);
+  await deliverWorldUpdateEmails(h.env);
+  assert.equal(h.sql.prepare('SELECT state FROM world_update_emails WHERE update_id=?').get(id).state,'skipped');
+  h.sql.exec('UPDATE users SET admin_email_updates=1 WHERE id=2');
+  await deliverWorldUpdateEmails(h.env);assert.equal(count,0);
+  h.sql.prepare("UPDATE world_update_emails SET state='pending' WHERE update_id=? AND state='skipped'").run(id);
+  await Promise.all([deliverWorldUpdateEmails(h.env),deliverWorldUpdateEmails(h.env)]);assert.equal(count,1);
+  assert.equal(h.sql.prepare('SELECT state FROM world_update_emails WHERE update_id=?').get(id).state,'sent');
+  await deliverWorldUpdateEmails(h.env);assert.equal(count,1);
+ }finally{globalThis.fetch=original;h.sql.close()}
+});
 test('errore del provider: retry con stesso contenuto e chiave, poi stato definitivo',async()=>{
  const h=setup(),original=globalThis.fetch,calls=[];globalThis.fetch=async(url,init)=>{calls.push(init);return calls.length===1?new Response('temporaneo',{status:503}):Response.json({id:'ok'})};
  try{

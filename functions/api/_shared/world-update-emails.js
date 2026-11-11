@@ -25,11 +25,13 @@ export async function deliverWorldUpdateEmails(env) {
           await env.DB.prepare("UPDATE world_update_emails SET state='review' WHERE update_id=? AND claimed_at=?").bind(update.id, now).run();
           totals.failed++; continue;
         }
+        // L'abilitazione admin forza anche gli invii non safe. Senza override valgono
+        // sia la preferenza personale sia il filtro Safe del destinatario.
         const recipient = await env.DB.prepare(`SELECT recipient.id, recipient.email FROM users actor
           JOIN users recipient ON recipient.identity=CASE actor.identity WHEN 'lui' THEN 'lei' ELSE 'lui' END
           WHERE actor.id=? AND actor.is_test=0 AND recipient.is_test=0 AND recipient.id!=actor.id
-            AND (recipient.notify_email_updates=1 OR recipient.admin_email_updates=1)
-            AND (recipient.safe_mode=0 OR ?=1)
+            AND (recipient.admin_email_updates=1 OR
+              (recipient.notify_email_updates=1 AND (recipient.safe_mode=0 OR ?=1)))
           ORDER BY recipient.id LIMIT 1`).bind(update.created_by, update.safe).first();
         if (!recipient) {
           await env.DB.prepare("UPDATE world_update_emails SET state='skipped' WHERE update_id=? AND claimed_at=?")

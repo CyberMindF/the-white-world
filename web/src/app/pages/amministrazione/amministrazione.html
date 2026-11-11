@@ -48,7 +48,7 @@
                   <label class="settings-toggle">
                     <span class="settings-toggle-info">
                       <span class="settings-toggle-title">Invii automatici via email</span>
-                      <span class="settings-toggle-description">Abilita gli avvisi anche con la preferenza personale disattivata. Disattivando questa opzione torna a valere la preferenza personale, attualmente {{ user.notify_email_updates === 1 ? 'attiva' : 'disattivata' }}.</span>
+                      <span class="settings-toggle-description">Forza gli avvisi anche con la preferenza personale disattivata o la modalità Safe attiva. Disattivando questa opzione tornano a valere i filtri personali; la preferenza email è attualmente {{ user.notify_email_updates === 1 ? 'attiva' : 'disattivata' }}.</span>
                     </span>
                     <input class="settings-toggle-input" type="checkbox"
                       [attr.aria-label]="'Abilita gli invii automatici per ' + user.nickname"
