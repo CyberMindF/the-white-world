@@ -11,7 +11,7 @@ export async function onRequestGet(context) {
     const session = await getAuthenticatedSession(context.request, context.env);
     if (!canManage(session)) return json({ error: "Non autorizzato." }, 403);
     const { results } = await context.env.DB.prepare(`
-      SELECT id, email, nickname, identity, is_test, activity_logging_enabled, admin_email_updates, notify_email_updates, notify_email_copies
+      SELECT id, email, nickname, identity, is_test, activity_logging_enabled, admin_email_updates, notify_email_updates
       FROM users
       WHERE is_activated = 1
       ORDER BY is_test ASC, nickname COLLATE NOCASE, id
