@@ -1,6 +1,7 @@
 import { getAuthenticatedSession, json, readJson } from "../auth/_shared.js";
 import { recordEvent } from "../_shared/events.js";
 import { notifyRealtime } from "../_shared/realtime.js";
+import { addWorldUpdate } from "../_shared/world-updates.js";
 
 const MAX_BODY_LENGTH = 20000;
 const DEFAULT_ADVENTURE = "il-prezzo-della-verita";
@@ -73,6 +74,9 @@ export async function onRequestPost(context) {
       adventure,
       turnId: result.meta.last_row_id
     }));
+    if (session.user.role === 'admin' && !session.user.isTest && !session.impersonation) {
+      context.waitUntil(announceNewGdrTurn(context.env, session.user.id, adventure, createdAt));
+    }
 
     return json(
       { saved: true, turnId: result.meta.last_row_id, author: session.user.nickname, isMaster: session.user.role === 'admin' && !session.user.isTest, createdAt },
@@ -81,6 +85,26 @@ export async function onRequestPost(context) {
   } catch (error) {
     console.error(JSON.stringify({ event: "gdr_turns_post_error", message: error.message }));
     return json({ error: "Non è stato possibile salvare il turno." }, 500);
+  }
+}
+
+async function announceNewGdrTurn(env, createdBy, adventure, publishedAt) {
+  try {
+    const published = await env.DB.prepare(
+      'SELECT title FROM gdr_workspace_adventures WHERE id = ? AND published = 1'
+    ).bind(adventure).first();
+    if (!published) return;
+    await addWorldUpdate(env, {
+      emoji: '🎲',
+      title: `L’avventura continua: ${published.title}`,
+      body: 'È stato pubblicato un nuovo seguito dell’avventura. Apri la partita per continuare a leggere.',
+      route: `/tavolo-da-gioco/gdr/gioca/${encodeURIComponent(adventure)}`,
+      ctaLabel: 'Leggi il seguito',
+      createdBy,
+      publishedAt
+    });
+  } catch (error) {
+    console.error(JSON.stringify({ event: 'gdr_turn_announcement_error', message: error.message }));
   }
 }
 
