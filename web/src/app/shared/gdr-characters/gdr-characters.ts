@@ -28,11 +28,12 @@ import {
 import { GdrTurn } from '../gdr-turn/gdr-turn';
 import { GdrImageLibrary, GdrLibraryImage } from './gdr-image-library';
 import { gdrImagePath } from './gdr-image-catalog';
+import { GdrPowers } from './gdr-powers';
 
 @Component({
   selector: 'app-gdr-characters',
   standalone: true,
-  imports: [FormsModule, GdrTurn, GdrImageLibrary],
+  imports: [FormsModule, GdrTurn, GdrImageLibrary, GdrPowers],
   templateUrl: './gdr-characters.html',
   styleUrl: './gdr-characters.css',
 })
@@ -400,7 +401,7 @@ export class GdrCharacters {
     });
 
     effect(() =>
-      this.workspace.pendingChanges.set(
+      this.workspace.characterPendingChanges.set(
         this.hasChanges() || this.mediaBusy() || !!this.cropSource(),
       ),
     );

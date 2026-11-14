@@ -1,0 +1,35 @@
+:host,
+section {
+  display: block;
+}
+label {
+  display: block;
+  margin: 1rem 0 0.4rem;
+}
+textarea,
+input {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  color: var(--text-color);
+  background: var(--input-bg);
+  border: 1px solid var(--panel-border-color);
+  border-radius: 0.6rem;
+  padding: 0.7rem;
+}
+textarea {
+  resize: vertical;
+  line-height: 1.6;
+}
+.hint {
+  opacity: 0.75;
+}
+.error {
+  color: var(--danger-text-color);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 1rem 0;
+}

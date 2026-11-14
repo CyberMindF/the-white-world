@@ -10,7 +10,6 @@ import { ActivatedRoute } from '@angular/router';
 import { AppShell } from '../../shell/app-shell';
 import { SafeModeService } from '../../core/safe-mode.service';
 import { AuthService } from '../../core/auth.service';
-import { GdrBlocks } from '../../shared/gdr-blocks/gdr-blocks';
 import {
   GdrBlockRow,
   GdrDocumentKey,
@@ -21,9 +20,10 @@ import { serializeGdrBlocks } from '../../shared/gdr-blocks/gdr-markdown.seriali
 import { GdrWorkspaceService } from '../../core/gdr-workspace.service';
 import { GdrCharacters } from '../../shared/gdr-characters/gdr-characters';
 import { GdrPowers } from '../../shared/gdr-characters/gdr-powers';
+import { GdrRules } from '../../shared/gdr-rules/gdr-rules';
+import { GdrReferenceBlock } from '../../shared/gdr-blocks/gdr-block.types';
 import { imagesFromGdrBlocks } from '../../shared/gdr-characters/gdr-image-library';
 import { GDR_PORTRAITS, gdrLibraryImages, gdrImagePath } from '../../shared/gdr-characters/gdr-image-catalog';
-import { splitCharacterPowers } from '../../shared/gdr-characters/character-powers';
 import { GdrNotesEditor } from '../../shared/gdr-notes/gdr-notes-editor';
 import { GdrPanel } from '../../shared/gdr-panel/gdr-panel';
 import { GdrTurn } from '../../shared/gdr-turn/gdr-turn';
@@ -117,12 +117,12 @@ const dateFormatter = new Intl.DateTimeFormat('it-IT', {
     AppShell,
     NgTemplateOutlet,
     FormsModule,
-    GdrBlocks,
     GdrTurn,
     GdrSourceEditor,
     GdrPanel,
     GdrCharacters,
     GdrPowers,
+    GdrRules,
     GdrNotesEditor,
   ],
   providers: [GdrWorkspaceService],
@@ -207,18 +207,12 @@ export class GdrLaboratorio implements OnInit {
       return current?.deleted ? [] : [{...entry,...(current ? {name:current.name,image:current.photo || entry.image,description:current.description}: {})}];
     })}};
   }));
-  protected readonly rulesSearch = signal('');
-  protected readonly filteredRules = computed(() => {
-    const query = this.rulesSearch().trim().toLocaleLowerCase('it');
-    return query
-      ? this.rulesBlocks().filter((b) =>
-          JSON.stringify(b.data).toLocaleLowerCase('it').includes(query),
-        )
-      : this.rulesBlocks();
-  });
-  protected readonly referenceBlocks = computed(() => splitCharacterPowers(this.forDocument(this.adventure().rules)));
-  protected readonly rulesBlocks = computed(() => this.referenceBlocks().rules);
-  protected readonly powersBlocks = computed(() => this.referenceBlocks().powers);
+  protected readonly canEditRules = computed(()=>this.canPrepare() && this.auth.adminModeEnabled() && this.liveGame);
+  protected readonly adventureRules = computed(()=>this.workspace.adventures().find(a=>a.id===this.selected()));
+  protected rulesSaved(value:{blocks:GdrReferenceBlock[];revision:number}):void {
+    this.workspace.adventures.update(list=>list.map(a=>a.id===this.selected()?{...a,rules:value.blocks,rulesRevision:value.revision}:a));
+    this.status.set('Regole aggiornate nella scheda dell’avventura.');
+  }
   protected readonly characterBlocks = computed(() => this.forDocument(this.adventure().character));
   protected readonly sharedStorySource = computed(() => this.adventure().legacy ? serializeGdrBlocks(this.narrativeBlocks()) : this.workspace.adventures().find(a=>a.id===this.selected())?.source ?? '');
   protected readonly recoveredChanges = computed(() => this.local().documentDraft === null ? [] : recoverStoryDraft(this.narrativeBlocks(),this.local().documentDraft!));
@@ -389,7 +383,6 @@ export class GdrLaboratorio implements OnInit {
       if(pending && typeof pending.id==='string' && typeof pending.source==='string' && pending.source.length<=20000) this.failedStoryChange.set(pending);
     } catch { /* Nessuna modifica recuperabile. */ }
     this.documentEditor.set(false);
-    this.rulesSearch.set('');
     this.loading.set(true);
     this.contentError.set('');
     this.turnsError.set('');

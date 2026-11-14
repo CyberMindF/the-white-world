@@ -1,4 +1,9 @@
 import { Injectable, computed, signal } from '@angular/core';
+import { GdrReferenceBlock } from '../shared/gdr-blocks/gdr-block.types';
+export interface CharacterPower {
+  id: string; kind: 'ability' | 'spell'; name: string; description: string;
+  effects: GdrReferenceBlock[]; revision: number;
+}
 export interface WorkspaceAdventure {
   id: string;
   title: string;
@@ -6,6 +11,8 @@ export interface WorkspaceAdventure {
   legacy: boolean;
   published: boolean;
   revision: number;
+  rules?: GdrReferenceBlock[];
+  rulesRevision?: number;
 }
 export interface InventoryItem {
   id: string;
@@ -32,6 +39,7 @@ export interface AssignedPet {
   description: string;
 }
 export interface WorkspaceCharacter {
+  powers?: CharacterPower[];
   id: string;
   adventureId: string;
   kind: 'pg' | 'png';
@@ -91,7 +99,9 @@ export class GdrWorkspaceService {
   readonly isMaster = signal(false);
   readonly available = signal(false);
   readonly saving = signal(false);
-  readonly pendingChanges = signal(false);
+  readonly characterPendingChanges = signal(false);
+  readonly rulesEditing = signal(false);
+  readonly pendingChanges = computed(()=>this.characterPendingChanges() || this.rulesEditing());
   readonly error = signal('');
   readonly message = signal('');
   readonly selectedId = signal('');

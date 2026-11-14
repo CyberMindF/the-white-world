@@ -52,4 +52,13 @@ describe('consultazione delle abilità del personaggio', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Potere aggiornato dal master');
   });
+  it('usa le assegnazioni del catalogo come unica fonte e non fa riapparire le voci rimosse',()=>{
+    TestBed.configureTestingModule({imports:[GdrPowers],providers:[GdrWorkspaceService]});
+    const workspace=TestBed.inject(GdrWorkspaceService);workspace.available.set(true);
+    workspace.characters.set([{...character('Daisy',true),powers:[{id:'spell',kind:'spell',name:'Scudo condiviso',description:'Descrizione del catalogo',effects:[],revision:1}]}]);
+    const fixture=TestBed.createComponent(GdrPowers);fixture.componentRef.setInput('legacyBlocks',splitCharacterPowers(source).powers);fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Scudo condiviso');expect(fixture.nativeElement.textContent).not.toContain('Dardo magico');expect(fixture.nativeElement.textContent).not.toContain('Un potere personale');
+    workspace.characters.update(cs=>cs.map(c=>({...c,powers:[]})));fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('Scudo condiviso');expect(fixture.nativeElement.textContent).not.toContain('Un potere personale');
+  });
 });

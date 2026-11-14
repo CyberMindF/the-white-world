@@ -2,7 +2,7 @@ import { Component, computed, inject, input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { GdrWorkspaceService } from '../../core/gdr-workspace.service';
 import { GdrBlocks } from '../gdr-blocks/gdr-blocks';
-import { GdrBlockRow, GdrHeadingData, GdrListData } from '../gdr-blocks/gdr-block.types';
+import { GdrBlockRow, GdrHeadingData, GdrListData, referenceRows } from '../gdr-blocks/gdr-block.types';
 import { GdrTurn } from '../gdr-turn/gdr-turn';
 
 @Component({
@@ -15,9 +15,15 @@ import { GdrTurn } from '../gdr-turn/gdr-turn';
 export class GdrPowers {
   protected readonly workspace = inject(GdrWorkspaceService);
   readonly legacyBlocks = input<GdrBlockRow[]>([]);
+  readonly showCharacterSelector = input(true);
+  protected readonly referenceRows = referenceRows;
   protected readonly blocks = computed(() =>
-    this.workspace.active()?.legacyProtagonist ? this.legacyBlocks() : [],
+    this.workspace.active()?.legacyProtagonist && this.workspace.active()?.powers === undefined ? this.legacyBlocks() : [],
   );
+  protected readonly personalNotes = computed(()=> {
+    const c=this.workspace.active();
+    return c?.powers === undefined ? c?.profile.abilities ?? '' : '';
+  });
   protected heading(block: GdrBlockRow): string {
     return (block.data as GdrHeadingData).text;
   }

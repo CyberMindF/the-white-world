@@ -168,6 +168,14 @@ I turni di prova non sono ancora pubblicati né sincronizzati: i permessi di int
 filtrano le voci disponibili, ma la futura pubblicazione dovrà verificare anche gli ID dei
 personaggi sul server prima di salvare un turno condiviso.
 
+### Catalogo abilità, magie e regole
+
+Con la Modalità admin attiva, «Gestisci abilità e magie» apre `/tavolo-da-gioco/gdr/poteri`, disponibile dall’hub, dall’avventura e dalla gestione del personaggio. Ogni voce ha nome, tipo, descrizione ed eventuali effetti o tabelle; può essere disponibile in più avventure e assegnata a più PG e PNG. Le schede mostrano le voci assegnate e leggono la stessa descrizione condivisa. La disponibilità nelle avventure prepara il collegamento a futuri sistemi senza introdurre un’entità sistema separata.
+
+Le regole appartengono all’avventura: nella scheda, scheda «Regole», il master può usare «Modifica regole», con editor e anteprima, poi salvare il documento condiviso. I salvataggi del catalogo e delle regole richiedono la Modalità admin e controllano la revisione per evitare sovrascritture concorrenti.
+
+Applicare **0160_add_gdr_power_catalog.sql prima del codice**: crea catalogo, disponibilità e assegnazioni, aggiunge il documento regole alle avventure e importa le abilità e magie storiche del protagonista con note e tabelle. Conserva i blocchi e le schede originali. Le modifiche del catalogo e delle regole non generano Novità o email.
+
 ### Nuove avventure e personaggi
 
 La migrazione **0133_add_gdr_workspace.sql** aggiunge soltanto tabelle `gdr_workspace_*`;

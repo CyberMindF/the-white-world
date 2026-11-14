@@ -101,7 +101,8 @@ export async function mutate(db, user, payload) {
       .first();
     if (!adventure) throw new WorkspaceError("Avventura non trovata.", 404);
     const pet = await petSettings(db, p, {kind:p.kind, adventure_id:p.adventureId});
-    await db
+    const importedProfile = profile(p.profile);
+    const inserted = await db
       .prepare(
         `INSERT INTO gdr_workspace_characters (id,adventure_id,kind,name,portrait,sheet,profile_json,photo,inventory_json,created_by,created_at,fields_json,is_pet,pet_owner_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`,
       )
@@ -112,7 +113,7 @@ export async function mutate(db, user, payload) {
         text(p.name, 160),
         portrait(p.portrait ?? ""),
         text(p.sheet ?? "", 20000, true),
-        JSON.stringify(profile(p.profile)),
+        JSON.stringify(importedProfile),
         portrait(p.photo ?? ""),
         JSON.stringify(inventory(p.items ?? [])),
         user.id,
@@ -128,6 +129,17 @@ export async function mutate(db, user, payload) {
         pet.ownerId,
       )
       .run();
+    if (inserted.meta.changes && importedProfile.abilities.trim()) {
+      await db.batch([
+        db.prepare(`INSERT OR IGNORE INTO gdr_powers(id,kind,name,description,created_by)
+          SELECT 'personal-'||id,'ability',substr('Abilità di '||name,1,160),json_extract(profile_json,'$.abilities'),created_by
+          FROM gdr_workspace_characters WHERE id=?`).bind(p.id),
+        db.prepare(`INSERT OR IGNORE INTO gdr_power_adventures(power_id,adventure_id)
+          SELECT 'personal-'||id,adventure_id FROM gdr_workspace_characters WHERE id=?`).bind(p.id),
+        db.prepare(`INSERT OR IGNORE INTO gdr_character_powers(character_id,power_id)
+          SELECT id,'personal-'||id FROM gdr_workspace_characters WHERE id=?`).bind(p.id)
+      ]);
+    }
     return { saved: true, id: p.id };
   }
   const character = await db

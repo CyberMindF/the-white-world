@@ -1,0 +1,59 @@
+<section aria-label="Regole dell’avventura">
+  @if (editing()) {
+    <h3>Modifica le regole dell’avventura</h3>
+    <p class="hint">
+      Usa ## per i titoli, - per gli elenchi e le barre | per le tabelle. L’anteprima mostra il
+      risultato nella scheda.
+    </p>
+    <label for="adventure-rules-source">Testo delle regole</label>
+    <textarea
+      id="adventure-rules-source"
+      rows="18"
+      maxlength="200000"
+      [disabled]="saving()"
+      [ngModel]="draft()"
+      (ngModelChange)="draft.set($event)"
+    ></textarea>
+    @for (issue of parsed().errors; track $index) {
+      <p class="error">{{ issue.message }}</p>
+    }
+    <h4>Anteprima</h4>
+    <app-gdr-blocks [blocks]="preview()" />
+    <div class="actions">
+      <button class="btn" [disabled]="saving()" (click)="cancel()">Annulla</button
+      ><button
+        class="btn"
+        [disabled]="saving() || !editable() || parsed().errors.length > 0"
+        (click)="save()"
+      >
+        {{ saving() ? 'Salvataggio…' : 'Salva regole' }}
+      </button>
+    </div>
+  } @else {
+    @if (editable()) {
+      <button class="btn" [disabled]="workspace.pendingChanges()" (click)="begin()">
+        Modifica regole
+      </button>
+    }
+    <label for="adventure-rules-search">Cerca nelle regole</label
+    ><input
+      id="adventure-rules-search"
+      type="search"
+      [ngModel]="search()"
+      (ngModelChange)="search.set($event)"
+    />
+    <app-gdr-blocks [blocks]="visible()" />
+    @if (!visible().length) {
+      <p>
+        {{
+          search()
+            ? 'Nessuna regola corrispondente.'
+            : 'Non sono ancora state scritte regole per questa avventura.'
+        }}
+      </p>
+    }
+  }
+  @if (error()) {
+    <p class="error" role="alert">{{ error() }}</p>
+  }
+</section>

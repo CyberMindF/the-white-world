@@ -7,16 +7,17 @@ export const {characterView}=helpers;
 const legacy=new Function('WorkspaceError',loadSource('./legacy.js')+';return {syncLegacy,characterFields,validateCharacterFields};')(helpers.WorkspaceError);
 export const mutate=new Function(...Object.keys(legacy),...Object.keys(helpers),loadSource('./mutate.js')+';return mutate;')(...Object.values(legacy),...Object.values(helpers));
 
-export function fixture() {
+export function fixture({powerCatalog=true}={}) {
   const sqlite=new DatabaseSync(':memory:');
   sqlite.exec('PRAGMA foreign_keys=ON; CREATE TABLE users(id INTEGER PRIMARY KEY,nickname TEXT,is_test INTEGER DEFAULT 0); INSERT INTO users VALUES(1,\'Master\',0),(2,\'Giocatrice\',0),(3,\'Altra persona\',0); CREATE TABLE gdr_turns(id INTEGER PRIMARY KEY,body TEXT); INSERT INTO gdr_turns VALUES(1,\'Turno originale\');');
   sqlite.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'member'; UPDATE users SET role='admin' WHERE id=1;");
   sqlite.exec(readFileSync(new URL('../migrations/0133_add_gdr_workspace.sql',import.meta.url),'utf8'));
   sqlite.exec(readFileSync(new URL('../migrations/0134_add_gdr_character_profiles.sql',import.meta.url),'utf8'));
-  sqlite.exec("CREATE TABLE gdr_character_schema(adventure TEXT PRIMARY KEY,fields_json TEXT); CREATE TABLE gdr_character_fields(adventure TEXT,field_key TEXT,value TEXT); CREATE TABLE gdr_blocks(id INTEGER PRIMARY KEY,document_key TEXT,type TEXT,data TEXT,position INTEGER);");
+  sqlite.exec("CREATE TABLE gdr_character_schema(adventure TEXT PRIMARY KEY,fields_json TEXT); CREATE TABLE gdr_character_fields(adventure TEXT,field_key TEXT,value TEXT); CREATE TABLE gdr_blocks(id INTEGER PRIMARY KEY,document_key TEXT,type TEXT,data TEXT,position INTEGER,created_by INTEGER DEFAULT 1);");
   sqlite.exec(readFileSync(new URL('../migrations/0145_unify_gdr_character_sheets.sql',import.meta.url),'utf8'));
   sqlite.exec(readFileSync(new URL('../migrations/0147_lock_gdr_base_stats.sql',import.meta.url),'utf8'));
   sqlite.exec(readFileSync(new URL('../migrations/0148_add_gdr_assigned_pets.sql',import.meta.url),'utf8'));
+  if(powerCatalog)sqlite.exec(readFileSync(new URL('../migrations/0160_add_gdr_power_catalog.sql',import.meta.url),'utf8'));
   const db={async batch(statements){sqlite.exec('BEGIN');try{const results=[];for(const statement of statements)results.push(await statement.run());sqlite.exec('COMMIT');return results;}catch(error){sqlite.exec('ROLLBACK');throw error;}},withSession(){return this;},prepare(sql){return{bind(...values){return{async run(){const r=sqlite.prepare(sql).run(...values);return{meta:{changes:Number(r.changes)}};},async first(){return sqlite.prepare(sql).get(...values) ?? null;},async all(){return{results:sqlite.prepare(sql).all(...values)};}};},async all(){return{results:sqlite.prepare(sql).all()};}};}};
   return {sqlite,db};
 }

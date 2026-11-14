@@ -251,6 +251,12 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/gdr/gdr').then((m) => m.Gdr),
       },
       {
+        path: 'tavolo-da-gioco/gdr/poteri',
+        canActivate: [adminModeGuard],
+        data: { bodyClasses: ['tavolo-page'] },
+        loadComponent: () => import('./pages/gdr-powers/gdr-powers-page').then(m=>m.GdrPowersPage),
+      },
+      {
         path: 'tavolo-da-gioco/gdr/gioca/:adventureId',
         data: { bodyClasses: ['tavolo-page'] },
         loadComponent: () => import('./pages/gdr-laboratorio/gdr-laboratorio').then((m) => m.GdrLaboratorio),

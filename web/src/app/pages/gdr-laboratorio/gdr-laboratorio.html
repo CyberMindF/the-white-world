@@ -62,6 +62,7 @@
         } @else {
           @if (canPrepare()) {
             <div class="lab-document-controls">
+              @if (canEditRules() && !workspace.pendingChanges()) { <a class="btn" href="/tavolo-da-gioco/gdr/poteri?adventure={{ selected() }}">Gestisci abilità e magie</a> }
               <button
                 class="btn"
                 [disabled]="
@@ -326,25 +327,11 @@
           />
         </div>
         <div gdrPowers>
-          <app-gdr-powers [legacyBlocks]="powersBlocks()" />
+          <app-gdr-powers />
         </div>
         <div gdrRules>
-          <label for="rules-search">Cerca nelle regole</label
-          ><input
-            type="search"
-            id="rules-search"
-            [ngModel]="rulesSearch()"
-            (ngModelChange)="rulesSearch.set($event)"
-            placeholder="Una parola o una regola…"
-          /><app-gdr-blocks [blocks]="filteredRules()" />
-          @if (rulesSearch() && !filteredRules().length) {
-            <p class="lab-help">Nessuna regola corrispondente.</p>
-          }
-          @if (!rulesBlocks().length) {
-            <p class="lab-help">
-              Le regole possono essere incluse nel testo della nuova avventura.
-            </p>
-          }
+          <app-gdr-rules [adventureId]="selected()" [blocks]="adventureRules()?.rules ?? []"
+            [revision]="adventureRules()?.rulesRevision ?? 1" [editable]="canEditRules()" (saved)="rulesSaved($event)" />
         </div>
         <div gdrNotes>
           <h3>Appunti personali</h3>

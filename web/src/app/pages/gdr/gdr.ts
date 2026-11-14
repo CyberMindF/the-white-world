@@ -26,6 +26,7 @@ export class Gdr implements OnInit {
   protected readonly canCreate = computed(
     () => !this.safe.enabled() && this.auth.isAdmin() && !this.auth.currentUser()?.isTest,
   );
+  protected readonly canManagePowers = computed(()=>this.canCreate() && this.auth.adminModeEnabled());
   protected readonly customAdventures = computed(() =>
     this.workspace.adventures().filter((a) => !a.legacy),
   );

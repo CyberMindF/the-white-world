@@ -14,7 +14,7 @@ export async function onRequestGet(context) {
       return json({ error: "Avventura non valida." }, 400);
     const adventures = await db
       .prepare(
-        "SELECT id,title,source,legacy,published,revision FROM gdr_workspace_adventures WHERE ?=1 OR published=1 ORDER BY legacy DESC,created_at,id",
+        "SELECT id,title,source,legacy,published,revision,rules_json,rules_revision FROM gdr_workspace_adventures WHERE ?=1 OR published=1 ORDER BY legacy DESC,created_at,id",
       )
       .bind(isMaster(user) ? 1 : 0)
       .all();
@@ -43,6 +43,17 @@ export async function onRequestGet(context) {
             .all()
         ).results;
     }
+    const assignedPowers=adventure ? (await db.prepare(`SELECT p.*,cp.character_id
+      FROM gdr_powers p JOIN gdr_character_powers cp ON cp.power_id=p.id
+      JOIN gdr_workspace_characters c ON c.id=cp.character_id
+      JOIN gdr_power_adventures pa ON pa.power_id=p.id AND pa.adventure_id=c.adventure_id
+      WHERE c.adventure_id=? AND (?=1 OR (c.archived=0 AND EXISTS(
+        SELECT 1 FROM gdr_workspace_grants g WHERE g.character_id=c.id AND g.user_id=?
+        AND (g.can_speak=1 OR g.can_edit_sheet=1 OR g.can_inventory=1))))
+      ORDER BY p.kind,p.sort_order,p.name,p.id`).bind(adventure,isMaster(user)?1:0,user.id).all()).results : [];
+    characters=characters.map(c=>({...c,powers:assignedPowers.filter(p=>p.character_id===c.id).map(p=>({
+      id:p.id,kind:p.kind,name:p.name,description:p.description,effects:JSON.parse(p.effects_json),revision:p.revision
+    }))}));
     // Solo i pet dei PG visibili, senza concedere accesso alla scheda privata del PNG.
     const pets = adventure ? (await db.prepare(`
       SELECT pet.id,pet.pet_owner_id,pet.name,pet.portrait,pet.photo,pet.profile_json
@@ -100,8 +111,10 @@ export async function onRequestGet(context) {
       narrativeCharacters,
       storyCharacters,
       pets,
-      adventures: adventures.results.map((a) => ({
+      adventures: adventures.results.map(({rules_json,rules_revision,...a}) => ({
         ...a,
+        rules: JSON.parse(rules_json),
+        rulesRevision: rules_revision,
         legacy: a.legacy === 1,
         published: a.published === 1,
       })),

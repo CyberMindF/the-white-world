@@ -640,9 +640,8 @@
                           @if (canManage()) {
                             <details class="form-group">
                               <summary>Abilità · riservato al master</summary>
-                              <label for="master-abilities">Abilità e incantesimi</label>
-                              <textarea id="master-abilities" rows="4" maxlength="6000" [ngModel]="profile().abilities" (ngModelChange)="changeProfile('abilities', $event)"></textarea>
-                              <p class="hint">Non compare nella scheda pubblica aperta dal racconto.</p>
+                              <p class="hint">Abilità e magie si assegnano dal catalogo condiviso.</p>
+                              @if (!hasChanges()) { <a class="btn" href="/tavolo-da-gioco/gdr/poteri?adventure={{ c.adventureId }}&character={{ c.id }}">Gestisci abilità e magie</a> }
                             </details>
                           }
                           <details>
@@ -805,6 +804,12 @@
                         </p>
                       }
                     }
+                  }
+                  @if (canManage() && section() === 'sheet' && !editing()) {
+                    <section class="master-guidance">
+                      <app-gdr-powers [showCharacterSelector]="false" />
+                      @if (!hasChanges()) { <a class="btn" href="/tavolo-da-gioco/gdr/poteri?adventure={{ c.adventureId }}&character={{ c.id }}">Gestisci abilità e magie</a> }
+                    </section>
                   }
                   @if (canManage() && section() === 'assignments') {
                     <section class="permissions">

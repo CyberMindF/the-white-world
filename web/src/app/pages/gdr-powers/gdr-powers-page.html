@@ -1,0 +1,157 @@
+<app-shell
+  homeHref="/tavolo-da-gioco/gdr"
+  homeLabel="Gioco di Ruolo"
+  homeAria="Torna alle avventure"
+>
+  <main class="catalog-page">
+    <header>
+      <p class="eyebrow">Strumenti del master</p>
+      <h1>Abilità e magie</h1>
+      <p>Un catalogo condiviso: scegli dove una voce è disponibile e quali personaggi la usano.</p>
+    </header>
+    @if (error()) {
+      <p class="error" role="alert">{{ error() }}</p>
+    }
+    @if (notice()) {
+      <p role="status">{{ notice() }}</p>
+    }
+    @if (loading()) {
+      <p>Caricamento del catalogo…</p>
+    }
+    <div class="catalog-layout">
+      <aside class="catalog-list card glass-surface" aria-label="Catalogo abilità e magie">
+        <div class="actions">
+          <button class="btn" [disabled]="dirty() || saving()" (click)="create()">
+            + Nuova voce</button
+          ><button class="btn" [disabled]="dirty() || saving()" (click)="load()">Ricarica</button>
+        </div>
+        <label
+          >Cerca<input type="search" [ngModel]="search()" (ngModelChange)="search.set($event)"
+        /></label>
+        <label
+          >Tipo<select [ngModel]="kindFilter()" (ngModelChange)="kindFilter.set($event)">
+            <option value="">Abilità e magie</option>
+            <option value="ability">Abilità</option>
+            <option value="spell">Magie</option>
+          </select></label
+        >
+        <label
+          >Avventura<select
+            [ngModel]="adventureFilter()"
+            (ngModelChange)="adventureFilter.set($event)"
+          >
+            <option value="">Tutte le avventure</option>
+            @for (a of adventures(); track a.id) {
+              <option [value]="a.id">{{ a.title }}</option>
+            }
+          </select></label
+        >
+        @for (power of filtered(); track power.id) {
+          <button
+            type="button"
+            class="catalog-entry"
+            [class.selected]="draft.id === power.id"
+            [disabled]="dirty() || saving()"
+            (click)="edit(power)"
+          >
+            <strong>{{ power.name }}</strong
+            ><small
+              >{{ power.kind === 'spell' ? 'Magia' : 'Abilità' }} ·
+              {{ power.characterIds.length }} personaggi</small
+            >
+          </button>
+        } @empty {
+          <p>Nessuna voce corrispondente.</p>
+        }
+      </aside>
+      <form class="catalog-editor card glass-surface" (ngSubmit)="save()">
+        <h2>{{ draft.revision === null ? 'Nuova voce' : draft.name }}</h2>
+        <fieldset [disabled]="!canManage() || loading() || saving()">
+          <label
+            >Tipo<select name="kind" [(ngModel)]="draft.kind" (ngModelChange)="change()">
+              <option value="ability">Abilità</option>
+              <option value="spell">Magia</option>
+            </select></label
+          >
+          <label
+            >Nome<input
+              name="name"
+              required
+              maxlength="160"
+              [(ngModel)]="draft.name"
+              (ngModelChange)="change()"
+          /></label>
+          <label
+            >Descrizione<textarea
+              name="description"
+              rows="5"
+              maxlength="20000"
+              [(ngModel)]="draft.description"
+              (ngModelChange)="change()"
+            ></textarea>
+          </label>
+          <label
+            >Effetti e tabelle aggiuntive<textarea
+              name="effects"
+              rows="8"
+              maxlength="200000"
+              [(ngModel)]="effectsSource"
+              (ngModelChange)="change()"
+            ></textarea>
+          </label>
+          <p class="hint">Puoi usare titoli (##), elenchi (-) e tabelle con le barre |.</p>
+          @if (effectsSource) {
+            <details>
+              <summary>Anteprima degli effetti</summary>
+              <app-gdr-blocks
+                [blocks]="referenceRows($any(parseGdrMarkdown(effectsSource).blocks))"
+              />
+            </details>
+          }
+          <fieldset>
+            <legend>Disponibile nelle avventure</legend>
+            @for (a of adventures(); track a.id) {
+              <label class="check"
+                ><input
+                  type="checkbox"
+                  [checked]="draft.adventureIds.includes(a.id)"
+                  (change)="toggle('adventureIds', a.id, $any($event.target).checked)"
+                />{{ a.title }}</label
+              >
+            }
+          </fieldset>
+          <fieldset>
+            <legend>Usata dai personaggi</legend>
+            <p class="hint">Scegli i PG e PNG che usano questa voce nelle avventure abilitate.</p>
+            @for (c of availableCharacters(); track c.id) {
+              <label class="check"
+                ><input
+                  type="checkbox"
+                  [checked]="draft.characterIds.includes(c.id)"
+                  (change)="toggle('characterIds', c.id, $any($event.target).checked)"
+                />{{ c.name }} · {{ c.kind === 'pg' ? 'PG' : 'PNG' }} ·
+                {{ adventureName(c.adventureId) }}{{ c.archived ? ' · archiviato' : '' }}</label
+              >
+            } @empty {
+              <p>Seleziona prima un’avventura.</p>
+            }
+          </fieldset>
+        </fieldset>
+        @if (dirty()) {
+          <p class="hint">Salva o annulla prima di scegliere un’altra voce.</p>
+        }
+        <div class="actions">
+          <button type="button" class="btn" [disabled]="saving()" (click)="cancel()">
+            Annulla modifiche</button
+          ><button
+            class="btn btn-submit"
+            type="submit"
+            [disabled]="!canManage() || !dirty() || saving() || loading()"
+          >
+            {{ saving() ? 'Salvataggio…' : 'Salva voce e assegnazioni' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </main>
+</app-shell>

@@ -61,6 +61,12 @@ export type GdrBlockData =
   | GdrListData
   | GdrTableData;
 
+export type GdrReferenceBlock = { type: GdrBlockType; data: GdrBlockData };
+
+export function referenceRows(blocks: GdrReferenceBlock[]): GdrBlockRow[] {
+  return blocks.map((block,position)=>({...block,id:`reference-${position}`,position,documentKey:'maga-regole'}));
+}
+
 export interface GdrBlockRow {
   id: string;
   documentKey: GdrDocumentKey;

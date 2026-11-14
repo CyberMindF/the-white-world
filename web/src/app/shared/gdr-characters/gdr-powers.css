@@ -12,3 +12,6 @@ summary { padding: .75rem .85rem; cursor: pointer; font-weight: 600; overflow-wr
 summary:focus-visible { outline: 2px solid var(--focus-color); outline-offset: 2px; border-radius: .6rem; }
 details p { margin: 0; padding: 0 .85rem .85rem; line-height: 1.6; white-space: pre-line; }
 .power-table { margin: .8rem 0; overflow: auto; }
+.catalog-power { margin: .6rem 0; }
+.power-description { padding: .2rem .9rem 1rem; }
+summary small { font-weight: 400; opacity: .75; }

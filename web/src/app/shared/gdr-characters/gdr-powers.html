@@ -1,7 +1,7 @@
 @if (!workspace.available()) {
   <p>Non è stato possibile caricare il personaggio. Riapri la scheda per riprovare.</p>
 } @else if (workspace.active(); as c) {
-  @if (workspace.characters().length > 1) {
+  @if (showCharacterSelector() && workspace.characters().length > 1) {
     <label for="powers-character">Personaggio</label>
     <select id="powers-character" [disabled]="workspace.pendingChanges() || workspace.saving()"
       [ngModel]="c.id" (ngModelChange)="workspace.activeId.set($event)">
@@ -11,8 +11,17 @@
     </select>
   }
   <header><h3>Abilità e incantesimi</h3></header>
-  @if (c.profile.abilities) {
-    <app-gdr-turn [source]="c.profile.abilities" />
+  @if (personalNotes()) {
+    <app-gdr-turn [source]="personalNotes()" />
+  }
+  @for (power of c.powers ?? []; track power.id) {
+    <details class="catalog-power">
+      <summary>{{ power.name }} <small>· {{ power.kind === 'spell' ? 'Magia' : 'Abilità' }}</small></summary>
+      <div class="power-description">
+        @if (power.description) { <app-gdr-turn [source]="power.description" /> }
+        <app-gdr-blocks [blocks]="referenceRows(power.effects)" />
+      </div>
+    </details>
   }
   @for (block of blocks(); track block.id) {
     @switch (block.type) {
@@ -32,7 +41,7 @@
       @default { <app-gdr-blocks [blocks]="[block]" /> }
     }
   }
-  @if (!c.profile.abilities && !blocks().length) {
+  @if (!personalNotes() && !blocks().length && !(c.powers?.length)) {
     <p class="hint">Il master non ha ancora aggiunto abilità o incantesimi a questo personaggio.</p>
   }
 } @else {

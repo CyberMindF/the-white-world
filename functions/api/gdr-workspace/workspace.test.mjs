@@ -161,7 +161,7 @@ test('unificazione: conserva PG assegnato, statistiche e gatto; il nome modifica
 });
 test('PNG del racconto: una sola identità, rinomina visibile nella storia e nessuna ricreazione dopo eliminazione',async()=>{
  const h=apiHarness();h.sqlite.prepare('INSERT INTO gdr_character_schema VALUES(?,?)').run(adventureId,'[]');
- h.sqlite.prepare('INSERT INTO gdr_blocks VALUES(1,?,?,?,0)').run('avventura','npc_grid',JSON.stringify({entries:[{name:'Shivay',image:'',description:'Una compagna'}]}));
+ h.sqlite.prepare('INSERT INTO gdr_blocks(id,document_key,type,data,position) VALUES(1,?,?,?,0)').run('avventura','npc_grid',JSON.stringify({entries:[{name:'Shivay',image:'',description:'Una compagna'}]}));
  await mutate(h.db,master,{action:'createCharacter',id:'existing-npc',adventureId,kind:'png',name:'Shivay'});
  await mutate(h.db,master,{action:'syncLegacy',adventureId});await mutate(h.db,master,{action:'syncLegacy',adventureId});
  let view=await (await h.call(1)).json();assert.equal(view.characters.filter(c=>c.kind==='png').length,1);
@@ -182,7 +182,7 @@ test('campi numerici della scheda unica: valori non validi non sovrascrivono il 
 });
 test('foto nel racconto e avatar del PNG restano indipendenti dopo il ritaglio',async()=>{
  const h=apiHarness();h.sqlite.prepare('INSERT INTO gdr_character_schema VALUES(?,?)').run(adventureId,'[]');
- h.sqlite.prepare('INSERT INTO gdr_blocks VALUES(1,?,?,?,0)').run('avventura','npc_grid',JSON.stringify({entries:[{name:'Shivay',image:'/assets/shivay-intera.webp',description:'Una compagna'}]}));
+ h.sqlite.prepare('INSERT INTO gdr_blocks(id,document_key,type,data,position) VALUES(1,?,?,?,0)').run('avventura','npc_grid',JSON.stringify({entries:[{name:'Shivay',image:'/assets/shivay-intera.webp',description:'Una compagna'}]}));
  await mutate(h.db,master,{action:'syncLegacy',adventureId});
  let npc=(await (await h.call(1)).json()).characters.find(c=>c.kind==='png');
  await mutate(h.db,master,{action:'saveCharacter',characterId:npc.id,revision:npc.revision,name:npc.name,portrait:'/api/media/gdr-workspace/shivay/avatar/ritaglio.webp',sheet:'',profile:npc.profile});
