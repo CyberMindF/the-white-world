@@ -1,4 +1,4 @@
-import { sendEmail } from './email.js';
+import { sendEmail, getEmailBcc } from './email.js';
 
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -41,6 +41,7 @@ export async function deliverWorldUpdateEmails(env) {
         const route = update.route?.startsWith('/') && !update.route.startsWith('//') ? update.route : '/novita';
         const payload = update.payload ? JSON.parse(update.payload) : {
           to: recipient.email,
+          bcc: await getEmailBcc(env, recipient.email),
           subject: `Novità nel Mondo Bianco: ${update.title}`,
           html: `<p>${escapeHtml(update.body).replace(/\n/g, '<br>')}</p><p><a href="${escapeHtml('https://il-mondo-bianco.com' + route)}">${escapeHtml(update.cta_label || 'Leggi la novità')}</a></p>`,
           text: `${update.title}\n\n${update.body}\n\nhttps://il-mondo-bianco.com${route}`
@@ -49,7 +50,9 @@ export async function deliverWorldUpdateEmails(env) {
         if (payload.to !== recipient.email) throw new Error('Destinatario della notifica modificato');
         await env.DB.prepare('UPDATE world_update_emails SET payload=?,first_attempt_at=COALESCE(first_attempt_at,?) WHERE update_id=? AND claimed_at=?')
           .bind(JSON.stringify(payload), now, update.id, now).run();
-        const result = await sendEmail(env, {...payload, idempotencyKey: `world-update/${update.id}`});
+        // I tentativi iniziati prima della CCN mantengono il payload originale:
+        // cambiare destinatari con la stessa chiave di idempotenza verrebbe rifiutato.
+        const result = await sendEmail(env, {...payload, bcc: payload.bcc ?? [], idempotencyKey: `world-update/${update.id}`});
         await env.DB.prepare(`UPDATE world_update_emails SET state=?,sent_at=? WHERE update_id=? AND claimed_at=?`)
           .bind(result.sent ? 'sent' : 'pending', result.sent ? now : null, update.id, now).run();
         totals[result.sent ? 'sent' : 'failed']++;

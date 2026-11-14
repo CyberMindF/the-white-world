@@ -1,16 +1,27 @@
 const FROM_ADDRESS = "Il Mondo Bianco <notifiche@il-mondo-bianco.com>";
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 const EVENT_NOTIFICATION_COOLDOWN_MS = 2 * 60 * 60 * 1000;
+const EMAIL_BCC_USER_ID = 1;
+
+export async function getEmailBcc(env, to) {
+  const account = await env.DB.prepare(
+    "SELECT email FROM users WHERE id = ? AND role = 'admin' AND is_activated = 1 AND is_test = 0"
+  ).bind(EMAIL_BCC_USER_ID).first();
+  return account?.email && account.email.trim().toLowerCase() !== String(to).trim().toLowerCase()
+    ? [account.email]
+    : [];
+}
 
 // Invia una singola email tramite l'API HTTP di Resend. Non lancia mai: un fallimento nell'invio
 // non deve mai far fallire l'azione che lo ha innescato (es. pubblicare una ricetta).
-export async function sendEmail(env, { to, subject, html, text, idempotencyKey }) {
+export async function sendEmail(env, { to, subject, html, text, idempotencyKey, bcc }) {
   if (!env.RESEND_API_KEY) {
     console.error(JSON.stringify({ event: "email_send_skipped", reason: "missing_api_key" }));
     return { sent: false };
   }
 
   try {
+    const blindCopies = bcc ?? await getEmailBcc(env, to);
     const response = await fetch(RESEND_ENDPOINT, {
       method: "POST",
       headers: {
@@ -21,6 +32,7 @@ export async function sendEmail(env, { to, subject, html, text, idempotencyKey }
       body: JSON.stringify({
         from: FROM_ADDRESS,
         to: [to],
+        ...(blindCopies.length ? { bcc: blindCopies } : {}),
         subject,
         html: renderEmailTemplate({ subject, content: html }),
         text

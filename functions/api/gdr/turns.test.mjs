@@ -149,8 +149,8 @@ test('un problema alle Novità non impedisce di salvare il seguito',async()=>{
 
 test('pubblicazione completa: il seguito crea la Novità e invia una sola email con il forzatore Safe',async()=>{
  const source=path=>readFileSync(path,'utf8').replace(/^import .*;\n/gm,'').replace(/export /g,'');
- const sendEmail=new Function(source('functions/api/_shared/email.js')+';return sendEmail;')();
- const deliver=new Function('sendEmail',source('functions/api/_shared/world-update-emails.js')+';return deliverWorldUpdateEmails;')(sendEmail);
+ const {sendEmail,getEmailBcc}=new Function(source('functions/api/_shared/email.js')+';return {sendEmail,getEmailBcc};')();
+ const deliver=new Function('sendEmail','getEmailBcc',source('functions/api/_shared/world-update-emails.js')+';return deliverWorldUpdateEmails;')(sendEmail,getEmailBcc);
  const add=new Function('deliverWorldUpdateEmails',source('functions/api/_shared/world-updates.js')+';return addWorldUpdate;')(deliver);
  const h=fixture({announce:(env,update)=>add({...env,RESEND_API_KEY:'fake-key'},update)}),original=globalThis.fetch,calls=[];
  globalThis.fetch=async(url,init)=>{calls.push(JSON.parse(init.body));return Response.json({id:'email-gdr'})};
@@ -160,6 +160,7 @@ test('pubblicazione completa: il seguito crea la Novità e invia una sola email 
     ALTER TABLE users ADD COLUMN notify_email_updates INTEGER DEFAULT 0;
     ALTER TABLE users ADD COLUMN admin_email_updates INTEGER DEFAULT 0;
     ALTER TABLE users ADD COLUMN safe_mode INTEGER DEFAULT 0;
+    ALTER TABLE users ADD COLUMN is_activated INTEGER DEFAULT 1;
     UPDATE users SET email='master@example.test',identity='lui' WHERE id=1;
     UPDATE users SET email='player@example.test',identity='lei',admin_email_updates=1,safe_mode=1 WHERE id=2;`);
   h.sqlite.exec(readFileSync('migrations/0132_add_world_updates_and_promos.sql','utf8').split('CREATE TABLE world_promos')[0]);
@@ -171,6 +172,7 @@ test('pubblicazione completa: il seguito crea la Novità e invia una sola email 
   assert.equal(h.sqlite.prepare('SELECT state FROM world_update_emails WHERE update_id=?').get(update.id).state,'sent');
   assert.equal(h.sqlite.prepare('SELECT user_id FROM world_update_reads WHERE update_id=?').get(update.id).user_id,1);
   assert.equal(calls.length,1);assert.deepEqual(calls[0].to,['player@example.test']);
+  assert.deepEqual(calls[0].bcc,['master@example.test']);
   assert.match(calls[0].subject,/L’avventura continua: Il Prezzo della Verità/);
   assert.ok(calls[0].text.includes('https://il-mondo-bianco.com/tavolo-da-gioco/gdr/gioca/il-prezzo-della-verita'));
   assert.ok(!calls[0].html.includes('Il seguito completo rimane nel GDR.'));
