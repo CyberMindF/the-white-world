@@ -70,7 +70,7 @@
     </section>
   }
   @else {
-    @if (arrival()) {
+    @for (message of arrivalMessages(); track message.id) {
       <div #arrivalElement class="global-chat-arrival glass-surface" [class.is-fading]="arrivalFading()" role="status" aria-live="polite" aria-atomic="true"
         (mouseenter)="pauseArrival()" (mouseleave)="resumeArrival()" (focusin)="pauseArrival()" (focusout)="resumeArrival()">
         <button type="button" class="global-chat-arrival-open" (click)="toggle()" [attr.aria-label]="'Apri il messaggio di ' + chat.contactName()">

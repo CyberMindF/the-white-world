@@ -26,11 +26,12 @@ export class GlobalChatWidget {
   protected readonly pendingPreviewUrl = signal<string | null>(null);
   private readonly arrivalId = signal<string | null>(null);
   protected readonly arrival = computed(() => this.chat.messages().find(message => message.id === this.arrivalId()));
+  protected readonly arrivalMessages = computed(() => { const message = this.arrival(); return message ? [message] : []; });
   protected readonly arrivalFading = signal(false);
   protected readonly arrivalText = computed(() => {
     const message = this.arrival();
-    const text = message?.body?.trim().replace(/\s+/g, ' ');
-    return text ? text.slice(0, 180) + (text.length > 180 ? '…' : '')
+    const text = message?.body?.trim();
+    return text ? text
       : message?.mediaType === 'photo' ? '📷 Foto' : message?.mediaType === 'video' ? '🎬 Video' : 'Nuovo messaggio';
   });
   private arrivalTimer?: ReturnType<typeof setTimeout>;
@@ -44,7 +45,7 @@ export class GlobalChatWidget {
       if (this.open() || document.visibilityState !== 'visible') return;
       this.pauseArrival();
       this.arrivalId.set(message.id);
-      this.resumeArrival();
+      afterNextRender(() => this.resumeArrival(), { injector: this.injector });
     });
     this.destroyRef.onDestroy(() => this.clearArrivalTimers());
     effect(() => {

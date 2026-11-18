@@ -146,6 +146,7 @@ try {
     await page
       .getByRole("button", { name: "Apri il messaggio di Rory", exact: true })
       .waitFor();
+    await page.locator('.global-chat-arrival').evaluate(element => Promise.all(element.getAnimations().map(animation => animation.finished)));
     const geometry = await page.evaluate(() => {
       const notice = document
           .querySelector(".global-chat-arrival")
