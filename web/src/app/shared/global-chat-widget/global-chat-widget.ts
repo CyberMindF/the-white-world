@@ -1,4 +1,5 @@
-import { Component, ElementRef, Injector, ViewChild, afterNextRender, effect, inject, signal, untracked } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Injector, ViewChild, afterNextRender, computed, effect, inject, signal, untracked } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -9,11 +10,13 @@ import { GlobalChatService } from '../../core/global-chat.service';
   standalone: true,
   imports: [DatePipe, FormsModule, RouterLink],
   templateUrl: './global-chat-widget.html',
-  styleUrl: './global-chat-widget.css'
+  styleUrl: './global-chat-widget.css',
+  host: { '(document:visibilitychange)': 'onVisibilityChange()' }
 })
 export class GlobalChatWidget {
   protected readonly chat = inject(GlobalChatService);
   private readonly injector = inject(Injector);
+  private readonly destroyRef = inject(DestroyRef);
   private waitingForFirstMessages = false;
   protected readonly open = signal(false);
   protected readonly text = signal('');
@@ -21,10 +24,29 @@ export class GlobalChatWidget {
   protected readonly error = signal('');
   protected readonly pendingFile = signal<File | null>(null);
   protected readonly pendingPreviewUrl = signal<string | null>(null);
+  private readonly arrivalId = signal<string | null>(null);
+  protected readonly arrival = computed(() => this.chat.messages().find(message => message.id === this.arrivalId()));
+  protected readonly arrivalFading = signal(false);
+  protected readonly arrivalText = computed(() => {
+    const message = this.arrival();
+    const text = message?.body?.trim().replace(/\s+/g, ' ');
+    return text ? text.slice(0, 180) + (text.length > 180 ? '…' : '')
+      : message?.mediaType === 'photo' ? '📷 Foto' : message?.mediaType === 'video' ? '🎬 Video' : 'Nuovo messaggio';
+  });
+  private arrivalTimer?: ReturnType<typeof setTimeout>;
+  private arrivalRemovalTimer?: ReturnType<typeof setTimeout>;
   @ViewChild('log') private log?: ElementRef<HTMLElement>;
   @ViewChild('fileInput') private fileInput?: ElementRef<HTMLInputElement>;
+  @ViewChild('arrivalElement') private arrivalElement?: ElementRef<HTMLElement>;
 
   constructor() {
+    this.chat.incomingMessage$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(message => {
+      if (this.open() || document.visibilityState !== 'visible') return;
+      this.pauseArrival();
+      this.arrivalId.set(message.id);
+      this.resumeArrival();
+    });
+    this.destroyRef.onDestroy(() => this.clearArrivalTimers());
     effect(() => {
       const opened = this.open(), count = this.chat.messages().length;
       // Se la prima risposta arriva dopo l'apertura, partiamo comunque dall'ultimo messaggio.
@@ -37,6 +59,7 @@ export class GlobalChatWidget {
   }
 
   protected toggle(): void {
+    this.dismissArrival();
     this.open.update((value) => !value);
     this.chat.panelOpen.set(this.open());
     this.waitingForFirstMessages = this.open() && this.chat.messages().length === 0;
@@ -44,6 +67,35 @@ export class GlobalChatWidget {
       void this.chat.markRead();
       this.scheduleScrollToBottom();
     }
+  }
+
+  private clearArrivalTimers(): void {
+    clearTimeout(this.arrivalTimer);
+    clearTimeout(this.arrivalRemovalTimer);
+  }
+
+  protected pauseArrival(): void {
+    this.clearArrivalTimers();
+    this.arrivalFading.set(false);
+  }
+
+  protected resumeArrival(): void {
+    if (!this.arrivalId() || this.arrivalElement?.nativeElement.matches(':hover, :focus-within')) return;
+    this.clearArrivalTimers();
+    this.arrivalTimer = setTimeout(() => {
+      this.arrivalFading.set(true);
+      this.arrivalRemovalTimer = setTimeout(() => this.dismissArrival(), 2000);
+    }, 4000);
+  }
+
+  protected dismissArrival(): void {
+    this.clearArrivalTimers();
+    this.arrivalId.set(null);
+    this.arrivalFading.set(false);
+  }
+
+  protected onVisibilityChange(): void {
+    if (document.visibilityState !== 'visible') this.dismissArrival();
   }
 
   protected async send(): Promise<void> {

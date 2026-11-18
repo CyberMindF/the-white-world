@@ -70,6 +70,15 @@
     </section>
   }
   @else {
+    @if (arrival()) {
+      <div #arrivalElement class="global-chat-arrival glass-surface" [class.is-fading]="arrivalFading()" role="status" aria-live="polite" aria-atomic="true"
+        (mouseenter)="pauseArrival()" (mouseleave)="resumeArrival()" (focusin)="pauseArrival()" (focusout)="resumeArrival()">
+        <button type="button" class="global-chat-arrival-open" (click)="toggle()" [attr.aria-label]="'Apri il messaggio di ' + chat.contactName()">
+          <strong>{{ chat.contactName() }}</strong><span>{{ arrivalText() }}</span>
+        </button>
+        <button type="button" class="global-chat-icon-btn global-chat-arrival-close" (click)="dismissArrival()" aria-label="Chiudi anteprima del messaggio">×</button>
+      </div>
+    }
     <button type="button" class="global-chat-trigger glass-surface" [class.has-unread]="chat.unreadCount() > 0" (click)="toggle()" aria-expanded="false"
       [attr.aria-label]="chat.unreadCount() ? 'Apri la chat globale, ' + chat.unreadCount() + ' messaggi non letti' : 'Apri la chat globale'">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3C6.9 3 3 6.45 3 10.75c0 2.42 1.24 4.6 3.28 6.04L5.4 20.5a.4.4 0 0 0 .55.46l4.14-2.1c.62.1 1.26.14 1.91.14 5.1 0 9-3.45 9-8.25S17.1 3 12 3Z"/></svg>

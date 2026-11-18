@@ -2,7 +2,8 @@ import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core'
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService, UserIdentity } from './auth.service';
 import { ApiService } from './api.service';
-import { RealtimeService } from './realtime.service';
+import { RealtimeEvent, RealtimeService } from './realtime.service';
+import { Subject } from 'rxjs';
 import { SafeModeService, isSafeRoute } from './safe-mode.service';
 import { WORLD_PLACES } from './world-places';
 
@@ -34,6 +35,10 @@ export class GlobalChatService {
   private readonly destroyRef = inject(DestroyRef);
   private originalTitle = document.title;
   private loadedForUserId: number | null = null;
+  private previewBaselineId: number | null = null;
+  private lastPreviewedId = 0;
+  private readonly incomingMessageSubject = new Subject<ChatMessage>();
+  readonly incomingMessage$ = this.incomingMessageSubject.asObservable();
 
   readonly messages = signal<ChatMessage[]>([]);
   readonly unreadCount = signal(0);
@@ -44,7 +49,7 @@ export class GlobalChatService {
   readonly contactName = computed(() => this.auth.currentUser()?.identity === 'lui' ? 'Desy' : 'Rory');
 
   constructor() {
-    this.realtime.on('ponti-chat:changed').pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => void this.loadRecent());
+    this.realtime.on('ponti-chat:changed').pipe(takeUntilDestroyed(this.destroyRef)).subscribe(event => void this.refreshFromRealtime(event));
     this.realtime.on('presence:changed').pipe(takeUntilDestroyed(this.destroyRef)).subscribe((event) => {
       const user = this.auth.currentUser();
       if (!user || event['identity'] === user.identity || event['isTest'] !== user.isTest) return;
@@ -60,11 +65,15 @@ export class GlobalChatService {
     const userId = this.auth.currentUser()?.id;
     if (userId === undefined || this.loadedForUserId === userId) return;
     this.loadedForUserId = userId;
+    this.previewBaselineId = null;
+    this.lastPreviewedId = 0;
     await this.loadRecent();
   }
 
   clear(): void {
     this.loadedForUserId = null;
+    this.previewBaselineId = null;
+    this.lastPreviewedId = 0;
     this.messages.set([]);
     this.unreadCount.set(0);
     this.contactPresence.set({ online: false, path: null, lastSeen: null });
@@ -79,11 +88,34 @@ export class GlobalChatService {
       if (!response.ok) return;
       const result = await this.api.readApiResponse<{ messages?: ChatMessage[]; unreadCount?: number }>(response);
       this.messages.set(result.messages ?? []);
+      if (this.previewBaselineId === null) {
+        this.previewBaselineId = Math.max(0, ...this.messages().map(message => Number(message.id)).filter(Number.isSafeInteger));
+      }
       this.unreadCount.set(result.unreadCount ?? 0);
       this.updateTitle();
       if (this.panelOpen() && this.unreadCount()) void this.markRead();
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  private async refreshFromRealtime(event: RealtimeEvent): Promise<void> {
+    const userId = this.ownUserId();
+    const id = Number(event['messageId']);
+    // Il primo caricamento è cronologia, non un arrivo. Il Subject non ripropone
+    // notifiche vecchie quando il widget viene ricreato navigando fra le pagine.
+    const freshArrival = this.previewBaselineId !== null && event['action'] === 'created' &&
+      Number.isSafeInteger(id) && id > this.previewBaselineId;
+    const showPreview = document.visibilityState === 'visible' && !this.panelOpen();
+    try {
+      await this.loadRecent();
+      if (!freshArrival || !userId || userId !== this.ownUserId() || id <= this.lastPreviewedId) return;
+      const message = this.messages().find(item => item.id === String(id));
+      if (!message || message.senderUserId === userId || message.readAt) return;
+      this.lastPreviewedId = id;
+      if (showPreview && document.visibilityState === 'visible' && !this.panelOpen()) this.incomingMessageSubject.next(message);
+    } catch (error) {
+      console.warn('Impossibile aggiornare la chat:', error);
     }
   }
 
