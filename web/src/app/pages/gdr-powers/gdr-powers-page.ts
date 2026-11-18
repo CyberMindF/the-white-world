@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { AppShell } from '../../shell/app-shell';
+import { GdrManagementShell } from '../../shared/gdr-management/gdr-management-shell';
 import { AuthService } from '../../core/auth.service';
 import { SafeModeService } from '../../core/safe-mode.service';
 import { GdrBlocks } from '../../shared/gdr-blocks/gdr-blocks';
@@ -37,7 +37,7 @@ const empty = (): CatalogPower => ({
 @Component({
   selector: 'app-gdr-powers-page',
   standalone: true,
-  imports: [FormsModule, AppShell, GdrBlocks],
+  imports: [FormsModule, GdrManagementShell, GdrBlocks],
   templateUrl: './gdr-powers-page.html',
   styleUrl: './gdr-powers-page.css',
 })
@@ -94,7 +94,7 @@ export class GdrPowersPage implements OnInit {
       this.powers.set(data.powers);
       this.systems.set(data.systems);
       const selected =
-        data.powers.find((p: CatalogPower) => p.id === this.draft.id) ?? this.filtered()[0];
+        data.powers.find((p: CatalogPower) => p.id === this.draft.id) ?? data.powers.find((p: CatalogPower) => p.id === this.route.snapshot.queryParamMap.get('power')) ?? this.filtered()[0];
       if (selected) this.edit(selected);
       else this.create();
     } catch (error) {
@@ -115,20 +115,12 @@ export class GdrPowersPage implements OnInit {
     if (this.saving() || this.dirty()) return;
     this.draft = empty();
     this.effectsSource = '';
-    const system = this.systemFilter();
-    if (system) this.draft.systemIds = [system];
     this.error.set('');
     this.notice.set('');
   }
   protected change(): void {
     this.dirty.set(true);
     this.notice.set('');
-  }
-  protected toggle(kind: 'systemIds', id: string, checked: boolean): void {
-    this.draft[kind] = checked
-      ? [...this.draft[kind], id]
-      : this.draft[kind].filter((value) => value !== id);
-    this.change();
   }
   protected async cancel(): Promise<void> {
     this.dirty.set(false);
@@ -146,6 +138,7 @@ export class GdrPowersPage implements OnInit {
       this.error.set(parsed.errors.map((e) => e.message).join(' '));
       return;
     }
+    const creating=this.draft.revision===null;
     this.saving.set(true);
     this.error.set('');
     try {
@@ -164,8 +157,9 @@ export class GdrPowersPage implements OnInit {
       if (!response.ok) throw new Error(data.error || 'Salvataggio non riuscito.');
       this.dirty.set(false);
       this.saving.set(false);
+      if(creating)this.systemFilter.set('');
       await this.load();
-      this.notice.set('Voce salvata.');
+      this.notice.set(creating?'Voce salvata. Puoi includerla nei sistemi dalla sezione «Sistemi».':'Voce salvata.');
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Non è stato possibile salvare.');
     } finally {

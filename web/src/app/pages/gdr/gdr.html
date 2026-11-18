@@ -1,16 +1,11 @@
-<app-shell
-  [homeHref]="management ? '/tavolo-da-gioco/gdr' : '/tavolo-da-gioco'"
-  [homeAria]="management ? 'Torna alle avventure GDR' : 'Torna al Tavolo da Gioco'"
-  [homeLabel]="management ? 'Gioco di Ruolo' : 'Il Tavolo da Gioco'"
->
+<app-shell homeHref="/tavolo-da-gioco" homeLabel="Il Tavolo da Gioco" homeAria="Torna al Tavolo da Gioco">
   <section class="tavolo-hero tavolo-hero-text-only" aria-labelledby="gdr-title">
     <p class="tavolo-eyebrow">Il tavolo · giochi di ruolo</p>
     <h1 id="gdr-title">
-      <span aria-hidden="true">🐉</span> {{ management ? 'Gestione GDR' : 'Gioco di Ruolo' }}{{ classic ? ' · versione classica' : '' }}
+      <span aria-hidden="true">🐉</span> Gioco di Ruolo{{ classic ? ' · versione classica' : '' }}
     </h1>
   </section>
 
-  @if (!management) {
   <div class="tavolo-intro" [class.tavolo-intro-rules]="safe.enabled()">
     @if (safe.enabled()) {
       <p>Qui giochiamo raccontando una storia a turni. Io faccio da master: descrivo i luoghi, interpreto gli altri personaggi e ti racconto cosa succede. Tu muovi la protagonista e scegli cosa fa, dice e pensa.</p>
@@ -22,12 +17,7 @@
     }
   </div>
 
-  }
-  @if (canManagePowers()) {
-    <p><a class="btn" [routerLink]="management ? '/tavolo-da-gioco/gdr/gestione/poteri' : '/tavolo-da-gioco/gdr/gestione'">{{ management ? 'Catalogo abilità e magie' : 'Gestione GDR' }}</a></p>
-  }
-  @if (management && canManagePowers()) { <p><a class="btn" routerLink="/tavolo-da-gioco/gdr/gestione/sistemi">Sistemi di gioco</a></p> }
-  @if (management) { <p class="tavolo-intro">Scegli un’avventura per gestire PG e PNG, sistema e contenuti. Riusa sistemi, regole, abilità e magie tra le avventure.</p> }
+  @if (canManagePowers()) { <p><a class="btn" routerLink="/tavolo-da-gioco/gdr/gestione">Gestione GDR</a></p> }
   <section class="tavolo-games" aria-labelledby="adventures-title">
     <div class="tavolo-section-heading">
       <p class="tavolo-eyebrow">Le storie</p>
@@ -40,77 +30,33 @@
       <a
         class="tavolo-game-card card glass-surface is-available"
         [routerLink]="
-          management ? '/tavolo-da-gioco/gdr/gestione/il-prezzo-della-verita' : classic
+          classic
             ? '/tavolo-da-gioco/gdr/il-prezzo-della-verita/avventura'
             : '/tavolo-da-gioco/gdr/gioca/il-prezzo-della-verita'
         "
         ><span class="tavolo-game-emoji">{{ adventureIcon('il-prezzo-della-verita') }}</span><strong>Il Prezzo della Verità</strong
-        ><small>{{ management ? 'Gestisci avventura' : 'Entra' }}</small></a
+        ><small>Entra</small></a
       >
       <a
         class="tavolo-game-card card glass-surface is-available"
         [routerLink]="
-          management ? '/tavolo-da-gioco/gdr/gestione/la-casa-che-trattiene-il-respiro' : classic
+          classic
             ? '/tavolo-da-gioco/gdr/la-casa-che-trattiene-il-respiro'
             : '/tavolo-da-gioco/gdr/gioca/la-casa-che-trattiene-il-respiro'
         "
         ><span class="tavolo-game-emoji">{{ adventureIcon('la-casa-che-trattiene-il-respiro') }}</span><strong>La casa che trattiene il respiro</strong
-        ><small>{{ management ? 'Gestisci avventura' : 'Entra' }}</small></a
+        ><small>Entra</small></a
       >
       @if (!classic) {
         @for (a of customAdventures(); track a.id) {
           <a
             class="tavolo-game-card card glass-surface is-available"
-            [routerLink]="[management ? '/tavolo-da-gioco/gdr/gestione' : '/tavolo-da-gioco/gdr/gioca', a.id]"
+            [routerLink]="['/tavolo-da-gioco/gdr/gioca', a.id]"
             ><span class="tavolo-game-emoji">{{ adventureIcon(a.id) }}</span><strong>{{ a.title }}</strong
-            ><small>{{ management ? 'Gestisci avventura' : a.published ? 'Entra' : 'Bozza · solo admin' }}</small></a
+            ><small>{{ a.published ? 'Entra' : 'Bozza · solo admin' }}</small></a
           >
         }
-        @if (canCreate()) {
-          @if (createOpen()) {
-            <form
-              class="tavolo-game-card card glass-surface is-creating"
-              (ngSubmit)="createAdventure()"
-              aria-label="Nuova avventura"
-            >
-              <strong>Nuova avventura</strong>
-              <label class="form-field" for="new-adventure-title">
-                <span>Titolo della nuova avventura</span>
-                <input
-                  id="new-adventure-title"
-                  name="title"
-                  maxlength="160"
-                  [ngModel]="title()"
-                  (ngModelChange)="title.set($event)"
-                  [disabled]="workspace.saving()"
-                />
-              </label>
-              <label class="form-field">Sistema di gioco<select aria-label="Sistema di gioco" [ngModel]="systemId()" (ngModelChange)="systemId.set($event)" name="systemId" [disabled]="workspace.saving()"><option value="">Scegli un sistema…</option>@for(system of systems();track system.id){<option [value]="system.id">{{system.name}}</option>}</select></label>
-              <button class="btn" type="submit" [disabled]="workspace.saving() || !title().trim() || !systemId()">
-                Crea e inizia a scrivere
-              </button>
-              <button
-                class="btn"
-                type="button"
-                [disabled]="workspace.saving()"
-                (click)="createOpen.set(false)"
-              >
-                Annulla
-              </button>
-            </form>
-          } @else {
-            <button
-              type="button"
-              class="tavolo-game-card card glass-surface is-available"
-              aria-label="Nuova avventura"
-              [disabled]="!workspace.available() || workspace.saving()"
-              (click)="createOpen.set(true)"
-            >
-              <span class="tavolo-game-emoji" aria-hidden="true">➕</span
-              ><strong>Nuova avventura</strong><small>Crea una nuova storia</small>
-            </button>
-          }
-        }
+
       }
     </div>
   </section>

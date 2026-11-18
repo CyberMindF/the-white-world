@@ -1,11 +1,6 @@
-<app-shell homeHref="/tavolo-da-gioco/gdr/gestione" homeLabel="Gestione GDR" homeAria="Torna a Gestione GDR">
-  <main class="systems-page">
-    <header><p class="eyebrow">Gestione GDR</p><h1>Sistemi di gioco</h1><p>Riunisci regole, scheda, abilità e magie. Riusa i contenuti nelle tue avventure.</p></header>
-    <nav class="actions" aria-label="Gestione sistemi e regole">
-      <button class="btn" [attr.aria-pressed]="mode()==='systems'" [disabled]="!canLeave()" (click)="setMode('systems')">Sistemi</button>
-      <button class="btn" [attr.aria-pressed]="mode()==='rules'" [disabled]="!canLeave()" (click)="setMode('rules')">Libreria delle regole</button>
-      @if (canLeave()) { <a class="btn" routerLink="/tavolo-da-gioco/gdr/gestione/poteri">Catalogo abilità e magie</a> }
-    </nav>
+<app-gdr-management-shell [activeSection]="mode()==='rules'?'rules':'systems'" [blocked]="!canLeave()">
+  <section class="systems-page">
+    <header class="section-heading"><h2>{{mode()==='rules'?'Regole':'Sistemi'}}</h2></header>
     @if (error()) { <p class="error" role="alert">{{error()}}</p> }
     @if (notice()) { <p role="status">{{notice()}}</p> }
     @if (loading()) { <p role="status">Caricamento dei sistemi…</p> } @else {
@@ -37,7 +32,7 @@
               <details><summary>Anteprima della regola</summary><app-gdr-blocks [blocks]="referenceRows($any(parsed().blocks))" /></details>
             </fieldset>
             <div class="actions"><button class="btn" [disabled]="saving()" (click)="closeRule()">Annulla e chiudi</button><button class="btn" [disabled]="!canManage() || !ruleDirty() || saving() || !ruleDraft.title.trim() || !parsed().blocks.length || parsed().errors.length>0" (click)="saveRule()">{{saving()?'Salvataggio…':'Salva regola'}}</button>
-              @if(ruleDraft.revision!==null){<button class="btn" [disabled]="ruleDirty() || saving()" (click)="editRule(ruleDraft,true,mode()==='systems')">Crea copia indipendente</button>}
+              @if(ruleDraft.revision!==null){<button class="btn" [disabled]="ruleDirty() || saving()" (click)="editRule(ruleDraft,true)">Crea copia indipendente</button>}
             </div>
           } @else if (mode()==='systems') {
             <h2>{{draft.revision===null?'Nuovo sistema':draft.name}}</h2>
@@ -56,11 +51,11 @@
                 @for(id of draft.ruleIds;track id;let i=$index){
                   @if(rule(id);as rule){
                     <article class="rule-card"><details><summary>{{rule.title}}</summary><app-gdr-blocks [blocks]="referenceRows(rule.blocks)" /></details>
-                      <div class="actions"><button class="btn" [disabled]="i===0" [attr.aria-label]="'Sposta su '+rule.title" (click)="moveRule(i,-1)">↑</button><button class="btn" [disabled]="i===draft.ruleIds.length-1" [attr.aria-label]="'Sposta giù '+rule.title" (click)="moveRule(i,1)">↓</button><button class="btn" (click)="editRule(rule,false,true)">Modifica regola</button><button class="btn" (click)="editRule(rule,true,true)">Copia regola</button><button class="btn" [attr.aria-label]="'Rimuovi '+rule.title+' dal sistema'" (click)="removeRule(id)">Rimuovi dal sistema</button></div>
+                      <div class="actions"><button class="btn" [disabled]="i===0" [attr.aria-label]="'Sposta su '+rule.title" (click)="moveRule(i,-1)">↑</button><button class="btn" [disabled]="i===draft.ruleIds.length-1" [attr.aria-label]="'Sposta giù '+rule.title" (click)="moveRule(i,1)">↓</button>@if(canLeave()){<a class="btn" routerLink="/tavolo-da-gioco/gdr/gestione/regole" [queryParams]="{rule:rule.id}">Modifica nella libreria</a>}<button class="btn" [attr.aria-label]="'Rimuovi '+rule.title+' dal sistema'" (click)="removeRule(id)">Rimuovi dal sistema</button></div>
                     </article>
                   }
                 } @empty {<p>Questo sistema non contiene ancora regole.</p>}
-                <button class="btn" (click)="editRule(undefined,false,true)">+ Scrivi una regola</button>
+                @if(canLeave()){<a class="btn" routerLink="/tavolo-da-gioco/gdr/gestione/regole">Crea nella libreria delle regole</a>}
                 <h3>Riusa dalla libreria</h3>
                 <label>Cerca una regola<input type="search" [ngModel]="ruleSearch()" (ngModelChange)="ruleSearch.set($event)" /></label>
                 <div class="reuse-list">@for(rule of availableRules();track rule.id){
@@ -85,7 +80,7 @@
                 } @empty {<p>Non ci sono ancora campi aggiuntivi.</p>}
                 <button class="btn" (click)="addField()">+ Campo della scheda</button>
               } @else {
-                <h3>Abilità e magie disponibili</h3><p class="hint">Qui scegli il catalogo del sistema. Nei dettagli dei PG e PNG scegli quali voci possiede ogni personaggio.</p>
+                <h3>Abilità e magie disponibili</h3><p class="hint">Seleziona le voci disponibili per questo sistema. Crea e modifica le descrizioni in «Abilità e magie».</p>
                 <label>Cerca abilità o magia<input type="search" [ngModel]="powerSearch()" (ngModelChange)="powerSearch.set($event)" /></label>
                 @for(power of filteredPowers();track power.id){<label class="check power-choice"><input type="checkbox" [checked]="draft.powerIds.includes(power.id)" (change)="togglePower(power.id,$any($event.target).checked)" /><span><strong>{{power.name}}</strong><small>{{power.kind==='spell'?'Magia':'Abilità'}}</small></span></label>} @empty {<p>Crea le prime voci nel catalogo di abilità e magie.</p>}
               }
@@ -96,5 +91,5 @@
         </section>
       </div>
     }
-  </main>
-</app-shell>
+  </section>
+</app-gdr-management-shell>

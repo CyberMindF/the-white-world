@@ -20,6 +20,7 @@ import { serializeGdrBlocks } from '../../shared/gdr-blocks/gdr-markdown.seriali
 import { GdrWorkspaceService } from '../../core/gdr-workspace.service';
 import { GdrCharacters } from '../../shared/gdr-characters/gdr-characters';
 import { GdrPowers } from '../../shared/gdr-characters/gdr-powers';
+import { GdrManagementShell } from '../../shared/gdr-management/gdr-management-shell';
 import { GdrAdventureSystem } from '../../shared/gdr-rules/gdr-adventure-system';
 import { GdrRules } from '../../shared/gdr-rules/gdr-rules';
 import { GdrReferenceBlock } from '../../shared/gdr-blocks/gdr-block.types';
@@ -118,6 +119,7 @@ const dateFormatter = new Intl.DateTimeFormat('it-IT', {
   standalone: true,
   imports: [
     AppShell,
+    GdrManagementShell,
     RouterLink,
     NgTemplateOutlet,
     FormsModule,
@@ -165,13 +167,16 @@ export class GdrLaboratorio implements OnInit {
   protected readonly workspace = inject(GdrWorkspaceService);
   protected readonly panelTab = signal('personaggio');
   protected readonly managementMode = inject(ActivatedRoute).snapshot.data?.['management'] === true;
-  protected readonly managementSection = signal<'characters' | 'rules' | 'adventure'>(inject(ActivatedRoute).snapshot.queryParamMap?.get('sezione') === 'regole' ? 'rules' : inject(ActivatedRoute).snapshot.queryParamMap?.get('sezione') === 'avventura' ? 'adventure' : 'characters');
+  protected readonly managementSection = signal<'characters' | 'rules' | 'adventure'>(
+    ['regole','sistema'].includes(inject(ActivatedRoute).snapshot.queryParamMap?.get('sezione') ?? '') ? 'rules' :
+    inject(ActivatedRoute).snapshot.queryParamMap?.get('sezione') === 'personaggi' ? 'characters' : 'adventure');
   protected readonly masterCharactersOpen = computed(() => this.managementMode && this.managementSection() === 'characters');
   protected refreshCharacters(): void { if (!this.workspace.pendingChanges() && !this.workspace.saving()) void this.workspace.load(this.selected()); }
   protected setManagementSection(section: 'characters' | 'rules' | 'adventure'): void {
     if (this.workspace.pendingChanges() || this.workspace.saving() || this.inlineBusy()) return;
     this.managementSection.set(section);
     this.documentEditor.set(false);
+    if(this.managementMode)void this.router.navigate([], {relativeTo:this.route,queryParams:{sezione:section==='characters'?'personaggi':section==='rules'?'sistema':'contenuto'},queryParamsHandling:'merge',replaceUrl:true});
   }
 
   protected readonly adventureTitle = signal('');

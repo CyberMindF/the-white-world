@@ -251,6 +251,13 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/gdr/gdr').then((m) => m.Gdr),
       },
       {
+        path: 'tavolo-da-gioco/gdr/gestione/regole',
+        canActivate: [adminModeGuard],
+        canDeactivate: [(page: { canLeave: () => boolean }) => page.canLeave()],
+        data: { bodyClasses: ['tavolo-page'], managementSection: 'rules' },
+        loadComponent: () => import('./pages/gdr-systems/gdr-systems-page').then(m => m.GdrSystemsPage),
+      },
+      {
         path: 'tavolo-da-gioco/gdr/gestione/sistemi',
         canActivate: [adminModeGuard],
         canDeactivate: [(page: { canLeave: () => boolean }) => page.canLeave()],
@@ -274,8 +281,9 @@ export const routes: Routes = [
       {
         path: 'tavolo-da-gioco/gdr/gestione',
         canActivate: [adminModeGuard],
-        data: { bodyClasses: ['tavolo-page'], management: true },
-        loadComponent: () => import('./pages/gdr/gdr').then(m => m.Gdr),
+        canDeactivate: [(page: { canLeave: () => boolean }) => page.canLeave()],
+        data: { bodyClasses: ['tavolo-page'] },
+        loadComponent: () => import('./pages/gdr-management/gdr-management').then(m => m.GdrManagement),
       },
       {
         path: 'tavolo-da-gioco/gdr/poteri',

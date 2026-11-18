@@ -4,7 +4,7 @@ import { SafeModeService } from '../../core/safe-mode.service';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AppShell } from '../../shell/app-shell';
+import { GdrManagementShell } from '../../shared/gdr-management/gdr-management-shell';
 import { GdrPowersPage } from './gdr-powers-page';
 
 async function setup() {
@@ -60,7 +60,7 @@ async function setup() {
     ],
   });
   TestBed.overrideComponent(GdrPowersPage, {
-    remove: { imports: [AppShell] },
+    remove: { imports: [GdrManagementShell] },
     add: { schemas: [NO_ERRORS_SCHEMA] },
   });
   const fixture = TestBed.createComponent(GdrPowersPage);
@@ -97,14 +97,13 @@ describe('catalogo condiviso di abilità e magie', () => {
     TestBed.resetTestingModule();
     vi.unstubAllGlobals();
   });
-  it('modifica una descrizione e la disponibilità senza inviare assegnazioni ai personaggi', async () => {
+  it('modifica una descrizione conservando sistemi e personaggi assegnati', async () => {
     const { fixture, fetchMock, button, check } = await setup();
     await fixture.whenStable();
     const description = fixture.nativeElement.querySelector('[name="description"]');
     description.value = 'Descrizione condivisa aggiornata';
     description.dispatchEvent(new Event('input'));
     fixture.detectChanges();
-    check('Sistema B');
     button('Salva voce').click();
     await vi.waitFor(() => {
       fixture.detectChanges();
@@ -116,7 +115,7 @@ describe('catalogo condiviso di abilità e magie', () => {
       id: 'spell',
       revision: 1,
       description: 'Descrizione condivisa aggiornata',
-      systemIds: ['a', 'b'],
+      systemIds: ['a'],
     });
     expect(fixture.nativeElement.textContent).toContain('Voce salvata.');
     expect(fixture.nativeElement.querySelector('[name="description"]').value).toBe(
@@ -145,6 +144,15 @@ describe('catalogo condiviso di abilità e magie', () => {
   it('non mostra assegnazioni ai personaggi nel catalogo', async () => {
     const h = await setup();
     expect(h.fixture.nativeElement.textContent).not.toContain('Usata dai personaggi');
-    expect(h.fixture.nativeElement.textContent).toContain('dai dettagli di ogni PG o PNG');
+    expect(h.fixture.nativeElement.textContent).toContain('dai dettagli del personaggio');
   });
+  it('crea una voce senza assegnarla al sistema usato come filtro', async () => {
+    const h=await setup();h.button('+ Nuova voce').click();h.fixture.detectChanges();await h.fixture.whenStable();
+    const name=h.fixture.nativeElement.querySelector('[name="name"]');name.value='Nuova magia';name.dispatchEvent(new Event('input'));h.fixture.detectChanges();
+    h.button('Salva voce').click();
+    await vi.waitFor(()=>{h.fixture.detectChanges();expect(h.fixture.nativeElement.textContent).toContain('Puoi includerla nei sistemi');});
+    const [,init]=h.fetchMock.mock.calls.find(([,options])=>options?.method==='POST')!;
+    expect(JSON.parse(init.body).systemIds).toEqual([]);
+  });
+
 });

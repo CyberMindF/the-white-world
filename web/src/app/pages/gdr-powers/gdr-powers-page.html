@@ -1,14 +1,6 @@
-<app-shell
-  homeHref="/tavolo-da-gioco/gdr/gestione"
-  homeLabel="Gestione GDR"
-  homeAria="Torna alle avventure"
->
-  <main class="catalog-page">
-    <header>
-      <p class="eyebrow">Strumenti del master</p>
-      <h1>Abilità e magie</h1>
-      <p>Crea le voci condivise e scegli in quali sistemi sono disponibili. Assegna abilità e magie dai dettagli di ogni PG o PNG.</p>
-    </header>
+<app-gdr-management-shell activeSection="powers" [blocked]="!canLeave()">
+  <section class="catalog-page">
+    <header><h2>Abilità e magie</h2></header>
     @if (error()) {
       <p class="error" role="alert">{{ error() }}</p>
     }
@@ -36,7 +28,7 @@
           </select></label
         >
         <label
-          >Sistema<select
+          >Filtra per sistema<select
             [ngModel]="systemFilter()"
             (ngModelChange)="systemFilter.set($event)"
           >
@@ -107,18 +99,13 @@
               />
             </details>
           }
-          <fieldset>
-            <legend>Disponibile nei sistemi</legend>
-            @for (a of systems(); track a.id) {
-              <label class="check"
-                ><input
-                  type="checkbox"
-                  [checked]="draft.systemIds.includes(a.id)"
-                  (change)="toggle('systemIds', a.id, $any($event.target).checked)"
-                />{{ a.name }}</label
-              >
-            }
-          </fieldset>
+          <section class="availability" aria-label="Sistemi che usano questa voce">
+            <h3>Usata nei sistemi</h3>
+            @for(id of draft.systemIds;track id){
+              @for(system of systems();track system.id){@if(system.id===id){<p>{{system.name}}</p>}}
+            }@empty{<p>Non ancora inclusa in un sistema.</p>}
+            <p class="hint">La disponibilità si sceglie nella sezione «Sistemi». Assegna le voci ai PG e PNG dai dettagli del personaggio.</p>
+          </section>
 
         </fieldset>
         @if (dirty()) {
@@ -137,5 +124,5 @@
         </div>
       </form>
     </div>
-  </main>
-</app-shell>
+  </section>
+</app-gdr-management-shell>

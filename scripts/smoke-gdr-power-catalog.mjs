@@ -58,10 +58,10 @@ try {
     await page.goto(base+'/tavolo-da-gioco/gdr/poteri?system=a');
     await page.getByRole('heading',{name:'Scudo magico',exact:true}).waitFor();
     await page.getByLabel('Descrizione',{exact:true}).fill('Protezione condivisa aggiornata.');
-    await page.getByLabel('Sistema B',{exact:true}).check();
+    assert.equal(await page.locator('form input[type=checkbox]').count(),0);
     await page.getByRole('button',{name:'Salva voce',exact:true}).click();
     await page.getByRole('status').filter({hasText:'Voce salvata.'}).waitFor();
-    assert.deepEqual(writes[0].systemIds,['a','b']);
+    assert.deepEqual(writes[0].systemIds,['a']);
     assert.equal('characterIds' in writes[0],false);
     assert.deepEqual(power.characterIds,['daisy']);
     assert.ok(page.url().includes('/gestione/poteri'));
@@ -71,7 +71,7 @@ try {
     assert.deepEqual(errors,[]);
     await context.close();
   }
-  console.log('Catalogo GDR: apertura, modifica, disponibilità, conservazione assegnazioni e salvataggio verificati a 390 e 1280 px.');
+  console.log('Catalogo GDR: apertura, modifica, disponibilità in sola lettura, conservazione assegnazioni e salvataggio verificati a 390 e 1280 px.');
 } finally {
   await browser.close();
   await new Promise(resolve=>server.close(resolve));

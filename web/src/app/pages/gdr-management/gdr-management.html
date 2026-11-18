@@ -1,0 +1,32 @@
+<app-gdr-management-shell activeSection="adventures" [blocked]="!canLeave()">
+  <section aria-labelledby="management-adventures-title">
+    <header class="section-header"><h2 id="management-adventures-title">Avventure</h2><button type="button" class="btn" [disabled]="!canManage() || loading() || creating() || workspace.saving()" (click)="creating.set(true)">Nuova avventura</button></header>
+    @if(error() || workspace.error()){<p role="alert">{{error() || workspace.error()}}</p>}
+    @if(creating()){
+      <form class="creation-panel" aria-label="Nuova avventura" (ngSubmit)="create()">
+        <h3>Nuova avventura</h3>
+        <fieldset [disabled]="!canManage() || workspace.saving()">
+          <label for="new-adventure-title">Titolo della nuova avventura</label><input id="new-adventure-title" name="title" maxlength="160" [ngModel]="title()" (ngModelChange)="title.set($event)" />
+          <label for="new-adventure-system">Sistema di gioco</label><select id="new-adventure-system" name="systemId" [ngModel]="systemId()" (ngModelChange)="systemId.set($event)"><option value="">Scegli un sistema…</option>@for(system of systems();track system.id){<option [value]="system.id">{{system.name}}</option>}</select>
+        </fieldset>
+          <div class="actions"><button type="button" class="btn" [disabled]="workspace.saving()" (click)="cancel()">Annulla</button><button class="btn" type="submit" [disabled]="!canManage() || workspace.saving() || !title().trim() || !systemId()">{{workspace.saving()?'Creazione…':'Crea avventura'}}</button></div>
+      </form>
+    }
+    <label class="search">Cerca un’avventura<input type="search" [ngModel]="search()" (ngModelChange)="search.set($event)" /></label>
+    @if(loading()){<p role="status">Caricamento delle avventure…</p>}@else{
+      <div class="adventure-list" aria-label="Avventure da gestire">
+        @for(a of filtered();track a.id){
+          <article class="adventure-row">
+            <div><h3>{{a.title}}</h3><p>{{a.systemName || 'Sistema da scegliere'}}<span class="status">{{a.published?'Pubblicata':'Bozza'}}</span></p></div>
+            <div class="actions">
+              @if(canLeave()){
+                <a class="btn" [routerLink]="['/tavolo-da-gioco/gdr/gestione',a.id]">Gestisci</a>
+                <a class="play-link" [routerLink]="['/tavolo-da-gioco/gdr/gioca',a.id]">Apri partita ↗</a>
+              }@else{<button type="button" class="btn" disabled>Gestisci</button>}
+            </div>
+          </article>
+        }@empty{<p>Nessuna avventura corrispondente.</p>}
+      </div>
+    }
+  </section>
+</app-gdr-management-shell>
