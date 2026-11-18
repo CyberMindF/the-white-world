@@ -167,17 +167,7 @@ export class GdrLaboratorio implements OnInit {
   protected readonly workspace = inject(GdrWorkspaceService);
   protected readonly panelTab = signal('personaggio');
   protected readonly managementMode = inject(ActivatedRoute).snapshot.data?.['management'] === true;
-  protected readonly managementSection = signal<'characters' | 'rules' | 'adventure'>(
-    ['regole','sistema'].includes(inject(ActivatedRoute).snapshot.queryParamMap?.get('sezione') ?? '') ? 'rules' :
-    inject(ActivatedRoute).snapshot.queryParamMap?.get('sezione') === 'personaggi' ? 'characters' : 'adventure');
-  protected readonly masterCharactersOpen = computed(() => this.managementMode && this.managementSection() === 'characters');
   protected refreshCharacters(): void { if (!this.workspace.pendingChanges() && !this.workspace.saving()) void this.workspace.load(this.selected()); }
-  protected setManagementSection(section: 'characters' | 'rules' | 'adventure'): void {
-    if (this.workspace.pendingChanges() || this.workspace.saving() || this.inlineBusy()) return;
-    this.managementSection.set(section);
-    this.documentEditor.set(false);
-    if(this.managementMode)void this.router.navigate([], {relativeTo:this.route,queryParams:{sezione:section==='characters'?'personaggi':section==='rules'?'sistema':'contenuto'},queryParamsHandling:'merge',replaceUrl:true});
-  }
 
   protected readonly adventureTitle = signal('');
   protected readonly adventures = computed<Adventure[]>(() => [
@@ -289,7 +279,7 @@ export class GdrLaboratorio implements OnInit {
       await this.workspace.load(requested);
     }
     this.realtime.on('gdr-turns:changed').pipe(takeUntilDestroyed(this.destroyRef)).subscribe(event => {
-      if (this.liveGame && event['adventure'] === this.selected()) void this.loadTurns(this.selected());
+      if (this.liveGame && !this.managementMode && event['adventure'] === this.selected()) void this.loadTurns(this.selected());
     });
     this.realtime.on('gdr-story:changed').pipe(takeUntilDestroyed(this.destroyRef)).subscribe(event => {
       if (this.liveGame && event['adventure'] === this.selected()) {
@@ -406,7 +396,7 @@ export class GdrLaboratorio implements OnInit {
     const encoded = encodeURIComponent(id);
     await Promise.all([
       this.workspace.load(id),
-      this.loadTurns(id),
+      ...(!this.managementMode ? [this.loadTurns(id)] : []),
       ...(this.adventure().legacy
         ? [
             this.read<{ blocks: GdrBlockRow[] }>('/api/gdr-blocks')
@@ -472,7 +462,7 @@ export class GdrLaboratorio implements OnInit {
         this.local.update((s) => ({ ...s, documentDraft: null }));
         this.persist();
       }
-      this.status.set('Avventura salvata nel laboratorio.');
+      this.status.set('Avventura salvata.');
     }
   }
   private async loadTurns(id: string): Promise<void> {

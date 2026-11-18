@@ -43,6 +43,7 @@ import { GdrPowers } from './gdr-powers';
 export class GdrCharacters {
   protected readonly workspace = inject(GdrWorkspaceService);
   readonly inventoryOnly = input(false);
+  readonly managementLocked = input(false);
   readonly adventureChanged = output<string>();
   protected readonly newAdventureId = signal('');
   protected readonly creationAdventure = computed(()=>this.newAdventureId() || this.workspace.selectedId());

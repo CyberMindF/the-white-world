@@ -96,7 +96,7 @@ try{
       await page.getByRole('button',{name:'Nuova avventura',exact:true}).click();await page.getByLabel('Titolo della nuova avventura',{exact:true}).fill('Partita '+width);await page.getByLabel('Sistema di gioco',{exact:true}).selectOption(a.id);await page.getByRole('button',{name:'Crea avventura',exact:true}).click();
       await page.waitForURL(url=>/\/gestione\/[a-f0-9-]{36}$/.test(url.pathname));
       await page.getByRole('heading',{name:'Partita '+width,exact:true,level:2}).waitFor();const adventureId=new URL(page.url()).pathname.split('/').pop();
-      await page.getByRole('button',{name:'PG e PNG',exact:true}).click();await page.getByRole('button',{name:'+ PG',exact:true}).click();
+      await page.getByRole('button',{name:'+ PG',exact:true}).click();
       await page.getByLabel('Avventura del personaggio',{exact:true}).selectOption(adventureId);await page.getByText('Sistema ereditato · Sistema A '+width,{exact:true}).waitFor();
       await page.getByLabel('Nome completo · facoltativo',{exact:true}).fill('Ada '+width);await page.getByRole('button',{name:'Crea PG',exact:true}).click();
       await page.getByRole('heading',{name:'Ada '+width,exact:true}).waitFor();await page.locator('.manager-tabs').getByRole('button',{name:'Scheda',exact:true}).click();
@@ -104,7 +104,9 @@ try{
       const pg=h.sqlite.prepare('SELECT * FROM gdr_workspace_characters WHERE adventure_id=? AND kind=\'pg\'').get(adventureId);
       await page.waitForFunction(()=>document.querySelector('.resource strong')?.textContent==='5');
       assert.equal(JSON.parse(h.sqlite.prepare('SELECT fields_json FROM gdr_workspace_characters WHERE id=?').get(pg.id).fields_json)[a.fields[0].key],'5');
-      await page.getByRole('navigation',{name:'Gestione dell’avventura'}).getByRole('button',{name:'Sistema',exact:true}).click();await page.getByRole('combobox',{name:'Sistema dell’avventura',exact:true}).selectOption(b.id);await page.getByRole('button',{name:'Applica sistema all’avventura',exact:true}).click();
+      await page.getByRole('combobox',{name:'Sistema dell’avventura',exact:true}).selectOption(b.id);
+      assert.equal(await page.getByRole('button',{name:'Modifica scheda',exact:true}).isDisabled(),true);
+      await page.getByRole('button',{name:'Applica sistema all’avventura',exact:true}).click();
       await page.getByRole('status').filter({hasText:'Sistema aggiornato.'}).waitFor();
       assert.equal(JSON.parse(h.sqlite.prepare('SELECT fields_json FROM gdr_workspace_characters WHERE id=?').get(pg.id).fields_json)[a.fields[0].key],'5');
       await page.screenshot({path:`/tmp/gdr-systems-${width}.png`,fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));

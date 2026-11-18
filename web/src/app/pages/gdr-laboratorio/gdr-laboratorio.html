@@ -4,6 +4,7 @@
     <app-gdr-characters
       [inventoryOnly]="inventoryOnly"
       [managementMode]="management"
+      [managementLocked]="management && workspace.systemEditing()"
       (adventureChanged)="openManagedAdventure($event)"
       [legacySheet]="legacySheet()"
       [legacyName]="legacyName()"
@@ -15,27 +16,25 @@
   @if (managementMode && canEditRules()) {
     <header class="management-adventure-heading">
       <h2>{{ adventure().title }}</h2>
-      @if(canLeave()){<a class="btn" [routerLink]="['/tavolo-da-gioco/gdr/gioca', selected()]">Apri partita ↗</a>}
+      <div class="management-adventure-actions">
+        @if(adventureRules();as a){
+          <span class="adventure-status">{{a.published?'Pubblicata':'Bozza'}}</span>
+          @if(!a.legacy && local().documentDraft !== null){<span class="adventure-status">Salva il racconto prima di pubblicare.</span>}
+          @if(!a.legacy){<button class="btn" [disabled]="!canLeave() || local().documentDraft !== null" (click)="publishAdventure()">{{a.published?'Rendi privata':'Pubblica avventura'}}</button>}
+        }
+        @if(canLeave()){<a class="btn" [routerLink]="['/tavolo-da-gioco/gdr/gioca', selected()]">Apri e modifica racconto ↗</a>}
+      </div>
     </header>
-    <nav class="management-navigation" aria-label="Gestione dell’avventura">
-      <button class="btn" [attr.aria-pressed]="managementSection() === 'adventure'" [disabled]="!canLeave()" (click)="setManagementSection('adventure')">Contenuto</button>
-      <button class="btn" [attr.aria-pressed]="managementSection() === 'characters'" [disabled]="!canLeave()" (click)="setManagementSection('characters')">PG e PNG</button>
-      <button class="btn" [attr.aria-pressed]="managementSection() === 'rules'" [disabled]="!canLeave()" (click)="setManagementSection('rules')">Sistema</button>
-    </nav>
+    @if(!loading()){<app-gdr-adventure-system />}
     @if (workspace.pendingChanges()) { <p>Salva o annulla le modifiche prima di cambiare sezione.</p> }
   }
   @if (managementMode && !canEditRules()) {
     <p class="lab-status">Attiva la Modalità admin per gestire l’avventura.</p>
-  } @else if (masterCharactersOpen() && canPrepare()) {
+  } @else if (managementMode && canPrepare()) {
     <div class="avventura-body character-management">
       @if (loading()) { <p role="status">Caricamento dei personaggi…</p> }
       @if(!loading()){<ng-container [ngTemplateOutlet]="characterView" [ngTemplateOutletContext]="{ management: true, inventoryOnly: false }" />}
     </div>
-  } @else if (managementMode && managementSection() === 'rules') {
-    <section class="avventura-body character-management" aria-label="Scelta del sistema">
-      <app-gdr-adventure-system />
-      @if(!adventureRules()?.systemId){<app-gdr-rules [adventureId]="selected()" [blocks]="adventureRules()?.rules ?? []" [revision]="adventureRules()?.rulesRevision ?? 1" [editable]="!adventureRules()?.systemId && canEditRules() && !loading()" (saved)="rulesSaved($event)" />}
-    </section>
   } @else {
     @if (!managementMode) {
     <section class="avventura-hero" aria-labelledby="adventure-title">
@@ -66,7 +65,7 @@
               @if (!managementMode && canEditRules() && !workspace.pendingChanges() && !inlineBusy()) {
                 <a class="btn" [routerLink]="['/tavolo-da-gioco/gdr/gestione', selected()]">Gestisci avventura</a>
               }
-              @if (managementMode && (!liveGame || !adventure().legacy)) {
+              @if (!liveGame || !adventure().legacy) {
               <button
                 class="lab-text-command"
                 [disabled]="inlineBusy() || workspace.saving()"
@@ -112,7 +111,7 @@
                   {{
                     adventure().legacy
                       ? 'Nessun salvataggio sulla partita originale.'
-                      : 'Usa Salva avventura per conservare il testo nel laboratorio.'
+                      : 'Usa Salva avventura per aggiornare il racconto condiviso.'
                   }}
                 </p>
                 @if (!adventure().legacy) {
@@ -140,7 +139,7 @@
               </section>
             }
           }
-          @if (canPrepare() && !adventure().legacy && (managementMode || local().documentDraft !== null)) {
+          @if (canPrepare() && !adventure().legacy && (documentEditor() || local().documentDraft !== null)) {
             <div class="lab-document-controls">
               @if (!adventure().legacy) {
                 <button
@@ -150,26 +149,7 @@
                 >
                   Salva avventura
                 </button>
-                @for (a of workspace.adventures(); track a.id) {
-                  @if (managementMode && a.id === selected()) {
-                    <p class="lab-help">
-                      {{
-                        a.published
-                          ? 'Visibile ai giocatori nel laboratorio.'
-                          : 'Bozza riservata al master.'
-                      }}
-                    </p>
-                    <button
-                      class="btn"
-                      [disabled]="
-                        workspace.saving() || inlineBusy() || local().documentDraft !== null
-                      "
-                      (click)="publishAdventure()"
-                    >
-                      {{ a.published ? 'Torna a bozza riservata' : 'Rendi visibile ai giocatori' }}
-                    </button>
-                  }
-                }
+
               }
             </div>
           }

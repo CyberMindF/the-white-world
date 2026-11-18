@@ -81,12 +81,13 @@ try {
     assert.equal(await page.getByRole('button',{name:'Nuova avventura',exact:true}).count(),1);
     assert.equal(await page.locator('.tavolo-hero').count(),0);
     await page.locator('.adventure-row').filter({has:page.getByRole('heading',{name:'Il Prezzo della Verità',exact:true})}).getByRole('link',{name:'Gestisci',exact:true}).click();
-    await page.getByRole('button',{name:'PG e PNG',exact:true}).click();
-    const editor=page.locator('app-gdr-character-powers-editor'),nav=page.getByRole('navigation',{name:'Gestione dell’avventura'});
+    const editor=page.locator('app-gdr-character-powers-editor');
+    assert.equal(await page.getByRole('button',{name:'Contenuto',exact:true}).count(),0);
+    assert.equal(await page.getByRole('navigation',{name:'Gestione dell’avventura'}).count(),0);
     await editor.getByRole('button',{name:'Scegli abilità e magie'}).click();
     await editor.getByLabel('Scudo magico').check();await editor.getByLabel('Famiglio').check();
     assert.equal(await editor.getByText('Solo altra avventura',{exact:true}).count(),0);
-    assert.equal(await nav.getByRole('button',{name:'Sistema',exact:true}).isDisabled(),true);
+    assert.equal(await page.getByRole('combobox',{name:'Sistema dell’avventura',exact:true}).isDisabled(),true);
     assert.equal(await page.getByRole('button',{name:'Modifica scheda',exact:true}).isDisabled(),true);
     await editor.getByRole('button',{name:'Salva abilità e magie'}).click();
     await page.getByRole('status').filter({hasText:'Abilità e magie salvate.'}).first().waitFor();
@@ -103,12 +104,7 @@ try {
     assert.equal(h.sqlite.prepare("SELECT count(*) n FROM gdr_character_powers WHERE character_id='sally'").get().n,1);
     await page.screenshot({path:`/tmp/gdr-management-${width}.png`,fullPage:true});
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
-    await nav.getByRole('button',{name:'Sistema',exact:true}).click();
-    await page.getByRole('button',{name:'Modifica regole',exact:true}).click();
-    await page.getByLabel('Testo delle regole').fill('## Regole condivise\n\nUna regola aggiornata.');
-    await page.getByRole('button',{name:'Salva regole',exact:true}).click();
-    await page.getByRole('button',{name:'Modifica regole',exact:true}).waitFor();
-    await page.getByRole('link',{name:'Apri partita ↗',exact:true}).click();
+    await page.getByRole('link',{name:'Apri e modifica racconto ↗',exact:true}).click();
     await page.locator('#adventure-title').waitFor();
     assert.equal(await page.locator('app-gdr-character-powers-editor').count(),0);
     await page.getByRole('link',{name:'Gestisci avventura',exact:true}).waitFor();
@@ -119,18 +115,22 @@ try {
       await page.getByLabel('Titolo della nuova avventura',{exact:true}).fill('Nuova storia di prova');
       await page.getByRole('combobox',{name:'Sistema di gioco',exact:true}).selectOption(adventure);
       await page.getByRole('button',{name:'Crea avventura',exact:true}).click();
-      await page.getByRole('heading',{name:'Nuova storia di prova',exact:true}).waitFor();
-      const adventureNav=page.getByRole('navigation',{name:'Gestione dell’avventura'});
-      assert.equal(await adventureNav.getByRole('button',{name:'Contenuto',exact:true}).getAttribute('aria-pressed'),'true');
+      await page.waitForURL(url=>/\/gestione\/[a-f0-9-]{36}$/.test(url.pathname));
+      await page.getByRole('heading',{name:'Nuova storia di prova',exact:true,level:2}).waitFor();
+      await page.locator('app-gdr-characters').waitFor();
+      assert.equal(await page.locator('app-gdr-characters').count(),1);
+      assert.equal(await page.getByRole('button',{name:'Modifica testo completo',exact:true}).count(),0);
+      await page.getByRole('link',{name:'Apri e modifica racconto ↗',exact:true}).click();
       await page.getByRole('button',{name:'Modifica testo completo',exact:true}).click();
       await page.locator('#lab-document').fill('Una nuova avventura.');
       await page.getByRole('button',{name:'Salva avventura',exact:true}).click();
-      await page.getByText('Avventura salvata nel laboratorio.',{exact:true}).waitFor();
-      await page.getByRole('button',{name:'Rendi visibile ai giocatori',exact:true}).click();
-      await page.getByRole('button',{name:'Torna a bozza riservata',exact:true}).waitFor();
+      await page.getByText('Avventura salvata.',{exact:true}).waitFor();
+      await page.getByRole('link',{name:'Gestisci avventura',exact:true}).click();
+      await page.getByRole('button',{name:'Pubblica avventura',exact:true}).click();
+      await page.getByRole('button',{name:'Rendi privata',exact:true}).waitFor();
       assert.deepEqual(errors,[]);
     }
     await context.close();
   }
-  console.log('PASS: gestione unica, assegnazioni PG/PNG, conflitto con scelta conservata, blocco navigazione, regole condivise e partita separata a 1280/390/320 px.');
+  console.log('PASS: gestione unica, assegnazioni PG/PNG, conflitto con scelta conservata, blocco navigazione, sistema compatto, racconto nella partita e pubblicazione a 1280/390/320 px.');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));h.sqlite.close();}

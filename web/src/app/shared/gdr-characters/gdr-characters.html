@@ -1,5 +1,5 @@
 <div class="characters">
-  <fieldset [disabled]="workspace.saving() || mediaBusy()">
+  <fieldset [disabled]="workspace.saving() || mediaBusy() || managementLocked()">
     @if (workspace.available()) {
       <div [class.management-layout]="canManage() && !inventoryOnly()">
         @if (canManage() && !inventoryOnly()) {

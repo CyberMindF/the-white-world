@@ -110,12 +110,11 @@ textarea:focus-visible {
 
 .avventura-body.character-management { width: min(100%, 76rem); }
 
-.management-navigation { margin-bottom: 1.5rem; }
-.management-navigation .btn[aria-pressed="true"] { outline: 2px solid var(--focus-color, currentColor); outline-offset: 2px; }
+
 
 .management-view .management-adventure-heading{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin:0 0 1.25rem}
 .management-view .management-adventure-heading h2{font-size:1.4rem;line-height:1.3;margin:0;overflow-wrap:anywhere}
 .management-view .management-adventure-heading .btn{flex-shrink:0;font-size:.85rem}
-.management-view .management-navigation{display:flex;flex-wrap:wrap;gap:.5rem;margin:0 0 1.5rem}
+.management-adventure-actions{display:flex;align-items:center;flex-wrap:wrap;gap:.6rem}.adventure-status{font-size:.8rem;color:var(--muted-color)}
 .management-view .avventura-body{width:100%;max-width:none;margin:0;padding:0}
 @media(max-width:600px){.management-view .management-adventure-heading{align-items:flex-start;flex-direction:column}}

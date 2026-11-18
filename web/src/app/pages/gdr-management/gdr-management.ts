@@ -42,7 +42,7 @@ export class GdrManagement implements OnInit{
     this.error.set('');const id=this.newId;
     if(await this.workspace.save({action:'createAdventure',id,title:this.title().trim(),source:'',systemId:this.systemId()})){
       this.newId=crypto.randomUUID();this.cancel();
-      await this.router.navigate(['/tavolo-da-gioco/gdr/gestione',id],{queryParams:{sezione:'contenuto'}});
+      await this.router.navigate(['/tavolo-da-gioco/gdr/gestione',id]);
     }
   }
 }
