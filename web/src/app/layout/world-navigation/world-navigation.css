@@ -191,7 +191,8 @@
   align-content: start;
 }
 
-.world-navigation-links a {
+.world-navigation-links a,
+.world-navigation-parent {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 0.45rem;

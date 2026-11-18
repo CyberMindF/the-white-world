@@ -34,18 +34,24 @@ export class WorldNavigation {
   protected readonly safe = inject(SafeModeService);
   protected readonly groups = computed(() => HOME_AREAS.map((area) => {
     const areaPlaces = WORLD_PLACES.filter((place) =>
-      place.id !== 'profilo' && place.route && (!this.safe.enabled() || isSafeRoute(place.route)) && this.areaFor(place) === area.id
+      place.id !== 'profilo' && place.route && this.areaFor(place) === area.id
     );
-    const primaryPlaces = areaPlaces.filter((place) => place.primary);
+    const canOpen = (place: WorldPlace) => !this.safe.enabled() || (!!place.route && isSafeRoute(place.route));
+    const visiblePlaces = areaPlaces.filter(canOpen);
+    // Una sezione con figli disponibili resta un'intestazione anche se la sua pagina
+    // non è accessibile in Safe mode: la Chat rimane sotto I Ponti, senza link bloccati.
+    const primaryPlaces = areaPlaces.filter((place) => place.primary &&
+      (canOpen(place) || visiblePlaces.some(child => child.parentId === place.id)));
 
     return {
       ...area,
-      label: this.safe.enabled() ? (area.id === 'prato' ? 'Studio e giochi' : 'Il mondo') : area.label,
+      label: this.safe.enabled() ? (area.id === 'prato' ? 'Studio e giochi' : area.id === 'giardino' ? 'Comunicazione' : 'Il mondo') : area.label,
       entries: primaryPlaces.map((place) => ({
         place,
-        children: areaPlaces.filter((candidate) => !candidate.primary && candidate.parentId === place.id)
+        canOpen: canOpen(place),
+        children: visiblePlaces.filter((candidate) => !candidate.primary && candidate.parentId === place.id)
       })),
-      secondaryPlaces: areaPlaces.filter((place) => !place.primary && !place.parentId)
+      secondaryPlaces: visiblePlaces.filter((place) => !place.primary && !place.parentId)
     };
   }).filter(group => group.entries.length || group.secondaryPlaces.length));
 

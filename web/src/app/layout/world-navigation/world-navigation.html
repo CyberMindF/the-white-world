@@ -41,10 +41,14 @@
           <div class="world-navigation-links">
             @for (entry of group.entries; track entry.place.id) {
               <div class="world-navigation-entry">
-                <a [routerLink]="entry.place.route" [class.is-current]="isCurrent(entry.place.route)" [attr.aria-current]="isCurrent(entry.place.route) ? 'page' : null">
-                  <span aria-hidden="true">{{ entry.place.emoji }}</span>
-                  <span>{{ entry.place.fallbackName }}</span>
-                </a>
+                @if (entry.canOpen) {
+                  <a [routerLink]="entry.place.route" [class.is-current]="isCurrent(entry.place.route)" [attr.aria-current]="isCurrent(entry.place.route) ? 'page' : null">
+                    <span aria-hidden="true">{{ entry.place.emoji }}</span>
+                    <span>{{ entry.place.fallbackName }}</span>
+                  </a>
+                } @else {
+                  <span class="world-navigation-parent"><span aria-hidden="true">{{ entry.place.emoji }}</span><span>{{ entry.place.fallbackName }}</span></span>
+                }
                 @for (place of entry.children; track place.id) {
                   <a class="is-secondary" [routerLink]="place.route" [class.is-current]="isCurrent(place.route)" [attr.aria-current]="isCurrent(place.route) ? 'page' : null">
                     <span aria-hidden="true">{{ place.emoji }}</span>

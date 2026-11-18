@@ -36,6 +36,7 @@ export const WORLD_PLACES: readonly WorldPlace[] = [
   { id: 'bacheca', emoji: '📸', route: '/bacheca', fallbackName: 'La Bacheca dei Ricordi', fallbackDescription: 'Il nostro album dei ricordi', group: 'ricordi', primary: true, homeArea: 'valle' },
   { id: 'mappamondo', emoji: '🌍', route: '/mappamondo', fallbackName: 'Il Mappamondo', fallbackDescription: 'Come ho immaginato la tua prima volta qui e anche un posto per orientarti', group: 'ricordi', primary: true, homeArea: 'valle' },
   { id: 'ponti', emoji: '🌈', route: '/ponti', fallbackName: 'I Ponti', fallbackDescription: 'I nostri modi per rimanere sempre in contatto, così che non possiamo perderci', group: 'ricordi', primary: true, homeArea: 'giardino' },
+  { id: 'chat', emoji: '💬', route: '/ponti-chat', fallbackName: 'Chat', fallbackDescription: 'Uno spazio per scriverci, anche con foto e video.', group: 'ricordi', parentId: 'ponti' },
   { id: 'storie', emoji: '📖', route: '/storie', fallbackName: 'Le Storie', fallbackDescription: 'Un posto dove ci sono storie che parlano di noi dentro questo mondo', group: 'ricordi', primary: true, homeArea: 'valle' },
   { id: 'calendario', emoji: '📅', route: '/calendario', fallbackName: 'Il Calendario', fallbackDescription: 'Tutte le nostre date che hanno avuto importanza', group: 'ricordi', primary: true, homeArea: 'valle' },
   { id: 'cuffiette', emoji: '🎧', route: '/cuffiette', fallbackName: 'Le Cuffiette', fallbackDescription: 'Le canzoni che ho scritto per te e quelle che ho ascoltato pensandoti', group: 'ricordi', primary: true, homeArea: 'valle' },
@@ -64,6 +65,5 @@ export const WORLD_PLACES: readonly WorldPlace[] = [
   { id: 'il-cielo', emoji: '🌌', route: '/il-cielo', fallbackName: 'Il Cielo', fallbackDescription: 'Uno spazio vuoto e calmo per goderti il cielo del mondo bianco', group: 'mondo', primary: true, homeArea: 'osservatorio' },
   { id: 'novita', emoji: '✨', route: '/novita', fallbackName: 'Le Novità', fallbackDescription: 'Quello che è comparso nel Mondo Bianco mentre non guardavi', group: 'mondo', primary: true, homeArea: 'osservatorio' },
   { id: 'suggerimenti', emoji: '💭', route: '/suggerimenti', fallbackName: 'I Suggerimenti', fallbackDescription: 'Questo mondo è tanto mio quanto tuo, se vuoi creare qualcosa proponilo qui', group: 'mondo', homeArea: 'osservatorio' },
-  { id: 'chat', emoji: '💬', route: '/ponti-chat', fallbackName: 'Chat', fallbackDescription: 'Uno spazio per scriverci, anche con foto e video.', group: 'mondo', homeArea: 'osservatorio' },
   { id: 'profilo', emoji: '👤', route: '/profilo', fallbackName: 'Il Profilo', fallbackDescription: 'Se vuoi cambiare password o il tuo nome', group: 'mondo' }
 ];
