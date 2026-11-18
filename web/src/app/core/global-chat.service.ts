@@ -15,6 +15,8 @@ export interface ChatMessage {
   mediaType: 'photo' | 'video' | null;
   readAt: string | null;
   createdAt: string;
+  editedAt?: string | null;
+  revision?: number;
 }
 
 export interface ContactPresence {

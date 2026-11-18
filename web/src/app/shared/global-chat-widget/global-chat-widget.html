@@ -37,6 +37,7 @@
             @if (message.mediaType === 'video' && message.mediaKey) { <span class="global-chat-attachment">🎬 Video allegato</span> }
             @if (message.body) { <p>{{ message.body }}</p> }
             <div class="global-chat-message-meta">
+              @if (message.editedAt) { <span class="global-chat-edited" [attr.title]="message.editedAt | date: 'dd/MM/yyyy HH:mm'">modificato</span> }
               <time>{{ message.createdAt | date: 'HH:mm' }}</time>
               @if (message.senderUserId === chat.ownUserId()) {
                 <span class="global-chat-read" [class.is-read]="message.readAt" [attr.aria-label]="message.readAt ? 'Letto' : 'Inviato'">✓</span>

@@ -61,6 +61,7 @@
 .global-chat-message p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .global-chat-message-meta { display: flex; align-items: center; justify-content: flex-end; gap: .25rem; margin-top: .2rem; }
 .global-chat-message time { color: var(--muted-color); font-size: .65rem; }
+.global-chat-edited { color: var(--muted-color); font-size: .65rem; }
 .global-chat-read { color: var(--muted-color); font-size: .72rem; line-height: 1; opacity: .7; }
 .global-chat-read.is-read { color: var(--success-text-color); opacity: 1; }
 .global-chat-message img { display: block; max-width: 100%; max-height: 10rem; margin-bottom: .35rem; border-radius: .5rem; }

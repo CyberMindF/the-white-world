@@ -25,7 +25,7 @@
         </span>
       </div>
     </header>
-    <div class="chat-log" #log aria-live="polite" [attr.aria-busy]="loading()">
+    <div class="chat-log" #log aria-live="polite" [attr.aria-busy]="loading()" (scroll)="closeMessageMenu()">
       @if (loading()) { <p class="chat-empty">Caricamento…</p> }
       @if (!loading() && messages().length === 0) { <p class="chat-empty">Ancora nessun messaggio.</p> }
 
@@ -33,7 +33,7 @@
       @if (startsNewDay(index)) {
       <div class="chat-day-divider"><span>{{ message.createdAt | date: 'EEEE d MMMM y' }}</span></div>
       }
-      <article class="chat-bubble" [class.chat-bubble--own]="message.senderUserId === ownUserId()">
+      <article class="chat-bubble" [class.chat-bubble--own]="message.senderUserId === ownUserId()" [class.has-open-actions]="openMessageMenuId() === message.id" [class.is-editing]="editingMessage()?.id === message.id">
         @if (message.mediaType === 'photo' && message.mediaKey) {
         <img class="chat-media chat-media--photo" [src]="mediaUrl(message)" alt="" />
         }
@@ -45,19 +45,29 @@
         }
         @if (message.body) { <p class="chat-bubble-text">{{ message.body }}</p> }
         <div class="chat-bubble-meta">
+          @if (message.editedAt) { <span class="chat-edited" [attr.title]="message.editedAt | date: 'dd/MM/yyyy HH:mm'">modificato</span> }
           <time [attr.datetime]="message.createdAt" [attr.title]="message.createdAt | date: 'dd/MM/yyyy HH:mm'">{{ message.createdAt | date: 'HH:mm' }}</time>
           @if (message.senderUserId === ownUserId()) {
           <span class="chat-read-status" [class.is-read]="message.readAt" [attr.aria-label]="message.readAt ? 'Letto' : 'Inviato'">✓</span>
-          <button type="button" class="chat-icon-btn chat-delete-btn" (click)="requestDelete(message.id)" aria-label="Elimina messaggio" title="Elimina messaggio">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-3 6h12l-1 12H7L6 9Zm4 2v8h1v-8h-1Zm3 0v8h1v-8h-1Z"/></svg>
-          </button>
+          <div class="chat-message-actions" (click)="$event.stopPropagation()">
+            <button type="button" class="chat-icon-btn chat-options-btn" (click)="toggleMessageMenu($event, message.id)" aria-label="Opzioni messaggio" title="Opzioni messaggio"
+              [disabled]="editingMessage() !== null" [attr.aria-expanded]="openMessageMenuId() === message.id" [attr.aria-controls]="'chat-actions-' + message.id">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg>
+            </button>
+            @if (openMessageMenuId() === message.id) {
+              <div class="chat-message-menu" [class.opens-below]="menuBelow()" [id]="'chat-actions-' + message.id" role="group" aria-label="Azioni del messaggio">
+                <button type="button" (click)="beginEdit(message)">Modifica messaggio</button>
+                <button type="button" class="is-danger" (click)="requestDelete(message.id)">Elimina messaggio</button>
+              </div>
+            }
+          </div>
           }
         </div>
       </article>
       }
     </div>
 
-      @if (pendingPreviewUrl()) {
+      @if (pendingPreviewUrl() && !editingMessage()) {
       <div class="chat-pending-preview">
         @if (pendingFileType() === 'photo') { <img [src]="pendingPreviewUrl()" alt="Anteprima allegato" /> }
         @if (pendingFileType() === 'video') { <video [src]="pendingPreviewUrl()" controls></video> }
@@ -65,6 +75,15 @@
         <button type="button" class="chat-icon-btn" (click)="clearPendingFile()" aria-label="Rimuovi allegato" title="Rimuovi allegato">×</button>
       </div>
       }
+    @if (editingMessage()) {
+      <form class="chat-compose chat-edit-compose" (ngSubmit)="saveEdit()" (keydown.escape)="cancelEdit($event)">
+        <label class="form-field"><span>Modifica messaggio</span>
+          <textarea #editInput name="editMessage" rows="3" maxlength="2000" [ngModel]="editText()" (ngModelChange)="editText.set($event)" [disabled]="savingEdit()" aria-label="Testo del messaggio da modificare"></textarea>
+        </label>
+        @if (editError()) { <p class="content-message is-error" role="alert">{{ editError() }}</p> }
+        <div class="chat-edit-actions"><button type="button" class="btn" (click)="cancelEdit()" [disabled]="savingEdit()">Annulla</button><button type="submit" class="btn btn-submit" [disabled]="savingEdit() || editUnchanged()">{{ savingEdit() ? 'Salvataggio…' : 'Salva modifica' }}</button></div>
+      </form>
+    } @else {
     <form class="chat-compose" (ngSubmit)="send()">
       <div class="chat-compose-row">
         <label class="chat-icon-btn chat-attach-btn" aria-label="Allega foto o video" title="Allega foto o video">
@@ -82,6 +101,7 @@
       @if (sending()) { <p class="chat-send-status" role="status">{{ uploading() ? 'Invio allegato…' : 'Invio…' }}</p> }
       @if (sendError()) { <p class="content-message is-error" role="status">{{ sendError() }}</p> }
     </form>
+    }
   </section>
   }
 

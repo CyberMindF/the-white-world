@@ -28,7 +28,9 @@ export function toMessageView(row) {
     mediaKey: row.media_key,
     mediaType: row.media_type,
     readAt: row.read_at,
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    editedAt: row.edited_at ?? null,
+    revision: row.edit_revision ?? 1
   };
 }
 

@@ -477,7 +477,7 @@ Function potrà chiamare `notifyRealtime()` soltanto dopo il salvataggio riuscit
 ricevente usera' l'evento come segnale per ricaricare i dati tramite il normale endpoint GET.
 
 Sono già collegati al canale, ma restano inattivi finché manca il binding: Ponti Chat (nuovi
-messaggi, eliminazioni e letture), Stranger Chat, i turni delle due avventure GDR, Lettere
+messaggi, modifiche, eliminazioni e letture), Stranger Chat, i turni delle due avventure GDR, Lettere
 (invio e lettura), proposte/risposte agli scambi di carte e Impostazioni del Mondo condivise.
 L'evento contiene l'utente che ha originato la modifica, così la sua stessa scheda non esegue
 un secondo caricamento ridondante.
@@ -487,6 +487,8 @@ visibilità su connessione, navigazione e `visibilitychange`; il Durable Object 
 per identità e separa account principali da account test. Una scheda in background non conta come
 online. L'ultima visita è conservata nello storage del Durable Object e il widget mostra pagina
 corrente o data dell'ultima visita senza introdurre heartbeat o polling.
+
+Nella pagina Chat, il menu con tre punti verticali dei propri messaggi offre «Modifica messaggio» ed «Elimina messaggio». La modifica riguarda il testo, conserva allegato, data e lettura e mostra «modificato» anche nel widget. `PATCH /api/ponti-chat/:id` verifica l’autore e la revisione: un conflitto conserva la bozza senza sovrascrivere il testo più recente. Applicare `0161_add_chat_message_edits.sql` prima del codice; aggiunge soltanto data di modifica e revisione ai messaggi esistenti. Verifiche: `node --test functions/api/ponti-chat/edit.test.mjs` e, dopo la build, `node scripts/smoke-chat-editing.mjs` (API locali simulate).
 
 Per validare e pubblicare il Worker:
 
