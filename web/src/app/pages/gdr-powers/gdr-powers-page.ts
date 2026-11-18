@@ -23,13 +23,6 @@ interface CatalogAdventure {
   id: string;
   title: string;
 }
-interface CatalogCharacter {
-  id: string;
-  name: string;
-  kind: string;
-  adventureId: string;
-  archived: number;
-}
 const empty = (): CatalogPower => ({
   id: crypto.randomUUID(),
   kind: 'ability',
@@ -61,7 +54,6 @@ export class GdrPowersPage implements OnInit {
   );
   protected readonly powers = signal<CatalogPower[]>([]);
   protected readonly adventures = signal<CatalogAdventure[]>([]);
-  protected readonly characters = signal<CatalogCharacter[]>([]);
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
   protected readonly dirty = signal(false);
@@ -87,6 +79,8 @@ export class GdrPowersPage implements OnInit {
   protected readonly parseGdrMarkdown = parseGdrMarkdown;
   protected readonly referenceRows = referenceRows;
 
+  canLeave(): boolean { return !this.dirty() && !this.saving(); }
+
   async ngOnInit(): Promise<void> {
     await this.load();
   }
@@ -99,7 +93,6 @@ export class GdrPowersPage implements OnInit {
       if (!response.ok) throw new Error(data.error || 'Catalogo non disponibile.');
       this.powers.set(data.powers);
       this.adventures.set(data.adventures);
-      this.characters.set(data.characters);
       const selected =
         data.powers.find((p: CatalogPower) => p.id === this.draft.id) ?? this.filtered()[0];
       if (selected) this.edit(selected);
@@ -124,12 +117,6 @@ export class GdrPowersPage implements OnInit {
     this.effectsSource = '';
     const adventure = this.adventureFilter();
     if (adventure) this.draft.adventureIds = [adventure];
-    const character = this.route.snapshot.queryParamMap.get('character');
-    if (
-      character &&
-      this.characters().some((c) => c.id === character && c.adventureId === adventure)
-    )
-      this.draft.characterIds = [character];
     this.error.set('');
     this.notice.set('');
   }
@@ -137,20 +124,11 @@ export class GdrPowersPage implements OnInit {
     this.dirty.set(true);
     this.notice.set('');
   }
-  protected toggle(kind: 'adventureIds' | 'characterIds', id: string, checked: boolean): void {
+  protected toggle(kind: 'adventureIds', id: string, checked: boolean): void {
     this.draft[kind] = checked
       ? [...this.draft[kind], id]
       : this.draft[kind].filter((value) => value !== id);
     this.change();
-  }
-  protected availableCharacters(): CatalogCharacter[] {
-    return this.characters().filter(
-      (c) =>
-        this.draft.adventureIds.includes(c.adventureId) || this.draft.characterIds.includes(c.id),
-    );
-  }
-  protected adventureName(id: string): string {
-    return this.adventures().find((a) => a.id === id)?.title ?? id;
   }
   protected async cancel(): Promise<void> {
     this.dirty.set(false);
@@ -168,26 +146,16 @@ export class GdrPowersPage implements OnInit {
       this.error.set(parsed.errors.map((e) => e.message).join(' '));
       return;
     }
-    if (
-      this.draft.characterIds.some(
-        (id) =>
-          !this.characters().some(
-            (c) => c.id === id && this.draft.adventureIds.includes(c.adventureId),
-          ),
-      )
-    ) {
-      this.error.set('Rimuovi le assegnazioni ai personaggi delle avventure non abilitate.');
-      return;
-    }
     this.saving.set(true);
     this.error.set('');
     try {
+      const { characterIds, ...voice } = this.draft;
       const response = await fetch('/api/gdr-powers', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...this.draft,
+          ...voice,
           name: this.draft.name.trim(),
           effects: parsed.blocks,
         }),
@@ -197,7 +165,7 @@ export class GdrPowersPage implements OnInit {
       this.dirty.set(false);
       this.saving.set(false);
       await this.load();
-      this.notice.set('Voce e assegnazioni salvate.');
+      this.notice.set('Voce salvata.');
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Non è stato possibile salvare.');
     } finally {

@@ -1,15 +1,16 @@
 <app-shell
-  homeHref="/tavolo-da-gioco"
-  homeAria="Torna al Tavolo da Gioco"
-  homeLabel="Il Tavolo da Gioco"
+  [homeHref]="management ? '/tavolo-da-gioco/gdr' : '/tavolo-da-gioco'"
+  [homeAria]="management ? 'Torna alle avventure GDR' : 'Torna al Tavolo da Gioco'"
+  [homeLabel]="management ? 'Gioco di Ruolo' : 'Il Tavolo da Gioco'"
 >
   <section class="tavolo-hero tavolo-hero-text-only" aria-labelledby="gdr-title">
     <p class="tavolo-eyebrow">Il tavolo · giochi di ruolo</p>
     <h1 id="gdr-title">
-      <span aria-hidden="true">🐉</span> Gioco di Ruolo{{ classic ? ' · versione classica' : '' }}
+      <span aria-hidden="true">🐉</span> {{ management ? 'Gestione GDR' : 'Gioco di Ruolo' }}{{ classic ? ' · versione classica' : '' }}
     </h1>
   </section>
 
+  @if (!management) {
   <div class="tavolo-intro" [class.tavolo-intro-rules]="safe.enabled()">
     @if (safe.enabled()) {
       <p>Qui giochiamo raccontando una storia a turni. Io faccio da master: descrivo i luoghi, interpreto gli altri personaggi e ti racconto cosa succede. Tu muovi la protagonista e scegli cosa fa, dice e pensa.</p>
@@ -21,7 +22,11 @@
     }
   </div>
 
-  @if (canManagePowers()) { <p><a class="btn" routerLink="/tavolo-da-gioco/gdr/poteri">Gestisci abilità e magie</a></p> }
+  }
+  @if (canManagePowers()) {
+    <p><a class="btn" [routerLink]="management ? '/tavolo-da-gioco/gdr/gestione/poteri' : '/tavolo-da-gioco/gdr/gestione'">{{ management ? 'Catalogo abilità e magie' : 'Gestione GDR' }}</a></p>
+  }
+  @if (management) { <p class="tavolo-intro">Scegli un’avventura per gestire PG e PNG, regole e contenuti. Il catalogo di abilità e magie è condiviso tra le avventure.</p> }
   <section class="tavolo-games" aria-labelledby="adventures-title">
     <div class="tavolo-section-heading">
       <p class="tavolo-eyebrow">Le storie</p>
@@ -34,30 +39,30 @@
       <a
         class="tavolo-game-card card glass-surface is-available"
         [routerLink]="
-          classic
+          management ? '/tavolo-da-gioco/gdr/gestione/il-prezzo-della-verita' : classic
             ? '/tavolo-da-gioco/gdr/il-prezzo-della-verita/avventura'
             : '/tavolo-da-gioco/gdr/gioca/il-prezzo-della-verita'
         "
         ><span class="tavolo-game-emoji">{{ adventureIcon('il-prezzo-della-verita') }}</span><strong>Il Prezzo della Verità</strong
-        ><small>Entra</small></a
+        ><small>{{ management ? 'Gestisci avventura' : 'Entra' }}</small></a
       >
       <a
         class="tavolo-game-card card glass-surface is-available"
         [routerLink]="
-          classic
+          management ? '/tavolo-da-gioco/gdr/gestione/la-casa-che-trattiene-il-respiro' : classic
             ? '/tavolo-da-gioco/gdr/la-casa-che-trattiene-il-respiro'
             : '/tavolo-da-gioco/gdr/gioca/la-casa-che-trattiene-il-respiro'
         "
         ><span class="tavolo-game-emoji">{{ adventureIcon('la-casa-che-trattiene-il-respiro') }}</span><strong>La casa che trattiene il respiro</strong
-        ><small>Entra</small></a
+        ><small>{{ management ? 'Gestisci avventura' : 'Entra' }}</small></a
       >
       @if (!classic) {
         @for (a of customAdventures(); track a.id) {
           <a
             class="tavolo-game-card card glass-surface is-available"
-            [routerLink]="['/tavolo-da-gioco/gdr/gioca', a.id]"
+            [routerLink]="[management ? '/tavolo-da-gioco/gdr/gestione' : '/tavolo-da-gioco/gdr/gioca', a.id]"
             ><span class="tavolo-game-emoji">{{ adventureIcon(a.id) }}</span><strong>{{ a.title }}</strong
-            ><small>{{ a.published ? 'Entra' : 'Bozza · solo admin' }}</small></a
+            ><small>{{ management ? 'Gestisci avventura' : a.published ? 'Entra' : 'Bozza · solo admin' }}</small></a
           >
         }
         @if (canCreate()) {

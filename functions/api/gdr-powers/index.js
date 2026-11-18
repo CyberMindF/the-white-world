@@ -110,8 +110,9 @@ export async function onRequestPost(context) {
         throw new WorkspaceError("Assegnazioni non valide.", 400);
       return value;
     };
-    const adventureIds = ids(body.adventureIds),
-      characterIds = ids(body.characterIds);
+    const adventureIds = ids(body.adventureIds);
+    const preserveAssignments = body.characterIds === undefined;
+    const characterIds = preserveAssignments ? null : ids(body.characterIds);
     const db = context.env.DB.withSession("first-primary");
     const previous = await db
       .prepare("SELECT revision FROM gdr_powers WHERE id=?")
@@ -138,7 +139,7 @@ export async function onRequestPost(context) {
     ).results;
     if (
       adventureIds.some((id) => !adventures.some((a) => a.id === id)) ||
-      characterIds.some(
+      (characterIds ?? []).some(
         (id) =>
           !characters.some(
             (c) => c.id === id && adventureIds.includes(c.adventure_id),
@@ -180,20 +181,23 @@ export async function onRequestPost(context) {
       );
     // Tutti i collegamenti sono protetti dalla stessa revisione, incrementata per ultima.
     // La batch D1 è atomica: un editor obsoleto non cancella le assegnazioni più recenti.
-    const guard = "EXISTS(SELECT 1 FROM gdr_powers WHERE id=? AND revision=?)";
-    statements.push(
+    const guard = "EXISTS(SELECT 1 FROM gdr_powers WHERE id=? AND revision=?)" + (preserveAssignments
+      ? " AND NOT EXISTS(SELECT 1 FROM gdr_character_powers cp JOIN gdr_workspace_characters c ON c.id=cp.character_id WHERE cp.power_id=? AND c.adventure_id NOT IN (SELECT value FROM json_each(?)))"
+      : "");
+    const guardBindings = [body.id, revision, ...(preserveAssignments ? [body.id, JSON.stringify(adventureIds)] : [])];
+    if (!preserveAssignments) statements.push(
       db
         .prepare(
           `DELETE FROM gdr_character_powers WHERE power_id=? AND ${guard}`,
         )
-        .bind(body.id, body.id, revision),
+        .bind(body.id, ...guardBindings),
     );
     statements.push(
       db
         .prepare(
           `DELETE FROM gdr_power_adventures WHERE power_id=? AND ${guard}`,
         )
-        .bind(body.id, body.id, revision),
+        .bind(body.id, ...guardBindings),
     );
     for (const id of adventureIds)
       statements.push(
@@ -201,21 +205,21 @@ export async function onRequestPost(context) {
           .prepare(
             `INSERT INTO gdr_power_adventures(power_id,adventure_id) SELECT ?,? WHERE ${guard}`,
           )
-          .bind(body.id, id, body.id, revision),
+          .bind(body.id, id, ...guardBindings),
       );
-    for (const id of characterIds)
+    for (const id of characterIds ?? [])
       statements.push(
         db
           .prepare(
             `INSERT INTO gdr_character_powers(character_id,power_id) SELECT ?,? WHERE ${guard}`,
           )
-          .bind(id, body.id, body.id, revision),
+          .bind(id, body.id, ...guardBindings),
       );
     if (!creating)
       statements.push(
         db
           .prepare(
-            `UPDATE gdr_powers SET kind=?,name=?,description=?,effects_json=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?`,
+            `UPDATE gdr_powers SET kind=?,name=?,description=?,effects_json=?,revision=revision+1,updated_at=? WHERE id=? AND ${guard}`,
           )
           .bind(
             body.kind,
@@ -224,13 +228,13 @@ export async function onRequestPost(context) {
             JSON.stringify(effects),
             now,
             body.id,
-            revision,
+            ...guardBindings,
           ),
       );
     const results = await db.batch(statements);
     if (!creating && !results.at(-1).meta.changes)
       throw new WorkspaceError(
-        "La voce è cambiata. Ricarica il catalogo prima di salvare.",
+        "La voce o le assegnazioni sono cambiate. Ricarica il catalogo; per rimuovere un’avventura, togli prima la voce dai suoi personaggi.",
         409,
       );
     context.waitUntil(

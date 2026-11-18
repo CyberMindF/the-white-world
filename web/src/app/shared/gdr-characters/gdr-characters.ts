@@ -28,12 +28,13 @@ import {
 import { GdrTurn } from '../gdr-turn/gdr-turn';
 import { GdrImageLibrary, GdrLibraryImage } from './gdr-image-library';
 import { gdrImagePath } from './gdr-image-catalog';
+import { GdrCharacterPowersEditor } from './gdr-character-powers-editor';
 import { GdrPowers } from './gdr-powers';
 
 @Component({
   selector: 'app-gdr-characters',
   standalone: true,
-  imports: [FormsModule, GdrTurn, GdrImageLibrary, GdrPowers],
+  imports: [FormsModule, GdrTurn, GdrImageLibrary, GdrPowers, GdrCharacterPowersEditor],
   templateUrl: './gdr-characters.html',
   styleUrl: './gdr-characters.css',
 })
@@ -303,11 +304,12 @@ export class GdrCharacters {
   protected readonly search = signal('');
   protected readonly statusFilter = signal<'active' | 'archived' | 'all'>('active');
   protected readonly section = signal<'sheet' | 'assignments' | 'inventory' | 'manage'>('sheet');
+  protected readonly powersPending = signal(false);
   protected readonly grantDirty = signal(false);
   protected readonly deleteOpen = signal(false);
   protected readonly deleteName = signal('');
   protected readonly hasChanges = computed(
-    () => this.dirty() || this.grantDirty() || this.statsDirty(),
+    () => this.dirty() || this.grantDirty() || this.statsDirty() || this.powersPending(),
   );
   protected readonly assignments = computed(() => {
     const id = this.workspace.active()?.id;
@@ -394,6 +396,7 @@ export class GdrCharacters {
   constructor() {
     this.destroyRef.onDestroy(() => {
       if (this.cropSource()) URL.revokeObjectURL(this.cropSource());
+      this.workspace.characterPendingChanges.set(false);
     });
     effect(() => {
       const dialog = this.cropDialog()?.nativeElement;

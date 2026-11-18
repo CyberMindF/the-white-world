@@ -109,3 +109,6 @@ textarea:focus-visible {
 }
 
 .avventura-body.character-management { width: min(100%, 76rem); }
+
+.management-navigation { margin-bottom: 1.5rem; }
+.management-navigation .btn[aria-pressed="true"] { outline: 2px solid var(--focus-color, currentColor); outline-offset: 2px; }

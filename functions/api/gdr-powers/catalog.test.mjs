@@ -79,10 +79,14 @@ function harness() {
     async () => {},
     async (env, event) => events.push(event),
   );
+  const assignments = new Function(
+    'json', 'readJson', 'masterSession', ...Object.keys(helpers), 'recordEvent', 'notifyRealtime',
+    source('functions/api/gdr-powers/assignments.js') + ';return onRequestPut;',
+  )(json, request => request.json(), catalog.masterSession, ...Object.values(helpers), async () => {}, async (env, event) => events.push(event));
   const call = async (method, body, user = 1, headers = {}) => {
     const pending = [],
       response = await (
-        method === "PUT"
+        method === "ASSIGN" ? assignments : method === "PUT"
           ? rules
           : method === "GET"
             ? catalog.onRequestGet
@@ -93,7 +97,7 @@ function harness() {
           pending.push(p);
         },
         request: new Request("https://test/api/gdr-powers", {
-          method,
+          method: method === "ASSIGN" ? "PUT" : method,
           headers: {
             "x-user": String(user),
             "Content-Type": "application/json",
@@ -473,4 +477,58 @@ test("migrazione: conserva regole, tabelle e note; assegna abilità e magie solo
   } finally {
     h.sqlite.close();
   }
+});
+
+
+test('assegnare abilità e magie dai dettagli di PG e PNG cambia solo il personaggio scelto', async () => {
+  const h = harness();
+  try {
+    await h.character('daisy'); await h.character('sally', 'png');
+    await h.catalog('POST', power());
+    for (const id of ['daisy', 'sally']) {
+      assert.equal((await h.catalog('ASSIGN', {characterId:id, revision:1, powerIds:['shared-spell']})).status, 200);
+      assert.equal(h.sqlite.prepare('SELECT revision FROM gdr_workspace_characters WHERE id=?').get(id).revision, 2);
+    }
+    assert.equal((await h.catalog('ASSIGN', {characterId:'sally', revision:2, powerIds:[]})).status, 200);
+    assert.deepEqual(h.sqlite.prepare('SELECT character_id FROM gdr_character_powers').all().map(x=>x.character_id), ['daisy']);
+    await h.catalog('POST', power({id:'other-power',name:'Altra abilità'}));
+    const metadata = power({revision:1,description:'Testo condiviso aggiornato'}); delete metadata.characterIds;
+    assert.equal((await h.catalog('POST', metadata)).status, 200);
+    assert.equal(h.sqlite.prepare("SELECT name FROM gdr_powers WHERE id='other-power'").get().name, 'Altra abilità');
+    assert.equal(h.sqlite.prepare('SELECT character_id FROM gdr_character_powers').get().character_id, 'daisy');
+    assert.equal((await h.catalog('POST', {...metadata, revision:2, adventureIds:[]})).status, 409);
+    assert.equal(h.sqlite.prepare('SELECT adventure_id FROM gdr_power_adventures').get().adventure_id, adventure);
+  } finally {h.sqlite.close();}
+});
+
+test('assegnazioni: permessi, voci non disponibili, revisioni e conflitti non causano scritture parziali', async () => {
+  const h = harness();
+  try {
+    await h.character('daisy'); await h.character('other','png',otherAdventure);
+    await h.catalog('POST', power({characterIds:['daisy']}));
+    const payload={characterId:'daisy',revision:1,powerIds:[]};
+    for (const [user,headers] of [[0,{}],[2,{}],[1,{'x-no-admin':'1'}],[1,{'x-test':'1'}],[1,{'x-safe':'1'}]])
+      assert.equal((await h.catalog('ASSIGN',payload,user,headers)).status,user===0?401:403);
+    assert.equal((await h.catalog('ASSIGN',{...payload,revision:0})).status,409);
+    assert.equal((await h.catalog('ASSIGN',{...payload,powerIds:['missing']})).status,409);
+    assert.equal((await h.catalog('ASSIGN',{...payload,characterId:'other',powerIds:['shared-spell']})).status,409);
+    assert.equal(h.sqlite.prepare('SELECT count(*) n FROM gdr_character_powers').get().n,1);
+    const batch=h.db.batch.bind(h.db);
+    h.db.batch=async statements=>{h.sqlite.exec("UPDATE gdr_workspace_characters SET revision=revision+1 WHERE id='daisy'");return batch(statements);};
+    assert.equal((await h.catalog('ASSIGN',payload)).status,409);
+    assert.equal(h.sqlite.prepare('SELECT character_id FROM gdr_character_powers').get().character_id,'daisy');
+  } finally {h.sqlite.close();}
+});
+
+test('concorrenza: il catalogo non rimuove un’avventura assegnata nel frattempo', async () => {
+  const h=harness();
+  try {
+    await h.character('daisy'); await h.catalog('POST',power());
+    const batch=h.db.batch.bind(h.db);
+    h.db.batch=async statements=>{h.sqlite.exec("INSERT INTO gdr_character_powers VALUES('daisy','shared-spell')");return batch(statements);};
+    const metadata=power({revision:1,adventureIds:[]});delete metadata.characterIds;
+    assert.equal((await h.catalog('POST',metadata)).status,409);
+    assert.equal(h.sqlite.prepare('SELECT adventure_id FROM gdr_power_adventures').get().adventure_id,adventure);
+    assert.equal(h.sqlite.prepare('SELECT count(*) n FROM gdr_character_powers').get().n,1);
+  } finally {h.sqlite.close();}
 });

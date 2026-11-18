@@ -251,10 +251,29 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/gdr/gdr').then((m) => m.Gdr),
       },
       {
-        path: 'tavolo-da-gioco/gdr/poteri',
+        path: 'tavolo-da-gioco/gdr/gestione/poteri',
         canActivate: [adminModeGuard],
+        canDeactivate: [(page: { canLeave: () => boolean }) => page.canLeave()],
         data: { bodyClasses: ['tavolo-page'] },
-        loadComponent: () => import('./pages/gdr-powers/gdr-powers-page').then(m=>m.GdrPowersPage),
+        loadComponent: () => import('./pages/gdr-powers/gdr-powers-page').then(m => m.GdrPowersPage),
+      },
+      {
+        path: 'tavolo-da-gioco/gdr/gestione/:adventureId',
+        canActivate: [adminModeGuard],
+        canDeactivate: [(page: { canLeave: () => boolean }) => page.canLeave()],
+        data: { bodyClasses: ['tavolo-page'], management: true },
+        loadComponent: () => import('./pages/gdr-laboratorio/gdr-laboratorio').then(m => m.GdrLaboratorio),
+      },
+      {
+        path: 'tavolo-da-gioco/gdr/gestione',
+        canActivate: [adminModeGuard],
+        data: { bodyClasses: ['tavolo-page'], management: true },
+        loadComponent: () => import('./pages/gdr/gdr').then(m => m.Gdr),
+      },
+      {
+        path: 'tavolo-da-gioco/gdr/poteri',
+        pathMatch: 'full',
+        redirectTo: 'tavolo-da-gioco/gdr/gestione/poteri',
       },
       {
         path: 'tavolo-da-gioco/gdr/gioca/:adventureId',

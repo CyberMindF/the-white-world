@@ -6,7 +6,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RealtimeService } from '../../core/realtime.service';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AppShell } from '../../shell/app-shell';
 import { SafeModeService } from '../../core/safe-mode.service';
 import { AuthService } from '../../core/auth.service';
@@ -115,6 +115,7 @@ const dateFormatter = new Intl.DateTimeFormat('it-IT', {
   standalone: true,
   imports: [
     AppShell,
+    RouterLink,
     NgTemplateOutlet,
     FormsModule,
     GdrTurn,
@@ -157,18 +158,14 @@ export class GdrLaboratorio implements OnInit {
   }
   protected readonly workspace = inject(GdrWorkspaceService);
   protected readonly panelTab = signal('personaggio');
-  protected readonly masterCharactersOpen = signal(false);
-  protected refreshCharacters():void { if(!this.workspace.pendingChanges() && !this.workspace.saving()) void this.workspace.load(this.selected()); }
-  protected setMasterCharacters(open: boolean): void {
-    if (
-      !this.canPrepare() ||
-      this.workspace.pendingChanges() ||
-      this.workspace.saving() ||
-      this.inlineBusy()
-    )
-      return;
-    this.masterCharactersOpen.set(open);
-    if(open) this.refreshCharacters();
+  protected readonly managementMode = inject(ActivatedRoute).snapshot.data?.['management'] === true;
+  protected readonly managementSection = signal<'characters' | 'rules' | 'adventure'>(inject(ActivatedRoute).snapshot.queryParamMap?.get('sezione') === 'regole' ? 'rules' : inject(ActivatedRoute).snapshot.queryParamMap?.get('sezione') === 'avventura' ? 'adventure' : 'characters');
+  protected readonly masterCharactersOpen = computed(() => this.managementMode && this.managementSection() === 'characters');
+  protected refreshCharacters(): void { if (!this.workspace.pendingChanges() && !this.workspace.saving()) void this.workspace.load(this.selected()); }
+  protected setManagementSection(section: 'characters' | 'rules' | 'adventure'): void {
+    if (this.workspace.pendingChanges() || this.workspace.saving() || this.inlineBusy()) return;
+    this.managementSection.set(section);
+    this.documentEditor.set(false);
   }
 
   protected readonly adventureTitle = signal('');
@@ -272,6 +269,8 @@ export class GdrLaboratorio implements OnInit {
   private turnsRequestVersion = 0;
   protected readonly liveGame = this.route.snapshot.paramMap.has('adventureId');
   protected readonly notesReadOnly = computed(() => !this.liveGame);
+  canLeave(): boolean { return !this.workspace.pendingChanges() && !this.workspace.saving() && !this.inlineBusy() && !this.sendingTurn(); }
+
   async ngOnInit(): Promise<void> {
     const requested = this.route.snapshot.paramMap.get('adventureId');
     if (requested && !ADVENTURES.some((a) => a.id === requested)) {

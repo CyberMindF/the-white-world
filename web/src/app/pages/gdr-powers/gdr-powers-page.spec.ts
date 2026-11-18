@@ -97,7 +97,7 @@ describe('catalogo condiviso di abilità e magie', () => {
     TestBed.resetTestingModule();
     vi.unstubAllGlobals();
   });
-  it('modifica una descrizione e assegna la stessa voce a due avventure e a un PG e un PNG', async () => {
+  it('modifica una descrizione e la disponibilità senza inviare assegnazioni ai personaggi', async () => {
     const { fixture, fetchMock, button, check } = await setup();
     await fixture.whenStable();
     const description = fixture.nativeElement.querySelector('[name="description"]');
@@ -105,21 +105,20 @@ describe('catalogo condiviso di abilità e magie', () => {
     description.dispatchEvent(new Event('input'));
     fixture.detectChanges();
     check('Avventura B');
-    check('PNG');
-    button('Salva voce e assegnazioni').click();
+    button('Salva voce').click();
     await vi.waitFor(() => {
       fixture.detectChanges();
-      expect(fixture.nativeElement.textContent).toContain('Voce e assegnazioni salvate.');
+      expect(fixture.nativeElement.textContent).toContain('Voce salvata.');
     });
     const [, init] = fetchMock.mock.calls.find(([, options]) => options?.method === 'POST')!;
+    expect(JSON.parse(init.body)).not.toHaveProperty('characterIds');
     expect(JSON.parse(init.body)).toMatchObject({
       id: 'spell',
       revision: 1,
       description: 'Descrizione condivisa aggiornata',
       adventureIds: ['a', 'b'],
-      characterIds: ['daisy', 'npc'],
     });
-    expect(fixture.nativeElement.textContent).toContain('Voce e assegnazioni salvate.');
+    expect(fixture.nativeElement.textContent).toContain('Voce salvata.');
     expect(fixture.nativeElement.querySelector('[name="description"]').value).toBe(
       'Descrizione condivisa aggiornata',
     );
@@ -131,7 +130,7 @@ describe('catalogo condiviso di abilità e magie', () => {
     description.value = 'Da conservare';
     description.dispatchEvent(new Event('input'));
     h.fixture.detectChanges();
-    h.button('Salva voce e assegnazioni').click();
+    h.button('Salva voce').click();
     await vi.waitFor(() => {
       h.fixture.detectChanges();
       expect(h.fixture.nativeElement.textContent).toContain('La voce è cambiata.');
@@ -143,13 +142,9 @@ describe('catalogo condiviso di abilità e magie', () => {
     expect(h.button('+ Nuova voce').disabled).toBe(true);
     expect(h.fetchMock.mock.calls).toHaveLength(2);
   });
-  it('impedisce di rimuovere un’avventura lasciando assegnati i suoi personaggi', async () => {
+  it('non mostra assegnazioni ai personaggi nel catalogo', async () => {
     const h = await setup();
-    h.check('Avventura A');
-    h.button('Salva voce e assegnazioni').click();
-    await h.fixture.whenStable();
-    h.fixture.detectChanges();
-    expect(h.fixture.nativeElement.textContent).toContain('Rimuovi le assegnazioni');
-    expect(h.fetchMock.mock.calls).toHaveLength(1);
+    expect(h.fixture.nativeElement.textContent).not.toContain('Usata dai personaggi');
+    expect(h.fixture.nativeElement.textContent).toContain('dai dettagli di ogni PG o PNG');
   });
 });

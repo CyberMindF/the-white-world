@@ -1,13 +1,13 @@
 <app-shell
-  homeHref="/tavolo-da-gioco/gdr"
-  homeLabel="Gioco di Ruolo"
+  homeHref="/tavolo-da-gioco/gdr/gestione"
+  homeLabel="Gestione GDR"
   homeAria="Torna alle avventure"
 >
   <main class="catalog-page">
     <header>
       <p class="eyebrow">Strumenti del master</p>
       <h1>Abilità e magie</h1>
-      <p>Un catalogo condiviso: scegli dove una voce è disponibile e quali personaggi la usano.</p>
+      <p>Crea le voci condivise e scegli in quali avventure sono disponibili. Assegna abilità e magie dai dettagli di ogni PG o PNG.</p>
     </header>
     @if (error()) {
       <p class="error" role="alert">{{ error() }}</p>
@@ -56,8 +56,7 @@
           >
             <strong>{{ power.name }}</strong
             ><small
-              >{{ power.kind === 'spell' ? 'Magia' : 'Abilità' }} ·
-              {{ power.characterIds.length }} personaggi</small
+              >{{ power.kind === 'spell' ? 'Magia' : 'Abilità' }}</small
             >
           </button>
         } @empty {
@@ -120,22 +119,7 @@
               >
             }
           </fieldset>
-          <fieldset>
-            <legend>Usata dai personaggi</legend>
-            <p class="hint">Scegli i PG e PNG che usano questa voce nelle avventure abilitate.</p>
-            @for (c of availableCharacters(); track c.id) {
-              <label class="check"
-                ><input
-                  type="checkbox"
-                  [checked]="draft.characterIds.includes(c.id)"
-                  (change)="toggle('characterIds', c.id, $any($event.target).checked)"
-                />{{ c.name }} · {{ c.kind === 'pg' ? 'PG' : 'PNG' }} ·
-                {{ adventureName(c.adventureId) }}{{ c.archived ? ' · archiviato' : '' }}</label
-              >
-            } @empty {
-              <p>Seleziona prima un’avventura.</p>
-            }
-          </fieldset>
+
         </fieldset>
         @if (dirty()) {
           <p class="hint">Salva o annulla prima di scegliere un’altra voce.</p>
@@ -148,7 +132,7 @@
             type="submit"
             [disabled]="!canManage() || !dirty() || saving() || loading()"
           >
-            {{ saving() ? 'Salvataggio…' : 'Salva voce e assegnazioni' }}
+            {{ saving() ? 'Salvataggio…' : 'Salva voce' }}
           </button>
         </div>
       </form>

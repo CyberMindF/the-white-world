@@ -19,14 +19,15 @@ import { EditorialText } from '../../shared/editorial-text/editorial-text';
 export class Gdr implements OnInit {
   protected readonly adventureIcon = gdrAdventureIcon;
   protected readonly safe = inject(SafeModeService);
+  protected readonly management = inject(ActivatedRoute).snapshot.data['management'] === true;
   protected readonly classic = inject(ActivatedRoute).snapshot.data['classic'] === true;
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   protected readonly workspace = inject(GdrWorkspaceService);
   protected readonly canCreate = computed(
-    () => !this.safe.enabled() && this.auth.isAdmin() && !this.auth.currentUser()?.isTest,
+    () => this.management && this.canManagePowers(),
   );
-  protected readonly canManagePowers = computed(()=>this.canCreate() && this.auth.adminModeEnabled());
+  protected readonly canManagePowers = computed(() => !this.safe.enabled() && this.auth.isAdmin() && !this.auth.currentUser()?.isTest && this.auth.adminModeEnabled());
   protected readonly customAdventures = computed(() =>
     this.workspace.adventures().filter((a) => !a.legacy),
   );
@@ -44,7 +45,7 @@ export class Gdr implements OnInit {
       await this.workspace.save({ action: 'createAdventure', id, title: this.title(), source: '' })
     ) {
       this.newAdventureId = crypto.randomUUID();
-      await this.router.navigate(['/tavolo-da-gioco/gdr/gioca', id]);
+      await this.router.navigate(['/tavolo-da-gioco/gdr/gestione', id], {queryParams: {sezione: 'avventura'}});
     }
   }
 }

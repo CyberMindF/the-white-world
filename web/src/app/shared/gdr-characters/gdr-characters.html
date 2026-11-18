@@ -637,13 +637,6 @@
                             </div>
                           }
                           </div>
-                          @if (canManage()) {
-                            <details class="form-group">
-                              <summary>Abilità · riservato al master</summary>
-                              <p class="hint">Abilità e magie si assegnano dal catalogo condiviso.</p>
-                              @if (!hasChanges()) { <a class="btn" href="/tavolo-da-gioco/gdr/poteri?adventure={{ c.adventureId }}&character={{ c.id }}">Gestisci abilità e magie</a> }
-                            </details>
-                          }
                           <details>
                             <summary>Altri dettagli della scheda</summary>
                             <label for="character-sheet">Scheda del personaggio</label
@@ -688,7 +681,7 @@
                     } @else {
                       <div class="character-actions">
                         @if (c.canEditSheet) {
-                          <button class="btn" [disabled]="statsDirty()" (click)="editing.set(true)">
+                          <button class="btn" [disabled]="statsDirty() || powersPending()" (click)="editing.set(true)">
                             {{ canManage() ? 'Modifica scheda' : 'Modifica personaggio' }}
                           </button>
                         }
@@ -808,7 +801,7 @@
                   @if (canManage() && section() === 'sheet' && !editing()) {
                     <section class="master-guidance">
                       <app-gdr-powers [showCharacterSelector]="false" />
-                      @if (!hasChanges()) { <a class="btn" href="/tavolo-da-gioco/gdr/poteri?adventure={{ c.adventureId }}&character={{ c.id }}">Gestisci abilità e magie</a> }
+                      <app-gdr-character-powers-editor [character]="c" [disabled]="dirty() || grantDirty() || statsDirty() || workspace.saving()" (pending)="powersPending.set($event)" />
                     </section>
                   }
                   @if (canManage() && section() === 'assignments') {

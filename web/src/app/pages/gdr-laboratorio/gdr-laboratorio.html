@@ -1,7 +1,7 @@
 <app-shell
-  homeHref="/tavolo-da-gioco/gdr"
-  homeLabel="Gioco di Ruolo"
-  homeAria="Torna alle avventure GDR"
+  [homeHref]="managementMode ? '/tavolo-da-gioco/gdr/gestione' : '/tavolo-da-gioco/gdr'"
+  [homeLabel]="managementMode ? 'Gestione GDR' : 'Gioco di Ruolo'"
+  [homeAria]="managementMode ? 'Torna a Gestione GDR' : 'Torna alle avventure GDR'"
 >
   <ng-template #characterView let-management="management" let-inventoryOnly="inventoryOnly">
     <app-gdr-characters
@@ -14,30 +14,37 @@
       [fields]="fields()"
     />
   </ng-template>
-  @if (masterCharactersOpen() && canPrepare()) {
-    <section class="avventura-hero" aria-labelledby="master-characters-title">
-      <p class="tavolo-eyebrow">{{ adventure().title }} · strumenti del master</p>
-      <h1 id="master-characters-title">PG e PNG</h1>
-    </section>
-    <div class="avventura-body character-management">
+  @if (managementMode && canEditRules()) {
+    <header class="avventura-hero">
+      <p class="tavolo-eyebrow">Gestione GDR</p>
+      <h1>{{ adventure().title }}</h1>
+    </header>
+    <nav class="avventura-body management-navigation" aria-label="Gestione dell’avventura">
       <div class="lab-document-controls">
-        <button
-          class="btn"
-          [disabled]="workspace.pendingChanges() || workspace.saving()"
-          (click)="setMasterCharacters(false)"
-        >
-          Torna all’avventura
-        </button>
-        @if (workspace.pendingChanges()) {
-          <span>Salva o annulla le modifiche prima di cambiare sezione.</span>
+        <button class="btn" [attr.aria-pressed]="managementSection() === 'characters'" [disabled]="workspace.pendingChanges() || workspace.saving() || inlineBusy()" (click)="setManagementSection('characters')">PG e PNG</button>
+        <button class="btn" [attr.aria-pressed]="managementSection() === 'rules'" [disabled]="workspace.pendingChanges() || workspace.saving() || inlineBusy()" (click)="setManagementSection('rules')">Regole</button>
+        <button class="btn" [attr.aria-pressed]="managementSection() === 'adventure'" [disabled]="workspace.pendingChanges() || workspace.saving() || inlineBusy()" (click)="setManagementSection('adventure')">Avventura</button>
+        @if (!workspace.pendingChanges() && !workspace.saving() && !inlineBusy()) {
+          <a class="btn" routerLink="/tavolo-da-gioco/gdr/gestione/poteri" [queryParams]="{ adventure: selected() }">Catalogo abilità e magie</a>
+          <a class="btn" [routerLink]="['/tavolo-da-gioco/gdr/gioca', selected()]">Apri partita</a>
         }
       </div>
-      <ng-container
-        [ngTemplateOutlet]="characterView"
-        [ngTemplateOutletContext]="{ management: true, inventoryOnly: false }"
-      />
+      @if (workspace.pendingChanges()) { <p>Salva o annulla le modifiche prima di cambiare sezione.</p> }
+    </nav>
+  }
+  @if (managementMode && !canEditRules()) {
+    <p class="lab-status">Attiva la Modalità admin per gestire l’avventura.</p>
+  } @else if (masterCharactersOpen() && canPrepare()) {
+    <div class="avventura-body character-management">
+      @if (loading()) { <p role="status">Caricamento dei personaggi…</p> }
+      <ng-container [ngTemplateOutlet]="characterView" [ngTemplateOutletContext]="{ management: true, inventoryOnly: false }" />
     </div>
+  } @else if (managementMode && managementSection() === 'rules') {
+    <section class="avventura-body character-management" aria-label="Regole dell’avventura">
+      <app-gdr-rules [adventureId]="selected()" [blocks]="adventureRules()?.rules ?? []" [revision]="adventureRules()?.rulesRevision ?? 1" [editable]="canEditRules() && !loading()" (saved)="rulesSaved($event)" />
+    </section>
   } @else {
+    @if (!managementMode) {
     <section class="avventura-hero" aria-labelledby="adventure-title">
       <p class="tavolo-eyebrow">{{ adventure().title }}</p>
       <h1 id="adventure-title">
@@ -45,6 +52,7 @@
       </h1>
     </section>
 
+    }
     @if (workspace.error()) {
       <p class="lab-error" role="alert">{{ workspace.error() }}</p>
     }
@@ -62,20 +70,10 @@
         } @else {
           @if (canPrepare()) {
             <div class="lab-document-controls">
-              @if (canEditRules() && !workspace.pendingChanges()) { <a class="btn" href="/tavolo-da-gioco/gdr/poteri?adventure={{ selected() }}">Gestisci abilità e magie</a> }
-              <button
-                class="btn"
-                [disabled]="
-                  !workspace.available() ||
-                  workspace.pendingChanges() ||
-                  workspace.saving() ||
-                  inlineBusy()
-                "
-                (click)="setMasterCharacters(true)"
-              >
-                Gestisci PG e PNG
-              </button>
-              @if (!liveGame || !adventure().legacy) {
+              @if (!managementMode && canEditRules() && !workspace.pendingChanges() && !inlineBusy()) {
+                <a class="btn" [routerLink]="['/tavolo-da-gioco/gdr/gestione', selected()]">Gestisci avventura</a>
+              }
+              @if (managementMode && (!liveGame || !adventure().legacy)) {
               <button
                 class="lab-text-command"
                 [disabled]="inlineBusy() || workspace.saving()"
@@ -149,7 +147,7 @@
               </section>
             }
           }
-          @if (canPrepare() && !adventure().legacy) {
+          @if (canPrepare() && !adventure().legacy && (managementMode || local().documentDraft !== null)) {
             <div class="lab-document-controls">
               @if (!adventure().legacy) {
                 <button
@@ -160,7 +158,7 @@
                   Salva avventura
                 </button>
                 @for (a of workspace.adventures(); track a.id) {
-                  @if (a.id === selected()) {
+                  @if (managementMode && a.id === selected()) {
                     <p class="lab-help">
                       {{
                         a.published
@@ -211,6 +209,7 @@
           }
         }
 
+        @if (!managementMode) {
         <section class="gdr-turn-section" aria-label="Svolgimento della storia">
           @if (turnsError()) {
             <p class="lab-error" role="alert">{{ turnsError() }}</p>
@@ -298,10 +297,11 @@
             </div>
           </section>
         </section>
+        }
         <p class="appunti-status" role="status" aria-live="polite">{{ status() }}</p>
       </div>
     }
-    @if (!loading()) {
+    @if (!loading() && !managementMode) {
       <app-gdr-panel
         [adventure]="adventure().id"
         [rulesDocumentKey]="adventure().rules || 'maga-regole'"
@@ -330,8 +330,9 @@
           <app-gdr-powers />
         </div>
         <div gdrRules>
+          @if (canEditRules() && !workspace.pendingChanges()) { <a class="btn" [routerLink]="['/tavolo-da-gioco/gdr/gestione', selected()]" [queryParams]="{ sezione: 'regole' }">Gestisci regole</a> }
           <app-gdr-rules [adventureId]="selected()" [blocks]="adventureRules()?.rules ?? []"
-            [revision]="adventureRules()?.rulesRevision ?? 1" [editable]="canEditRules()" (saved)="rulesSaved($event)" />
+            [revision]="adventureRules()?.rulesRevision ?? 1" [editable]="false" (saved)="rulesSaved($event)" />
         </div>
         <div gdrNotes>
           <h3>Appunti personali</h3>

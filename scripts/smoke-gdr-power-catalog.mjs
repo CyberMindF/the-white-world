@@ -28,7 +28,7 @@ const server = createServer(async (req,res) => {
           let raw=''; for await (const chunk of req) raw+=chunk;
           const payload=JSON.parse(raw); writes.push(payload);
           assert.equal(payload.revision,power.revision);
-          power={...payload,revision:power.revision+1}; body={saved:true};
+          power={...power,...payload,revision:power.revision+1}; body={saved:true};
         } else body={powers:[power],adventures,characters};
       } else if (path === '/api/realtime') body={enabled:false};
       else if (path === '/api/world-settings') body={settings:{hearts:false},values:{theme:'love'}};
@@ -59,18 +59,19 @@ try {
     await page.getByRole('heading',{name:'Scudo magico',exact:true}).waitFor();
     await page.getByLabel('Descrizione',{exact:true}).fill('Protezione condivisa aggiornata.');
     await page.getByLabel('Avventura B',{exact:true}).check();
-    await page.getByLabel('Sally · PNG · Avventura B',{exact:true}).check();
-    await page.getByRole('button',{name:'Salva voce e assegnazioni',exact:true}).click();
-    await page.getByRole('status').filter({hasText:'Voce e assegnazioni salvate.'}).waitFor();
+    await page.getByRole('button',{name:'Salva voce',exact:true}).click();
+    await page.getByRole('status').filter({hasText:'Voce salvata.'}).waitFor();
     assert.deepEqual(writes[0].adventureIds,['a','b']);
-    assert.deepEqual(writes[0].characterIds,['daisy','sally']);
+    assert.equal('characterIds' in writes[0],false);
+    assert.deepEqual(power.characterIds,['daisy']);
+    assert.ok(page.url().includes('/gestione/poteri'));
     assert.equal(await page.getByLabel('Descrizione',{exact:true}).inputValue(),'Protezione condivisa aggiornata.');
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Nessuno scorrimento orizzontale');
     await page.screenshot({path:`/tmp/gdr-power-catalog-${width}.png`,fullPage:true});
     assert.deepEqual(errors,[]);
     await context.close();
   }
-  console.log('Catalogo GDR: apertura, modifica, assegnazione PG/PNG e salvataggio verificati a 390 e 1280 px.');
+  console.log('Catalogo GDR: apertura, modifica, disponibilità, conservazione assegnazioni e salvataggio verificati a 390 e 1280 px.');
 } finally {
   await browser.close();
   await new Promise(resolve=>server.close(resolve));
