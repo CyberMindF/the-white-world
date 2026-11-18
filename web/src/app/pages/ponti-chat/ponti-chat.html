@@ -1,7 +1,7 @@
 <app-shell>
   <section class="chat-hero" aria-labelledby="chat-title">
     <p class="chat-eyebrow">I Ponti</p>
-    <h1 id="chat-title"><span aria-hidden="true">📧</span> Chat</h1>
+    <h1 id="chat-title">Chat</h1>
     <p class="chat-intro">Uno spazio per scriversi quando serve, senza aspettare — anche una foto o un video, ma non
       per sempre: i file allegati restano disponibili per 30 giorni.</p>
   </section>
@@ -12,26 +12,28 @@
   <section class="chat-panel card glass-surface" aria-label="Conversazione">
     <header class="chat-presence" [attr.aria-label]="chat.contactPresence().online ? 'Online' : 'Offline'">
       <span class="chat-presence-dot" [class.is-online]="chat.contactPresence().online" aria-hidden="true"></span>
-      <p>
+      <div class="chat-presence-copy">
         <strong>{{ chat.contactName() }}</strong>
+        <span class="chat-presence-status">
         @if (chat.contactPresence().online) {
-          <span> · {{ chat.contactPageLabel() }}</span>
+          {{ chat.contactPageLabel() }}
         } @else if (chat.contactPresence().lastSeen) {
-          <span> · ultima visita: {{ chat.contactPresence().lastSeen | date: 'dd/MM/yyyy HH:mm' }}</span>
+          ultima visita: {{ chat.contactPresence().lastSeen | date: 'dd/MM/yyyy HH:mm' }}
         } @else {
-          <span> · offline</span>
+          offline
         }
-      </p>
+        </span>
+      </div>
     </header>
-    <div class="chat-log" #log>
-      @if (loading()) { <p class="content-message">Caricamento…</p> }
-      @if (!loading() && messages().length === 0) { <p class="content-message">Ancora nessun messaggio.</p> }
+    <div class="chat-log" #log aria-live="polite" [attr.aria-busy]="loading()">
+      @if (loading()) { <p class="chat-empty">Caricamento…</p> }
+      @if (!loading() && messages().length === 0) { <p class="chat-empty">Ancora nessun messaggio.</p> }
 
       @for (message of messages(); track message.id; let index = $index) {
       @if (startsNewDay(index)) {
       <div class="chat-day-divider"><span>{{ message.createdAt | date: 'EEEE d MMMM y' }}</span></div>
       }
-      <article class="chat-bubble glass-surface" [class.chat-bubble--own]="message.senderUserId === ownUserId()">
+      <article class="chat-bubble" [class.chat-bubble--own]="message.senderUserId === ownUserId()">
         @if (message.mediaType === 'photo' && message.mediaKey) {
         <img class="chat-media chat-media--photo" [src]="mediaUrl(message)" alt="" />
         }
@@ -43,35 +45,41 @@
         }
         @if (message.body) { <p class="chat-bubble-text">{{ message.body }}</p> }
         <div class="chat-bubble-meta">
-          <time>{{ message.createdAt | date: 'dd/MM HH:mm' }}</time>
+          <time [attr.datetime]="message.createdAt" [attr.title]="message.createdAt | date: 'dd/MM/yyyy HH:mm'">{{ message.createdAt | date: 'HH:mm' }}</time>
           @if (message.senderUserId === ownUserId()) {
           <span class="chat-read-status" [class.is-read]="message.readAt" [attr.aria-label]="message.readAt ? 'Letto' : 'Inviato'">✓</span>
-          <button type="button" class="chat-delete-btn" (click)="requestDelete(message.id)" aria-label="Elimina messaggio">🗑️</button>
+          <button type="button" class="chat-icon-btn chat-delete-btn" (click)="requestDelete(message.id)" aria-label="Elimina messaggio" title="Elimina messaggio">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-3 6h12l-1 12H7L6 9Zm4 2v8h1v-8h-1Zm3 0v8h1v-8h-1Z"/></svg>
+          </button>
           }
         </div>
       </article>
       }
     </div>
 
-    <form class="chat-compose" (ngSubmit)="send()">
       @if (pendingPreviewUrl()) {
       <div class="chat-pending-preview">
-        @if (pendingFileType() === 'photo') { <img [src]="pendingPreviewUrl()" alt="" /> }
+        @if (pendingFileType() === 'photo') { <img [src]="pendingPreviewUrl()" alt="Anteprima allegato" /> }
         @if (pendingFileType() === 'video') { <video [src]="pendingPreviewUrl()" controls></video> }
-        <button type="button" class="btn" (click)="clearPendingFile()">Rimuovi allegato</button>
+        <span>{{ pendingFile()?.name }}</span>
+        <button type="button" class="chat-icon-btn" (click)="clearPendingFile()" aria-label="Rimuovi allegato" title="Rimuovi allegato">×</button>
       </div>
       }
+    <form class="chat-compose" (ngSubmit)="send()">
       <div class="chat-compose-row">
-        <label class="btn chat-attach-btn" aria-label="Allega foto o video">
-          <span aria-hidden="true">📎</span>
+        <label class="chat-icon-btn chat-attach-btn" aria-label="Allega foto o video" title="Allega foto o video">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.5 6.5v10a4.5 4.5 0 0 1-9 0V5a3 3 0 0 1 6 0v10.5a1.5 1.5 0 0 1-3 0V6H9v9.5a3 3 0 0 0 6 0V5a4.5 4.5 0 0 0-9 0v11.5a6 6 0 0 0 12 0v-10h-1.5Z"/></svg>
           <input #fileInput type="file" accept="image/*,video/*" (change)="onFileSelected($event)" hidden />
         </label>
-        <textarea class="chat-compose-input" [ngModel]="composeText()" (ngModelChange)="composeText.set($event)"
-          name="composeText" maxlength="2000" placeholder="Scrivi un messaggio..." (keydown)="onComposerKeydown($event)"></textarea>
-        <button type="submit" class="btn btn-submit" [disabled]="sending() || (!composeText().trim() && !pendingFile())">
-          {{ uploading() ? 'Invio allegato…' : sending() ? 'Invio…' : 'Invia' }}
+        <label class="form-field chat-text-field">
+          <textarea class="chat-compose-input" [ngModel]="composeText()" (ngModelChange)="composeText.set($event)"
+            name="composeText" rows="1" maxlength="2000" aria-label="Messaggio" placeholder="Scrivi un messaggio…" (keydown)="onComposerKeydown($event)"></textarea>
+        </label>
+        <button type="submit" class="btn btn-submit chat-send" aria-label="Invia messaggio" title="Invia messaggio" [attr.aria-busy]="sending()" [disabled]="sending() || (!composeText().trim() && !pendingFile())">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3.4 20.4 18-8a.45.45 0 0 0 0-.82l-18-8A.45.45 0 0 0 2.8 4l1.8 6.55L14 12l-9.4 1.45L2.8 20a.45.45 0 0 0 .6.4Z"/></svg>
         </button>
       </div>
+      @if (sending()) { <p class="chat-send-status" role="status">{{ uploading() ? 'Invio allegato…' : 'Invio…' }}</p> }
       @if (sendError()) { <p class="content-message is-error" role="status">{{ sendError() }}</p> }
     </form>
   </section>
