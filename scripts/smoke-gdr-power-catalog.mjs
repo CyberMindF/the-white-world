@@ -6,7 +6,7 @@ import { resolve, join, extname } from 'node:path';
 import assert from 'node:assert/strict';
 
 const root = resolve('web/dist/web/browser');
-const adventures = [{ id:'a', title:'Avventura A' }, { id:'b', title:'Avventura B' }];
+const adventures = [{ id:'a', name:'Sistema A' }, { id:'b', name:'Sistema B' }];
 const characters = [
   { id:'daisy', name:'Daisy', kind:'pg', adventureId:'a', archived:0 },
   { id:'sally', name:'Sally', kind:'png', adventureId:'b', archived:0 },
@@ -14,7 +14,7 @@ const characters = [
 let power, writes;
 const reset = () => {
   writes = [];
-  power = { id:'scudo', name:'Scudo magico', kind:'spell', description:'Protegge da un colpo.', effects:[], revision:1, adventureIds:['a'], characterIds:['daisy'] };
+  power = { id:'scudo', name:'Scudo magico', kind:'spell', description:'Protegge da un colpo.', effects:[], revision:1, systemIds:['a'], characterIds:['daisy'] };
 };
 reset();
 const server = createServer(async (req,res) => {
@@ -29,7 +29,7 @@ const server = createServer(async (req,res) => {
           const payload=JSON.parse(raw); writes.push(payload);
           assert.equal(payload.revision,power.revision);
           power={...power,...payload,revision:power.revision+1}; body={saved:true};
-        } else body={powers:[power],adventures,characters};
+        } else body={powers:[power],systems:adventures,characters};
       } else if (path === '/api/realtime') body={enabled:false};
       else if (path === '/api/world-settings') body={settings:{hearts:false},values:{theme:'love'}};
       else if (path === '/api/world-updates') body={updates:[]};
@@ -55,13 +55,13 @@ try {
       sessionStorage.setItem('noi-crossword-access-session-v1','1');
       sessionStorage.setItem('noi-crossword-access-session-touched-at-v1',String(Date.now()));
     });
-    await page.goto(base+'/tavolo-da-gioco/gdr/poteri?adventure=a');
+    await page.goto(base+'/tavolo-da-gioco/gdr/poteri?system=a');
     await page.getByRole('heading',{name:'Scudo magico',exact:true}).waitFor();
     await page.getByLabel('Descrizione',{exact:true}).fill('Protezione condivisa aggiornata.');
-    await page.getByLabel('Avventura B',{exact:true}).check();
+    await page.getByLabel('Sistema B',{exact:true}).check();
     await page.getByRole('button',{name:'Salva voce',exact:true}).click();
     await page.getByRole('status').filter({hasText:'Voce salvata.'}).waitFor();
-    assert.deepEqual(writes[0].adventureIds,['a','b']);
+    assert.deepEqual(writes[0].systemIds,['a','b']);
     assert.equal('characterIds' in writes[0],false);
     assert.deepEqual(power.characterIds,['daisy']);
     assert.ok(page.url().includes('/gestione/poteri'));

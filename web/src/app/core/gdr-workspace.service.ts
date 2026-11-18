@@ -4,6 +4,10 @@ export interface CharacterPower {
   id: string; kind: 'ability' | 'spell'; name: string; description: string;
   effects: GdrReferenceBlock[]; revision: number;
 }
+export interface SystemSheetField {
+  key: string; label: string; type: string; min?: number; max?: number; long?: boolean;
+  default?: string | number; role?: 'field' | 'stat' | 'resource';
+}
 export interface WorkspaceAdventure {
   id: string;
   title: string;
@@ -11,6 +15,10 @@ export interface WorkspaceAdventure {
   legacy: boolean;
   published: boolean;
   revision: number;
+  systemId?: string | null;
+  systemName?: string;
+  fields?: SystemSheetField[];
+  statBudget?: number;
   rules?: GdrReferenceBlock[];
   rulesRevision?: number;
 }
@@ -101,7 +109,8 @@ export class GdrWorkspaceService {
   readonly saving = signal(false);
   readonly characterPendingChanges = signal(false);
   readonly rulesEditing = signal(false);
-  readonly pendingChanges = computed(()=>this.characterPendingChanges() || this.rulesEditing());
+  readonly systemEditing = signal(false);
+  readonly pendingChanges = computed(()=>this.characterPendingChanges() || this.rulesEditing() || this.systemEditing());
   readonly error = signal('');
   readonly message = signal('');
   readonly selectedId = signal('');

@@ -18,7 +18,7 @@ export async function onRequestPut(context) {
     // La stessa condizione protegge tutta la batch, anche se il catalogo cambia nel frattempo.
     const guard = `EXISTS(SELECT 1 FROM gdr_workspace_characters c WHERE c.id=? AND c.revision=?
       AND NOT EXISTS(SELECT 1 FROM json_each(?) selected WHERE NOT EXISTS(
-        SELECT 1 FROM gdr_power_adventures a WHERE a.power_id=selected.value AND a.adventure_id=c.adventure_id)))`;
+        SELECT 1 FROM gdr_power_availability a WHERE a.power_id=selected.value AND a.adventure_id=c.adventure_id)))`;
     const bindings = [body.characterId, body.revision, JSON.stringify(body.powerIds)];
     const results = await db.batch([
       db.prepare(`DELETE FROM gdr_character_powers WHERE character_id=? AND ${guard}`).bind(body.characterId, ...bindings),

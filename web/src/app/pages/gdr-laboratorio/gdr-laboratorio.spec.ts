@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { EMPTY } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthService } from '../../core/auth.service';
@@ -39,6 +39,7 @@ class TurnPage extends GdrLaboratorio {
 }
 function create(live = true, player = false) {
   TestBed.configureTestingModule({providers: [
+    {provide:Router,useValue:{navigate:vi.fn()}},
     {provide: AuthService, useValue: {currentUser: signal({id: 7, nickname: 'Rory'}), isAdmin: signal(!player), impersonation: signal(null)}},
     {provide: SafeModeService, useValue: {enabled: signal(false)}},
     {provide: RealtimeService, useValue: {on: () => EMPTY}},

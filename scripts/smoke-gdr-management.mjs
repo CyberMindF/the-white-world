@@ -43,6 +43,7 @@ const server=createServer(async(req,res)=>{
       const response=await assign({request:new Request('https://test/api/gdr-powers/assignments',{method:'PUT',body:JSON.stringify(payload)}),env:{DB:h.db},waitUntil(){}});
       res.writeHead(response.status,{'Content-Type':'application/json'});res.end(await response.text());return;
     }
+    if(path==='/api/gdr-systems') {send({systems:h.sqlite.prepare('SELECT id,name,revision FROM gdr_systems').all(),rules:[],powers:[],adventures:[]});return;}
     if(path==='/api/gdr-powers') {
       send({powers:powers.map(p=>({...p,characterIds:h.sqlite.prepare('SELECT character_id FROM gdr_character_powers WHERE power_id=?').all(p.id).map(x=>x.character_id)})),adventures:h.sqlite.prepare('SELECT id,title FROM gdr_workspace_adventures').all(),characters:[]});return;
     }
@@ -83,7 +84,7 @@ try {
     await editor.getByRole('button',{name:'Scegli abilità e magie'}).click();
     await editor.getByLabel('Scudo magico').check();await editor.getByLabel('Famiglio').check();
     assert.equal(await editor.getByText('Solo altra avventura',{exact:true}).count(),0);
-    assert.equal(await nav.getByRole('button',{name:'Regole',exact:true}).isDisabled(),true);
+    assert.equal(await nav.getByRole('button',{name:'Sistema e regole',exact:true}).isDisabled(),true);
     assert.equal(await page.getByRole('button',{name:'Modifica scheda',exact:true}).isDisabled(),true);
     await editor.getByRole('button',{name:'Salva abilità e magie'}).click();
     await page.getByRole('status').filter({hasText:'Abilità e magie salvate.'}).first().waitFor();
@@ -100,7 +101,7 @@ try {
     assert.equal(h.sqlite.prepare("SELECT count(*) n FROM gdr_character_powers WHERE character_id='sally'").get().n,1);
     await page.screenshot({path:`/tmp/gdr-management-${width}.png`,fullPage:true});
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
-    await nav.getByRole('button',{name:'Regole',exact:true}).click();
+    await nav.getByRole('button',{name:'Sistema e regole',exact:true}).click();
     await page.getByRole('button',{name:'Modifica regole',exact:true}).click();
     await page.getByLabel('Testo delle regole').fill('## Regole condivise\n\nUna regola aggiornata.');
     await page.getByRole('button',{name:'Salva regole',exact:true}).click();
@@ -114,6 +115,7 @@ try {
       await page.goto(base+'/tavolo-da-gioco/gdr/gestione');
       await page.getByRole('button',{name:'Nuova avventura',exact:true}).click();
       await page.getByLabel('Titolo della nuova avventura',{exact:true}).fill('Nuova storia di prova');
+      await page.getByRole('combobox',{name:'Sistema di gioco',exact:true}).selectOption(adventure);
       await page.getByRole('button',{name:'Crea e inizia a scrivere',exact:true}).click();
       await page.getByRole('heading',{name:'Nuova storia di prova',exact:true}).waitFor();
       const adventureNav=page.getByRole('navigation',{name:'Gestione dell’avventura'});

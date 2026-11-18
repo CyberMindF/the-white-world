@@ -405,13 +405,7 @@ test("le regole si modificano per avventura con controllo dei conflitti e restan
 test("migrazione: conserva regole, tabelle e note; assegna abilità e magie solo al protagonista e mantiene gli originali", async () => {
   const h = fixture({ powerCatalog: false });
   try {
-    await mutate(h.db, master, {
-      action: "createCharacter",
-      id: "daisy",
-      kind: "pg",
-      adventureId: adventure,
-      name: "Daisy",
-    });
+    h.sqlite.prepare("INSERT INTO gdr_workspace_characters(id,adventure_id,kind,name,created_by,created_at) VALUES('daisy',?,'pg','Daisy',1,'test')").run(adventure);
     h.sqlite
       .prepare("INSERT INTO gdr_workspace_story_links VALUES(?,'pg',?)")
       .run(adventure, "daisy");

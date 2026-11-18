@@ -16,12 +16,12 @@ export interface CatalogPower {
   description: string;
   effects: GdrReferenceBlock[];
   revision: number | null;
-  adventureIds: string[];
+  systemIds: string[];
   characterIds: string[];
 }
-interface CatalogAdventure {
+interface CatalogSystem {
   id: string;
-  title: string;
+  name: string;
 }
 const empty = (): CatalogPower => ({
   id: crypto.randomUUID(),
@@ -30,7 +30,7 @@ const empty = (): CatalogPower => ({
   description: '',
   effects: [],
   revision: null,
-  adventureIds: [],
+  systemIds: [],
   characterIds: [],
 });
 
@@ -53,21 +53,21 @@ export class GdrPowersPage implements OnInit {
       !this.safe.enabled(),
   );
   protected readonly powers = signal<CatalogPower[]>([]);
-  protected readonly adventures = signal<CatalogAdventure[]>([]);
+  protected readonly systems = signal<CatalogSystem[]>([]);
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
   protected readonly dirty = signal(false);
   protected readonly error = signal('');
   protected readonly notice = signal('');
   protected readonly search = signal('');
-  protected readonly adventureFilter = signal(
-    this.route.snapshot.queryParamMap.get('adventure') ?? '',
+  protected readonly systemFilter = signal(
+    this.route.snapshot.queryParamMap.get('system') ?? '',
   );
   protected readonly kindFilter = signal('');
   protected readonly filtered = computed(() =>
     this.powers().filter(
       (p) =>
-        (!this.adventureFilter() || p.adventureIds.includes(this.adventureFilter())) &&
+        (!this.systemFilter() || p.systemIds.includes(this.systemFilter())) &&
         (!this.kindFilter() || p.kind === this.kindFilter()) &&
         (p.name + ' ' + p.description)
           .toLocaleLowerCase('it')
@@ -92,7 +92,7 @@ export class GdrPowersPage implements OnInit {
         data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Catalogo non disponibile.');
       this.powers.set(data.powers);
-      this.adventures.set(data.adventures);
+      this.systems.set(data.systems);
       const selected =
         data.powers.find((p: CatalogPower) => p.id === this.draft.id) ?? this.filtered()[0];
       if (selected) this.edit(selected);
@@ -115,8 +115,8 @@ export class GdrPowersPage implements OnInit {
     if (this.saving() || this.dirty()) return;
     this.draft = empty();
     this.effectsSource = '';
-    const adventure = this.adventureFilter();
-    if (adventure) this.draft.adventureIds = [adventure];
+    const system = this.systemFilter();
+    if (system) this.draft.systemIds = [system];
     this.error.set('');
     this.notice.set('');
   }
@@ -124,7 +124,7 @@ export class GdrPowersPage implements OnInit {
     this.dirty.set(true);
     this.notice.set('');
   }
-  protected toggle(kind: 'adventureIds', id: string, checked: boolean): void {
+  protected toggle(kind: 'systemIds', id: string, checked: boolean): void {
     this.draft[kind] = checked
       ? [...this.draft[kind], id]
       : this.draft[kind].filter((value) => value !== id);

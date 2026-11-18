@@ -18,7 +18,7 @@ export async function onRequestGet(context) {
     if (!adventure) return json({ error: "Avventura mancante." }, 400);
 
     const schemaRow = await context.env.DB.prepare(
-      "SELECT fields_json FROM gdr_character_schema WHERE adventure = ?",
+      "SELECT fields_json FROM gdr_adventure_schema WHERE adventure = ?",
     )
       .bind(adventure)
       .first();
@@ -90,7 +90,7 @@ export async function onRequestPost(context) {
     }
 
     const schemaRow = await context.env.DB.prepare(
-      "SELECT fields_json FROM gdr_character_schema WHERE adventure = ?",
+      "SELECT fields_json FROM gdr_adventure_schema WHERE adventure = ?",
     )
       .bind(adventure)
       .first();

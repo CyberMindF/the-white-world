@@ -6,7 +6,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RealtimeService } from '../../core/realtime.service';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink, Router } from '@angular/router';
 import { AppShell } from '../../shell/app-shell';
 import { SafeModeService } from '../../core/safe-mode.service';
 import { AuthService } from '../../core/auth.service';
@@ -20,6 +20,7 @@ import { serializeGdrBlocks } from '../../shared/gdr-blocks/gdr-markdown.seriali
 import { GdrWorkspaceService } from '../../core/gdr-workspace.service';
 import { GdrCharacters } from '../../shared/gdr-characters/gdr-characters';
 import { GdrPowers } from '../../shared/gdr-characters/gdr-powers';
+import { GdrAdventureSystem } from '../../shared/gdr-rules/gdr-adventure-system';
 import { GdrRules } from '../../shared/gdr-rules/gdr-rules';
 import { GdrReferenceBlock } from '../../shared/gdr-blocks/gdr-block.types';
 import { imagesFromGdrBlocks } from '../../shared/gdr-characters/gdr-image-library';
@@ -94,6 +95,8 @@ interface Field {
   min?: number;
   max?: number;
   long?: boolean;
+  default?: string | number;
+  role?: 'field' | 'stat' | 'resource';
 }
 const emptyState = (): LocalState => ({
   version: 2,
@@ -124,6 +127,7 @@ const dateFormatter = new Intl.DateTimeFormat('it-IT', {
     GdrCharacters,
     GdrPowers,
     GdrRules,
+    GdrAdventureSystem,
     GdrNotesEditor,
   ],
   providers: [GdrWorkspaceService],
@@ -131,6 +135,8 @@ const dateFormatter = new Intl.DateTimeFormat('it-IT', {
   styleUrls: ['../../../styles/pages/tavolo.css', './gdr-laboratorio.css'],
 })
 export class GdrLaboratorio implements OnInit {
+  private readonly router = inject(Router);
+  protected openManagedAdventure(id:string):void{void this.router.navigate(['/tavolo-da-gioco/gdr/gestione',id]);}
   private readonly auth = inject(AuthService);
   protected readonly readingEdit = signal(false);
   protected readonly documentEdit = signal(false);
@@ -188,7 +194,8 @@ export class GdrLaboratorio implements OnInit {
   protected readonly turnsError = signal('');
   protected readonly status = signal('');
   protected readonly documentEditor = signal(false);
-  protected readonly fields = signal<Field[]>([]);
+  private readonly legacyFields = signal<Field[]>([]);
+  protected readonly fields = computed(() => this.adventureRules()?.fields ?? this.legacyFields());
   protected readonly values = signal<Record<string, string>>({});
   protected readonly toolsError = signal('');
   protected readonly toolsLoading = signal(false);
@@ -389,7 +396,7 @@ export class GdrLaboratorio implements OnInit {
     this.toolsLoading.set(true);
     this.blocks.set([]);
     this.turns.set([]);
-    this.fields.set([]);
+    this.legacyFields.set([]);
     this.values.set({});
     const encoded = encodeURIComponent(id);
     await Promise.all([
@@ -415,7 +422,7 @@ export class GdrLaboratorio implements OnInit {
             ])
               .then(([schema, values]) => {
                 if (version !== this.requestVersion) return;
-                this.fields.set(schema.fields ?? []);
+                this.legacyFields.set(schema.fields ?? []);
                 this.values.set(values.values ?? {});
               })
               .catch(() => {

@@ -14,10 +14,13 @@ export async function onRequestGet(context) {
       return json({ error: "Avventura non valida." }, 400);
     const adventures = await db
       .prepare(
-        "SELECT id,title,source,legacy,published,revision,rules_json,rules_revision FROM gdr_workspace_adventures WHERE ?=1 OR published=1 ORDER BY legacy DESC,created_at,id",
+        "SELECT id,title,source,legacy,published,revision,rules_json,rules_revision,system_id FROM gdr_workspace_adventures WHERE ?=1 OR published=1 ORDER BY legacy DESC,created_at,id",
       )
       .bind(isMaster(user) ? 1 : 0)
       .all();
+    const schemas=(await db.prepare('SELECT * FROM gdr_adventure_schema').all()).results;
+    const systemRules=(await db.prepare(`SELECT sr.system_id,r.type,r.data_json FROM gdr_system_rules sr JOIN gdr_rule_blocks r ON r.id=sr.rule_id
+      WHERE sr.system_id IN (SELECT system_id FROM gdr_workspace_adventures WHERE ?=1 OR published=1) ORDER BY sr.system_id,sr.position,sr.rule_id`).bind(isMaster(user)?1:0).all()).results;
     let characters = [],
       grants = [];
     if (adventure) {
@@ -32,7 +35,12 @@ export async function onRequestGet(context) {
         )
         .bind(user.id, adventure, isMaster(user) ? 1 : 0)
         .all();
-      characters = result.results.map((row) => characterView(row, user));
+      characters = result.results.map((row) => {
+        const fields=JSON.parse(schemas.find(s=>s.adventure===row.adventure_id)?.fields_json ?? '[]');
+        const defaults=Object.fromEntries(fields.filter(f=>!['name','nome','inventory'].includes(f.key)).map(f=>[f.key,String(f.default ?? (f.type==='number'?f.min:'') ?? '')]));
+        return {...characterView(row,user),statsBudget:row.stat_budget_override?row.stats_budget:(schemas.find(s=>s.adventure===row.adventure_id)?.stat_budget??row.stats_budget),characterFields:{...defaults,...JSON.parse(row.fields_json)},
+          canEditStats:row.kind==='pg' && !row.archived && row.stats_editable===1 && (isMaster(user)||row.can_edit_sheet===1) && fields.some(f=>f.role==='stat'||(f.role===undefined&&['statMente','statCuore','statCorpo','statMagia'].includes(f.key)))};
+      });
       if (isMaster(user))
         grants = (
           await db
@@ -46,7 +54,7 @@ export async function onRequestGet(context) {
     const assignedPowers=adventure ? (await db.prepare(`SELECT p.*,cp.character_id
       FROM gdr_powers p JOIN gdr_character_powers cp ON cp.power_id=p.id
       JOIN gdr_workspace_characters c ON c.id=cp.character_id
-      JOIN gdr_power_adventures pa ON pa.power_id=p.id AND pa.adventure_id=c.adventure_id
+      JOIN gdr_power_availability pa ON pa.power_id=p.id AND pa.adventure_id=c.adventure_id
       WHERE c.adventure_id=? AND (?=1 OR (c.archived=0 AND EXISTS(
         SELECT 1 FROM gdr_workspace_grants g WHERE g.character_id=c.id AND g.user_id=?
         AND (g.can_speak=1 OR g.can_edit_sheet=1 OR g.can_inventory=1))))
@@ -111,9 +119,13 @@ export async function onRequestGet(context) {
       narrativeCharacters,
       storyCharacters,
       pets,
-      adventures: adventures.results.map(({rules_json,rules_revision,...a}) => ({
+      adventures: adventures.results.map(({rules_json,rules_revision,system_id,...a}) => ({
         ...a,
-        rules: JSON.parse(rules_json),
+        systemId:system_id,
+        systemName:schemas.find(s=>s.adventure===a.id)?.system_name ?? '',
+        fields:JSON.parse(schemas.find(s=>s.adventure===a.id)?.fields_json ?? '[]'),
+        statBudget:schemas.find(s=>s.adventure===a.id)?.stat_budget ?? 12,
+        rules:system_id ? systemRules.filter(r=>r.system_id===system_id).flatMap(r=>r.type==='document'?JSON.parse(r.data_json):[{type:r.type,data:JSON.parse(r.data_json)}]) : JSON.parse(rules_json),
         rulesRevision: rules_revision,
         legacy: a.legacy === 1,
         published: a.published === 1,

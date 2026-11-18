@@ -45,6 +45,10 @@
                       : 'Un personaggio del racconto, gestito dal master.'
                   }}
                 </p>
+                @if(workspace.adventures().length){
+                  <label for="new-character-adventure">Avventura del personaggio</label><select id="new-character-adventure" [ngModel]="creationAdventure()" (ngModelChange)="newAdventureId.set($event)">@for(a of workspace.adventures();track a.id){<option [value]="a.id">{{a.title}}</option>}</select>
+                  @if(creationSystem()){<p class="hint">Sistema ereditato · {{creationSystem()}}</p>}
+                }
                 <label for="new-character-name">{{
                   newKind() === 'pg' ? 'Nome completo · facoltativo' : 'Nome completo'
                 }}</label
@@ -317,7 +321,7 @@
                         }
                       </section>
                     }
-                    @if (baseStats().length === 4 && (!editing() || canManage())) {
+                    @if (baseStats().length > 0 && (!editing() || canManage())) {
                       <section class="base-stats-card">
                         <div class="base-stats-heading">
                           <h4>Caratteristiche di base</h4>
@@ -329,7 +333,7 @@
                         </div>
                         @if (!canManage() && c.canEditStats) {
                           <p class="hint">
-                            Distribuisci {{ c.statsBudget || 12 }} punti, da 1 a 5 per
+                            Distribuisci {{ c.statsBudget || 12 }} punti rispettando i limiti di ogni
                             caratteristica. Dopo la conferma potrà riaprirle solo il master.
                           </p>
                           <div class="player-stats">
@@ -339,8 +343,8 @@
                                 }}<input
                                   [id]="'base-' + field.key"
                                   type="number"
-                                  min="1"
-                                  max="5"
+                                  [min]="field.min ?? 1"
+                                  [max]="field.max ?? 5"
                                   [ngModel]="statDraft()[field.key]"
                                   (ngModelChange)="changeStat(field.key, $event)"
                               /></label>
@@ -364,7 +368,7 @@
                             @for (field of baseStats(); track field.key) {
                               <div>
                                 <dt>{{ field.label }}</dt>
-                                <dd>{{ c.characterFields?.[field.key] || '1' }}</dd>
+                                <dd>{{ c.characterFields?.[field.key] ?? field.default ?? field.min ?? '1' }}</dd>
                               </div>
                             }
                           </dl>
@@ -375,7 +379,7 @@
                             </p>
                           }
                         }
-                        @if (canManage()) {
+                        @if (canManage() && c.kind === 'pg') {
                           <div class="stat-permission">
                             <label for="stats-budget"
                               >Punti totali consentiti<input
@@ -725,8 +729,8 @@
                         <dl class="profile-details adventure-fields">
                           @for (field of extraFields(); track field.key) {
                             @if (
-                              (baseStats().length !== 4 || !statKeys.includes(field.key)) &&
-                              !resourceKeys.includes(field.key)
+                              (baseStats().length === 0 || !statKeys().includes(field.key)) &&
+                              !resourceKeys().includes(field.key)
                             ) {
                               <div>
                                 <dt>{{ field.label }}</dt>

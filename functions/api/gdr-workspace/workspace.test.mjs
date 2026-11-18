@@ -224,7 +224,7 @@ test('distribuzione iniziale: totale obbligatorio, conferma atomica e blocco del
 h.sqlite.close();
 });
 test('solo il master riapre la distribuzione, anche con un nuovo totale; la nuova conferma richiude il permesso',async()=>{
- const h=apiHarness();await character(h.db,'level-up');await grant(h.db,h.sqlite,'level-up',{canEditSheet:true});
+ const h=apiHarness();h.sqlite.prepare('INSERT INTO gdr_character_schema VALUES(?,?)').run(adventureId,JSON.stringify(['statMente','statCuore','statCorpo','statMagia'].map(key=>({key,label:key,type:'number',min:1,max:5,default:1}))));await character(h.db,'level-up');await grant(h.db,h.sqlite,'level-up',{canEditSheet:true});
  await mutate(h.db,master,{action:'setStatAccess',characterId:'level-up',revision:revision(h.sqlite,'level-up'),editable:false,budget:12});
  await denied(()=>mutate(h.db,member,{action:'setStatAccess',characterId:'level-up',revision:revision(h.sqlite,'level-up'),editable:true,budget:14}));
  await mutate(h.db,master,{action:'setStatAccess',characterId:'level-up',revision:revision(h.sqlite,'level-up'),editable:true,budget:14});

@@ -7,6 +7,7 @@
     <app-gdr-characters
       [inventoryOnly]="inventoryOnly"
       [managementMode]="management"
+      (adventureChanged)="openManagedAdventure($event)"
       [legacySheet]="legacySheet()"
       [legacyName]="legacyName()"
       [legacyPortrait]="legacyPortrait()"
@@ -22,10 +23,10 @@
     <nav class="avventura-body management-navigation" aria-label="Gestione dell’avventura">
       <div class="lab-document-controls">
         <button class="btn" [attr.aria-pressed]="managementSection() === 'characters'" [disabled]="workspace.pendingChanges() || workspace.saving() || inlineBusy()" (click)="setManagementSection('characters')">PG e PNG</button>
-        <button class="btn" [attr.aria-pressed]="managementSection() === 'rules'" [disabled]="workspace.pendingChanges() || workspace.saving() || inlineBusy()" (click)="setManagementSection('rules')">Regole</button>
+        <button class="btn" [attr.aria-pressed]="managementSection() === 'rules'" [disabled]="workspace.pendingChanges() || workspace.saving() || inlineBusy()" (click)="setManagementSection('rules')">Sistema e regole</button>
         <button class="btn" [attr.aria-pressed]="managementSection() === 'adventure'" [disabled]="workspace.pendingChanges() || workspace.saving() || inlineBusy()" (click)="setManagementSection('adventure')">Avventura</button>
         @if (!workspace.pendingChanges() && !workspace.saving() && !inlineBusy()) {
-          <a class="btn" routerLink="/tavolo-da-gioco/gdr/gestione/poteri" [queryParams]="{ adventure: selected() }">Catalogo abilità e magie</a>
+          <a class="btn" routerLink="/tavolo-da-gioco/gdr/gestione/poteri" [queryParams]="{ system: adventureRules()?.systemId }">Catalogo abilità e magie</a>
           <a class="btn" [routerLink]="['/tavolo-da-gioco/gdr/gioca', selected()]">Apri partita</a>
         }
       </div>
@@ -41,7 +42,8 @@
     </div>
   } @else if (managementMode && managementSection() === 'rules') {
     <section class="avventura-body character-management" aria-label="Regole dell’avventura">
-      <app-gdr-rules [adventureId]="selected()" [blocks]="adventureRules()?.rules ?? []" [revision]="adventureRules()?.rulesRevision ?? 1" [editable]="canEditRules() && !loading()" (saved)="rulesSaved($event)" />
+      <app-gdr-adventure-system />
+      <app-gdr-rules [adventureId]="selected()" [blocks]="adventureRules()?.rules ?? []" [revision]="adventureRules()?.rulesRevision ?? 1" [editable]="!adventureRules()?.systemId && canEditRules() && !loading()" (saved)="rulesSaved($event)" />
     </section>
   } @else {
     @if (!managementMode) {
@@ -304,6 +306,7 @@
     @if (!loading() && !managementMode) {
       <app-gdr-panel
         [adventure]="adventure().id"
+        [systemName]="adventureRules()?.systemName || ''"
         [rulesDocumentKey]="adventure().rules || 'maga-regole'"
         [fieldsDocumentKey]="adventure().character"
         [personaggioLabel]="
@@ -330,7 +333,7 @@
           <app-gdr-powers />
         </div>
         <div gdrRules>
-          @if (canEditRules() && !workspace.pendingChanges()) { <a class="btn" [routerLink]="['/tavolo-da-gioco/gdr/gestione', selected()]" [queryParams]="{ sezione: 'regole' }">Gestisci regole</a> }
+          @if (canEditRules() && !workspace.pendingChanges()) { <a class="btn" [routerLink]="['/tavolo-da-gioco/gdr/gestione', selected()]" [queryParams]="{ sezione: 'regole' }">Gestisci sistema e regole</a> }
           <app-gdr-rules [adventureId]="selected()" [blocks]="adventureRules()?.rules ?? []"
             [revision]="adventureRules()?.rulesRevision ?? 1" [editable]="false" (saved)="rulesSaved($event)" />
         </div>

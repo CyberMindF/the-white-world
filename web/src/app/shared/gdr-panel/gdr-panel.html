@@ -65,6 +65,7 @@
         @if(pendingChanges){<span class="gdr-panel-status">Salva o annulla prima di cambiare scheda.</span>}
       </div>
     }
+    @if (systemName) { <p class="gdr-panel-status">Sistema · {{ systemName }}</p> }
     <div class="gdr-panel-tabs" [class.is-workspace]="workspaceMode" role="tablist">
       <button type="button" role="tab" [disabled]="pendingChanges" [class.is-active]="activeTab() === 'personaggio'" (click)="setTab('personaggio')">
         <span aria-hidden="true">{{ personaggioIcon }}</span> {{ workspaceMode && !legacyCharacterSheet ? 'Personaggio' : personaggioLabel }}

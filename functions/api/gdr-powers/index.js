@@ -63,12 +63,15 @@ export async function onRequestGet(context) {
         .all()
     ).results;
     const availability = (
-      await db.prepare("SELECT * FROM gdr_power_adventures").all()
+      await db.prepare("SELECT * FROM gdr_power_availability").all()
     ).results;
     const assignments = (
       await db.prepare("SELECT * FROM gdr_character_powers").all()
     ).results;
+    const systems=(await db.prepare('SELECT id,name FROM gdr_systems ORDER BY name COLLATE NOCASE').all()).results;
+    const systemLinks=(await db.prepare('SELECT * FROM gdr_system_powers').all()).results;
     return json({
+      systems,
       adventures,
       characters,
       powers: powers.map((p) => ({
@@ -78,6 +81,7 @@ export async function onRequestGet(context) {
         description: p.description,
         effects: JSON.parse(p.effects_json),
         revision: p.revision,
+        systemIds:systemLinks.filter(l=>l.power_id===p.id).map(l=>l.system_id),
         adventureIds: availability
           .filter((a) => a.power_id === p.id)
           .map((a) => a.adventure_id),
@@ -110,7 +114,7 @@ export async function onRequestPost(context) {
         throw new WorkspaceError("Assegnazioni non valide.", 400);
       return value;
     };
-    const adventureIds = ids(body.adventureIds);
+    let adventureIds = ids(body.adventureIds ?? []);
     const preserveAssignments = body.characterIds === undefined;
     const characterIds = preserveAssignments ? null : ids(body.characterIds);
     const db = context.env.DB.withSession("first-primary");
@@ -130,8 +134,15 @@ export async function onRequestPost(context) {
         409,
       );
     const adventures = (
-      await db.prepare("SELECT id FROM gdr_workspace_adventures").all()
+      await db.prepare("SELECT id,system_id FROM gdr_workspace_adventures").all()
     ).results;
+    const usingSystems=body.systemIds!==undefined || adventureIds.some(id=>adventures.some(a=>a.id===id && a.system_id));
+    const systemIds=usingSystems ? ids(body.systemIds ?? [...new Set(adventureIds.map(id=>adventures.find(a=>a.id===id)?.system_id))]) : [];
+    if(usingSystems){
+      const known=(await db.prepare('SELECT id FROM gdr_systems WHERE id IN(SELECT value FROM json_each(?))').bind(JSON.stringify(systemIds)).all()).results;
+      if(known.length!==systemIds.length)throw new WorkspaceError('Seleziona sistemi esistenti.',400);
+      adventureIds=adventures.filter(a=>systemIds.includes(a.system_id)).map(a=>a.id);
+    }
     const characters = (
       await db
         .prepare("SELECT id,adventure_id FROM gdr_workspace_characters")
@@ -155,11 +166,12 @@ export async function onRequestPost(context) {
     const previousAdventures = (
       await db
         .prepare(
-          "SELECT adventure_id FROM gdr_power_adventures WHERE power_id=?",
+          "SELECT adventure_id FROM gdr_power_availability WHERE power_id=?",
         )
         .bind(body.id)
         .all()
     ).results.map((a) => a.adventure_id);
+    const previousSystems=usingSystems ? (await db.prepare('SELECT system_id FROM gdr_system_powers WHERE power_id=?').bind(body.id).all()).results.map(s=>s.system_id) : [];
     const statements = [];
     if (creating)
       statements.push(
@@ -181,10 +193,11 @@ export async function onRequestPost(context) {
       );
     // Tutti i collegamenti sono protetti dalla stessa revisione, incrementata per ultima.
     // La batch D1 è atomica: un editor obsoleto non cancella le assegnazioni più recenti.
-    const guard = "EXISTS(SELECT 1 FROM gdr_powers WHERE id=? AND revision=?)" + (preserveAssignments
-      ? " AND NOT EXISTS(SELECT 1 FROM gdr_character_powers cp JOIN gdr_workspace_characters c ON c.id=cp.character_id WHERE cp.power_id=? AND c.adventure_id NOT IN (SELECT value FROM json_each(?)))"
-      : "");
-    const guardBindings = [body.id, revision, ...(preserveAssignments ? [body.id, JSON.stringify(adventureIds)] : [])];
+    const assignedGuard=usingSystems
+      ? " AND NOT EXISTS(SELECT 1 FROM gdr_character_powers cp JOIN gdr_workspace_characters c ON c.id=cp.character_id JOIN gdr_workspace_adventures a ON a.id=c.adventure_id WHERE cp.power_id=? AND (a.system_id IS NULL OR a.system_id NOT IN(SELECT value FROM json_each(?))))"
+      : " AND NOT EXISTS(SELECT 1 FROM gdr_character_powers cp JOIN gdr_workspace_characters c ON c.id=cp.character_id WHERE cp.power_id=? AND c.adventure_id NOT IN(SELECT value FROM json_each(?)))";
+    const guard="EXISTS(SELECT 1 FROM gdr_powers WHERE id=? AND revision=?)"+(preserveAssignments?assignedGuard:'');
+    const guardBindings=[body.id,revision,...(preserveAssignments?[body.id,JSON.stringify(usingSystems?systemIds:adventureIds)]:[])];
     if (!preserveAssignments) statements.push(
       db
         .prepare(
@@ -195,18 +208,13 @@ export async function onRequestPost(context) {
     statements.push(
       db
         .prepare(
-          `DELETE FROM gdr_power_adventures WHERE power_id=? AND ${guard}`,
+          `DELETE FROM ${usingSystems ? "gdr_system_powers" : "gdr_power_adventures"} WHERE power_id=? AND ${guard}`,
         )
         .bind(body.id, ...guardBindings),
     );
-    for (const id of adventureIds)
-      statements.push(
-        db
-          .prepare(
-            `INSERT INTO gdr_power_adventures(power_id,adventure_id) SELECT ?,? WHERE ${guard}`,
-          )
-          .bind(body.id, id, ...guardBindings),
-      );
+    for (const id of usingSystems ? systemIds : adventureIds)
+      statements.push(db.prepare(`INSERT INTO ${usingSystems ? 'gdr_system_powers(power_id,system_id)' : 'gdr_power_adventures(power_id,adventure_id)'} SELECT ?,? WHERE ${guard}`).bind(body.id,id,...guardBindings));
+    if(usingSystems)statements.push(db.prepare(`UPDATE gdr_systems SET revision=revision+1 WHERE id IN(SELECT value FROM json_each(?)) AND ${guard}`).bind(JSON.stringify([...new Set([...previousSystems,...systemIds])]),...guardBindings));
     for (const id of characterIds ?? [])
       statements.push(
         db
@@ -234,7 +242,7 @@ export async function onRequestPost(context) {
     const results = await db.batch(statements);
     if (!creating && !results.at(-1).meta.changes)
       throw new WorkspaceError(
-        "La voce o le assegnazioni sono cambiate. Ricarica il catalogo; per rimuovere un’avventura, togli prima la voce dai suoi personaggi.",
+        "La voce o le assegnazioni sono cambiate. Ricarica il catalogo; per rimuovere un sistema, togli prima la voce dai personaggi che lo usano.",
         409,
       );
     context.waitUntil(

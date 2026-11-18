@@ -18,7 +18,7 @@ export async function onRequestGet(context) {
     if (!adventure) return json({ error: "Avventura mancante." }, 400);
 
     const row = await context.env.DB
-      .prepare("SELECT fields_json FROM gdr_character_schema WHERE adventure = ?")
+      .prepare("SELECT fields_json FROM gdr_adventure_schema WHERE adventure = ?")
       .bind(adventure)
       .first();
 
@@ -43,6 +43,8 @@ export async function onRequestPost(context) {
     const adventure = payload?.adventure;
     if (typeof adventure !== "string" || !adventure) return json({ error: "Avventura mancante." }, 400);
 
+    const linked=await context.env.DB.prepare('SELECT system_id FROM gdr_workspace_adventures WHERE id=?').bind(adventure).first();
+    if(linked?.system_id)return json({error:'La scheda appartiene al sistema. Modificala da Gestione GDR → Sistemi di gioco.'},409);
     const fields = payload?.fields;
     if (!validateFields(fields)) return json({ error: "Struttura non valida." }, 400);
 

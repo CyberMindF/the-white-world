@@ -15,15 +15,15 @@ async function setup() {
     description: 'Descrizione originale',
     effects: [],
     revision: 1,
-    adventureIds: ['a'],
+    systemIds: ['a'],
     characterIds: ['daisy'],
   };
   let reject = false;
   const data = () => ({
     powers: [power],
-    adventures: [
-      { id: 'a', title: 'Avventura A' },
-      { id: 'b', title: 'Avventura B' },
+    systems: [
+      { id: 'a', name: 'Sistema A' },
+      { id: 'b', name: 'Sistema B' },
     ],
     characters: [
       { id: 'daisy', name: 'Daisy', kind: 'pg', adventureId: 'a', archived: 0 },
@@ -54,7 +54,7 @@ async function setup() {
       {
         provide: ActivatedRoute,
         useValue: {
-          snapshot: { queryParamMap: convertToParamMap({ adventure: 'a', character: 'daisy' }) },
+          snapshot: { queryParamMap: convertToParamMap({ system: 'a', character: 'daisy' }) },
         },
       },
     ],
@@ -104,7 +104,7 @@ describe('catalogo condiviso di abilità e magie', () => {
     description.value = 'Descrizione condivisa aggiornata';
     description.dispatchEvent(new Event('input'));
     fixture.detectChanges();
-    check('Avventura B');
+    check('Sistema B');
     button('Salva voce').click();
     await vi.waitFor(() => {
       fixture.detectChanges();
@@ -116,7 +116,7 @@ describe('catalogo condiviso di abilità e magie', () => {
       id: 'spell',
       revision: 1,
       description: 'Descrizione condivisa aggiornata',
-      adventureIds: ['a', 'b'],
+      systemIds: ['a', 'b'],
     });
     expect(fixture.nativeElement.textContent).toContain('Voce salvata.');
     expect(fixture.nativeElement.querySelector('[name="description"]').value).toBe(

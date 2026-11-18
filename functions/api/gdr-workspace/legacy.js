@@ -8,7 +8,7 @@ export async function syncLegacy(db, user, adventureId) {
   };
   if (!documents[adventureId]) return;
   const schemaRow = await db
-    .prepare("SELECT fields_json FROM gdr_character_schema WHERE adventure=?")
+    .prepare("SELECT fields_json FROM gdr_adventure_schema WHERE adventure=?")
     .bind(adventureId)
     .first();
   if (!schemaRow) return;
@@ -206,7 +206,7 @@ export function characterFields(value) {
 export async function validateCharacterFields(db, adventureId, value) {
   const result = characterFields(value);
   const row = await db
-    .prepare("SELECT fields_json FROM gdr_character_schema WHERE adventure=?")
+    .prepare("SELECT fields_json FROM gdr_adventure_schema WHERE adventure=?")
     .bind(adventureId)
     .first();
   for (const field of row ? JSON.parse(row.fields_json) : []) {

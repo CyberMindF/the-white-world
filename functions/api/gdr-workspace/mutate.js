@@ -1,3 +1,4 @@
+import { statFields } from '../gdr-systems/_shared.js';
 import { recordEvent } from "../_shared/events.js";
 import { syncLegacy, validateCharacterFields } from "./legacy.js";
 import { getAuthenticatedSession, json } from "../auth/_shared.js";
@@ -34,10 +35,12 @@ export async function mutate(db, user, payload) {
     requireMaster(user);
     if (!validId(p.id))
       throw new WorkspaceError("Identificativo non valido.", 400);
+    const system=await db.prepare('SELECT id FROM gdr_systems WHERE id=? OR ?=1 ORDER BY created_at,id LIMIT 1').bind(p.systemId ?? '',p.systemId===undefined?1:0).first();
+    if (!system) throw new WorkspaceError('Seleziona un sistema esistente.',400);
     // UUID fornito dal client: un retry non crea una seconda avventura.
     await db
       .prepare(
-        `INSERT INTO gdr_workspace_adventures (id,title,source,created_by,created_at) VALUES (?,?,?,?,?) ON CONFLICT(id) DO NOTHING`,
+        `INSERT INTO gdr_workspace_adventures (id,title,source,created_by,created_at,system_id) VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`,
       )
       .bind(
         p.id,
@@ -45,6 +48,7 @@ export async function mutate(db, user, payload) {
         text(p.source ?? "", 100000, true),
         user.id,
         new Date().toISOString(),
+        system?.id ?? null,
       )
       .run();
     return { saved: true, id: p.id };
@@ -100,11 +104,14 @@ export async function mutate(db, user, payload) {
       .bind(p.adventureId)
       .first();
     if (!adventure) throw new WorkspaceError("Avventura non trovata.", 404);
+    const template=await db.prepare('SELECT stat_budget,system_id,system_revision FROM gdr_adventure_schema WHERE adventure=?').bind(p.adventureId).first();
     const pet = await petSettings(db, p, {kind:p.kind, adventure_id:p.adventureId});
     const importedProfile = profile(p.profile);
     const inserted = await db
       .prepare(
-        `INSERT INTO gdr_workspace_characters (id,adventure_id,kind,name,portrait,sheet,profile_json,photo,inventory_json,created_by,created_at,fields_json,is_pet,pet_owner_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`,
+        `INSERT INTO gdr_workspace_characters (id,adventure_id,kind,name,portrait,sheet,profile_json,photo,inventory_json,created_by,created_at,fields_json,is_pet,pet_owner_id,stats_budget) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+         WHERE EXISTS(SELECT 1 FROM gdr_workspace_adventures a LEFT JOIN gdr_systems s ON s.id=a.system_id
+           WHERE a.id=? AND a.system_id IS ? AND (s.revision=? OR s.id IS NULL)) ON CONFLICT(id) DO NOTHING`,
       )
       .bind(
         p.id,
@@ -127,8 +134,12 @@ export async function mutate(db, user, payload) {
         ),
         +pet.isPet,
         pet.ownerId,
+        template?.stat_budget ?? 12,
+        p.adventureId,template?.system_id ?? null,template?.system_revision ?? null,
       )
       .run();
+    if(!inserted.meta.changes && !await db.prepare('SELECT id FROM gdr_workspace_characters WHERE id=?').bind(p.id).first())
+      throw new WorkspaceError('Il sistema è cambiato. Ricarica prima di creare il personaggio.',409);
     if (inserted.meta.changes && importedProfile.abilities.trim()) {
       await db.batch([
         db.prepare(`INSERT OR IGNORE INTO gdr_powers(id,kind,name,description,created_by)
@@ -136,6 +147,7 @@ export async function mutate(db, user, payload) {
           FROM gdr_workspace_characters WHERE id=?`).bind(p.id),
         db.prepare(`INSERT OR IGNORE INTO gdr_power_adventures(power_id,adventure_id)
           SELECT 'personal-'||id,adventure_id FROM gdr_workspace_characters WHERE id=?`).bind(p.id),
+        db.prepare(`INSERT OR IGNORE INTO gdr_system_powers(system_id,power_id) SELECT a.system_id,'personal-'||c.id FROM gdr_workspace_characters c JOIN gdr_workspace_adventures a ON a.id=c.adventure_id WHERE c.id=? AND a.system_id IS NOT NULL`).bind(p.id),
         db.prepare(`INSERT OR IGNORE INTO gdr_character_powers(character_id,power_id)
           SELECT id,'personal-'||id FROM gdr_workspace_characters WHERE id=?`).bind(p.id)
       ]);
@@ -197,10 +209,14 @@ export async function mutate(db, user, payload) {
     changed(result);
     return { saved: true };
   }
+  const schemaRow=await db.prepare('SELECT fields_json,stat_budget FROM gdr_adventure_schema WHERE adventure=?').bind(character.adventure_id).first();
+  const effectiveBudget=character.stat_budget_override ? character.stats_budget : (schemaRow?.stat_budget ?? character.stats_budget);
+  const schemaFields=JSON.parse(schemaRow?.fields_json ?? '[]');
+  const stats=statFields(schemaFields),statKeys=stats.map(f=>f.key);
   if (p.action === "adjustResource") {
     if (
-      character.kind !== "pg" ||
-      !["stressCurrent", "spellSlotsCurrent"].includes(p.fieldKey) ||
+      (character.kind !== "pg" && !master) ||
+      !schemaFields.some(f=>f.key===p.fieldKey && (f.role==='resource'||(f.role===undefined&&['stressCurrent','spellSlotsCurrent'].includes(f.key)))) ||
       ![-1, 1].includes(p.delta)
     )
       throw new WorkspaceError("Risorsa non valida.", 400);
@@ -218,7 +234,7 @@ export async function mutate(db, user, payload) {
     )
       throw new WorkspaceError("Non puoi modificare questa risorsa.", 403);
     const schema = await db
-      .prepare("SELECT fields_json FROM gdr_character_schema WHERE adventure=?")
+      .prepare("SELECT fields_json FROM gdr_adventure_schema WHERE adventure=?")
       .bind(character.adventure_id)
       .first();
     const field = schema
@@ -245,23 +261,24 @@ export async function mutate(db, user, payload) {
     changed(result);
     return { saved: true };
   }
-  const statKeys = ["statMente", "statCuore", "statCorpo", "statMagia"];
   if (p.action === "setStatAccess") {
     requireMaster(user);
     if (
       character.kind !== "pg" ||
-      character.adventure_id !== "il-prezzo-della-verita" ||
+      (!stats.length && p.editable) ||
       typeof p.editable !== "boolean" ||
       !Number.isInteger(p.budget) ||
       p.budget < 4 ||
       p.budget > 20
     )
       throw new WorkspaceError("Configurazione dei punti non valida.", 400);
+    if(p.editable && stats.length && (p.budget<stats.reduce((sum,f)=>sum+f.min,0)||p.budget>stats.reduce((sum,f)=>sum+f.max,0)))
+      throw new WorkspaceError('Il totale dei punti non è distribuibile nelle caratteristiche del sistema.',400);
     const result = await db
       .prepare(
-        "UPDATE gdr_workspace_characters SET stats_editable=?,stats_budget=?,revision=revision+1 WHERE id=? AND revision=?",
+        "UPDATE gdr_workspace_characters SET stats_editable=?,stats_budget=?,stat_budget_override=CASE WHEN ?<>? THEN 1 ELSE stat_budget_override END,revision=revision+1 WHERE id=? AND revision=?",
       )
-      .bind(+p.editable, p.budget, character.id, p.revision)
+      .bind(+p.editable,p.budget,p.budget,effectiveBudget,character.id,p.revision)
       .run();
     changed(result);
     return { saved: true };
@@ -269,7 +286,7 @@ export async function mutate(db, user, payload) {
   if (p.action === "confirmStats") {
     if (
       character.kind !== "pg" ||
-      character.adventure_id !== "il-prezzo-della-verita"
+      !stats.length
     )
       throw new WorkspaceError(
         "Queste caratteristiche non sono disponibili.",
@@ -295,11 +312,11 @@ export async function mutate(db, user, payload) {
       );
     const values = statKeys.map((key) => Number(p.values?.[key]));
     if (
-      values.some((n) => !Number.isInteger(n) || n < 1 || n > 5) ||
-      values.reduce((a, b) => a + b, 0) !== character.stats_budget
+      values.some((n,i) => !Number.isInteger(n) || n < stats[i].min || n > stats[i].max) ||
+      values.reduce((a, b) => a + b, 0) !== effectiveBudget
     )
       throw new WorkspaceError(
-        `Distribuisci esattamente ${character.stats_budget} punti, da 1 a 5 per caratteristica.`,
+        `Distribuisci esattamente ${effectiveBudget} punti rispettando i limiti delle caratteristiche.`,
         400,
       );
     const fields = {
@@ -320,7 +337,7 @@ export async function mutate(db, user, payload) {
     const pet = await petSettings(db, p, character);
     if (
       !master &&
-      character.adventure_id === "il-prezzo-della-verita" &&
+      stats.length > 0 &&
       p.characterFields
     ) {
       const current = JSON.parse(character.fields_json);
@@ -328,7 +345,7 @@ export async function mutate(db, user, payload) {
         statKeys.some(
           (key) =>
             p.characterFields[key] !== undefined &&
-            String(p.characterFields[key]) !== String(current[key] ?? "1"),
+            String(p.characterFields[key]) !== String(current[key] ?? stats.find(f=>f.key===key)?.default ?? stats.find(f=>f.key===key)?.min ?? 1),
         )
       )
         throw new WorkspaceError(
@@ -362,17 +379,17 @@ export async function mutate(db, user, payload) {
           await validateCharacterFields(
             db,
             character.adventure_id,
-            !master && character.adventure_id === "il-prezzo-della-verita"
+            !master && stats.length > 0
               ? {
-                  ...(p.characterFields ?? JSON.parse(character.fields_json)),
+                  ...({...JSON.parse(character.fields_json),...p.characterFields}),
                   ...Object.fromEntries(
                     statKeys.map((k) => [
                       k,
-                      JSON.parse(character.fields_json)[k] ?? "1",
+                      JSON.parse(character.fields_json)[k] ?? String(stats.find(f=>f.key===k)?.default ?? stats.find(f=>f.key===k)?.min ?? 1),
                     ]),
                   ),
                 }
-              : (p.characterFields ?? JSON.parse(character.fields_json)),
+              : ({...JSON.parse(character.fields_json),...p.characterFields}),
           ),
         ),
         +pet.isPet,

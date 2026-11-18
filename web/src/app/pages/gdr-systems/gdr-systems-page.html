@@ -1,0 +1,100 @@
+<app-shell homeHref="/tavolo-da-gioco/gdr/gestione" homeLabel="Gestione GDR" homeAria="Torna a Gestione GDR">
+  <main class="systems-page">
+    <header><p class="eyebrow">Gestione GDR</p><h1>Sistemi di gioco</h1><p>Riunisci regole, scheda, abilità e magie. Riusa i contenuti nelle tue avventure.</p></header>
+    <nav class="actions" aria-label="Gestione sistemi e regole">
+      <button class="btn" [attr.aria-pressed]="mode()==='systems'" [disabled]="!canLeave()" (click)="setMode('systems')">Sistemi</button>
+      <button class="btn" [attr.aria-pressed]="mode()==='rules'" [disabled]="!canLeave()" (click)="setMode('rules')">Libreria delle regole</button>
+      @if (canLeave()) { <a class="btn" routerLink="/tavolo-da-gioco/gdr/gestione/poteri">Catalogo abilità e magie</a> }
+    </nav>
+    @if (error()) { <p class="error" role="alert">{{error()}}</p> }
+    @if (notice()) { <p role="status">{{notice()}}</p> }
+    @if (loading()) { <p role="status">Caricamento dei sistemi…</p> } @else {
+      <div class="systems-layout">
+        <aside class="panel systems-list" [attr.aria-label]="mode()==='systems'?'Elenco dei sistemi':'Libreria delle regole'">
+          <button class="btn" [disabled]="!canLeave() || !canManage()" (click)="mode()==='systems'?createSystem():editRule()">{{mode()==='systems'?'+ Nuovo sistema':'+ Nuova regola'}}</button>
+          <label>Cerca<input type="search" [ngModel]="search()" (ngModelChange)="search.set($event)" /></label>
+          @if (mode()==='systems') {
+            @for (system of filteredSystems();track system.id) {
+              <button class="list-entry" [class.selected]="draft.id===system.id" [disabled]="!canLeave()" (click)="selectSystem(system)"><strong>{{system.name}}</strong><small>{{system.ruleIds.length}} regole · {{system.adventureIds.length}} avventure</small></button>
+            } @empty { <p>Nessun sistema corrispondente.</p> }
+          } @else {
+            @for (rule of filteredRules();track rule.id) {
+              <button class="list-entry" [class.selected]="ruleDraft.id===rule.id && ruleEditorOpen()" [disabled]="ruleDirty() || saving()" (click)="editRule(rule)"><strong>{{rule.title}}</strong><small>{{rule.systemIds.length}} sistemi</small></button>
+            } @empty { <p>Nessuna regola corrispondente.</p> }
+          }
+        </aside>
+        <section class="panel system-editor">
+          @if (ruleEditorOpen()) {
+            <h2>{{ruleDraft.revision===null?'Nuova regola':ruleDraft.title}}</h2>
+            @if (ruleDraft.systemIds.length) {
+              <p class="hint">Le modifiche si applicano a tutti i sistemi che usano questa regola:</p><ul>@for(id of ruleDraft.systemIds;track id){<li>{{systemName(id)}}</li>}</ul>
+            }
+            <fieldset [disabled]="!canManage() || saving()">
+              <label>Nome della regola<input [(ngModel)]="ruleDraft.title" (ngModelChange)="ruleChange()" maxlength="160" /></label>
+              <label>Contenuto della regola<textarea rows="12" [ngModel]="ruleSource()" (ngModelChange)="ruleSource.set($event);ruleChange()" maxlength="200000"></textarea></label>
+              <p class="hint">Puoi usare titoli (##), elenchi (-) e tabelle con le barre |.</p>
+              @for(issue of parsed().errors;track $index){<p class="error">{{issue.message}}</p>}
+              <details><summary>Anteprima della regola</summary><app-gdr-blocks [blocks]="referenceRows($any(parsed().blocks))" /></details>
+            </fieldset>
+            <div class="actions"><button class="btn" [disabled]="saving()" (click)="closeRule()">Annulla e chiudi</button><button class="btn" [disabled]="!canManage() || !ruleDirty() || saving() || !ruleDraft.title.trim() || !parsed().blocks.length || parsed().errors.length>0" (click)="saveRule()">{{saving()?'Salvataggio…':'Salva regola'}}</button>
+              @if(ruleDraft.revision!==null){<button class="btn" [disabled]="ruleDirty() || saving()" (click)="editRule(ruleDraft,true,mode()==='systems')">Crea copia indipendente</button>}
+            </div>
+          } @else if (mode()==='systems') {
+            <h2>{{draft.revision===null?'Nuovo sistema':draft.name}}</h2>
+            @if(draft.adventureIds.length){<p class="hint">Usato da: @for(id of draft.adventureIds;track id){<span>{{adventureName(id)}}{{$last?'':', '}}</span>}</p>}
+            <fieldset [disabled]="!canManage() || saving()">
+              <label>Nome del sistema<input [(ngModel)]="draft.name" (ngModelChange)="change()" maxlength="160" /></label>
+              <label>Descrizione<textarea rows="3" [(ngModel)]="draft.description" (ngModelChange)="change()" maxlength="6000"></textarea></label>
+              <nav class="actions" aria-label="Contenuto del sistema">
+                <button class="btn" [attr.aria-pressed]="section()==='rules'" (click)="section.set('rules')">Regole · {{draft.ruleIds.length}}</button>
+                <button class="btn" [attr.aria-pressed]="section()==='sheet'" (click)="section.set('sheet')">Scheda del personaggio</button>
+                <button class="btn" [attr.aria-pressed]="section()==='powers'" (click)="section.set('powers')">Abilità e magie · {{draft.powerIds.length}}</button>
+              </nav>
+              @if(section()==='rules'){
+                <h3>Regole del sistema</h3>
+                <p class="hint">Le regole sono condivise. Rimuoverle da questo elenco le lascia disponibili nella libreria.</p>
+                @for(id of draft.ruleIds;track id;let i=$index){
+                  @if(rule(id);as rule){
+                    <article class="rule-card"><details><summary>{{rule.title}}</summary><app-gdr-blocks [blocks]="referenceRows(rule.blocks)" /></details>
+                      <div class="actions"><button class="btn" [disabled]="i===0" [attr.aria-label]="'Sposta su '+rule.title" (click)="moveRule(i,-1)">↑</button><button class="btn" [disabled]="i===draft.ruleIds.length-1" [attr.aria-label]="'Sposta giù '+rule.title" (click)="moveRule(i,1)">↓</button><button class="btn" (click)="editRule(rule,false,true)">Modifica regola</button><button class="btn" (click)="editRule(rule,true,true)">Copia regola</button><button class="btn" [attr.aria-label]="'Rimuovi '+rule.title+' dal sistema'" (click)="removeRule(id)">Rimuovi dal sistema</button></div>
+                    </article>
+                  }
+                } @empty {<p>Questo sistema non contiene ancora regole.</p>}
+                <button class="btn" (click)="editRule(undefined,false,true)">+ Scrivi una regola</button>
+                <h3>Riusa dalla libreria</h3>
+                <label>Cerca una regola<input type="search" [ngModel]="ruleSearch()" (ngModelChange)="ruleSearch.set($event)" /></label>
+                <div class="reuse-list">@for(rule of availableRules();track rule.id){
+                  @if(!draft.ruleIds.includes(rule.id)){<article class="reuse-entry"><strong>{{rule.title}}</strong><button class="btn" [attr.aria-label]="'Usa '+rule.title" (click)="attachRule(rule.id)">Usa nel sistema</button></article>}
+                }</div>
+              } @else if(section()==='sheet'){
+                <h3>Scheda del personaggio</h3><p class="hint">Questi campi vengono ereditati da PG e PNG delle avventure che usano il sistema.</p>
+                <label>Copia la struttura da un sistema<select #sheetModel (change)="copySheet(sheetModel.value);sheetModel.value=''" [disabled]="draft.fields.length>0"><option value="">Scegli un modello…</option>@for(system of systems();track system.id){@if(system.id!==draft.id){<option [value]="system.id">{{system.name}}</option>}}</select></label>
+                <label>Punti da distribuire nelle caratteristiche<input type="number" min="4" max="20" [(ngModel)]="draft.statBudget" (ngModelChange)="change()" /></label>
+                @for(field of draft.fields;track field.key;let i=$index){
+                  <article class="field-card">
+                    <label>Nome del campo<input [(ngModel)]="field.label" (ngModelChange)="change()" maxlength="160" /></label>
+                    <label>Tipo<select aria-label="Tipo" [(ngModel)]="field.type" (ngModelChange)="fieldType(field)"><option value="text">Testo</option><option value="number">Numero</option></select></label>
+                    @if(field.type==='number'){
+                      <label>Uso<select aria-label="Uso" [(ngModel)]="field.role" (ngModelChange)="change()"><option value="field">Valore numerico</option><option value="stat">Caratteristica con punti</option><option value="resource">Risorsa con + e −</option></select></label>
+                      <div class="number-fields"><label>Minimo<input type="number" [(ngModel)]="field.min" (ngModelChange)="change()" /></label><label>Massimo<input type="number" [(ngModel)]="field.max" (ngModelChange)="change()" /></label><label>Valore iniziale<input type="number" [(ngModel)]="field.default" (ngModelChange)="change()" /></label></div>
+                    } @else {
+                      <label>Valore iniziale<input [(ngModel)]="field.default" (ngModelChange)="change()" maxlength="4000" /></label><label class="check"><input type="checkbox" [(ngModel)]="field.long" (ngModelChange)="change()" />Testo su più righe</label>
+                    }
+                    <button class="btn" [attr.aria-label]="'Rimuovi campo '+field.label" (click)="removeField(i)">Rimuovi campo</button>
+                  </article>
+                } @empty {<p>Non ci sono ancora campi aggiuntivi.</p>}
+                <button class="btn" (click)="addField()">+ Campo della scheda</button>
+              } @else {
+                <h3>Abilità e magie disponibili</h3><p class="hint">Qui scegli il catalogo del sistema. Nei dettagli dei PG e PNG scegli quali voci possiede ogni personaggio.</p>
+                <label>Cerca abilità o magia<input type="search" [ngModel]="powerSearch()" (ngModelChange)="powerSearch.set($event)" /></label>
+                @for(power of filteredPowers();track power.id){<label class="check power-choice"><input type="checkbox" [checked]="draft.powerIds.includes(power.id)" (change)="togglePower(power.id,$any($event.target).checked)" /><span><strong>{{power.name}}</strong><small>{{power.kind==='spell'?'Magia':'Abilità'}}</small></span></label>} @empty {<p>Crea le prime voci nel catalogo di abilità e magie.</p>}
+              }
+            </fieldset>
+            <div class="actions"><button class="btn" [disabled]="saving()" (click)="cancel()">Annulla modifiche</button><button class="btn" [disabled]="!canManage() || !dirty() || saving() || !draft.name.trim()" (click)="saveSystem()">{{saving()?'Salvataggio…':'Salva sistema'}}</button><button class="btn" [disabled]="!canLeave() || !canManage()" (click)="createSystem(draft)">Copia sistema</button></div>
+            @if(dirty()){<p class="hint">Salva o annulla le modifiche prima di cambiare sistema o uscire dalla pagina.</p>}
+          } @else {<p>Scegli una regola dalla libreria oppure creane una nuova.</p>}
+        </section>
+      </div>
+    }
+  </main>
+</app-shell>

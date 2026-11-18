@@ -12,6 +12,8 @@ export async function onRequestPut(context) {
       throw new WorkspaceError("Avventura non valida.", 400);
     const blocks = referenceBlocks(body.blocks),
       db = context.env.DB.withSession("first-primary");
+    const adventure=await db.prepare('SELECT system_id FROM gdr_workspace_adventures WHERE id=?').bind(body.adventureId).first();
+    if(adventure?.system_id)throw new WorkspaceError('Le regole appartengono al sistema: modificale da Gestione GDR → Sistemi di gioco.',409);
     const result = await db
       .prepare(
         `UPDATE gdr_workspace_adventures SET rules_json=?,rules_revision=rules_revision+1

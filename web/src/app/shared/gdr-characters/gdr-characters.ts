@@ -6,6 +6,7 @@ import {
   effect,
   inject,
   input,
+  output,
   signal,
   viewChild,
 } from '@angular/core';
@@ -15,6 +16,7 @@ import {
   InventoryItem,
   WorkspaceCharacter,
   CharacterProfile,
+  SystemSheetField,
 } from '../../core/gdr-workspace.service';
 import {
   PROFILE_FIELDS,
@@ -41,12 +43,14 @@ import { GdrPowers } from './gdr-powers';
 export class GdrCharacters {
   protected readonly workspace = inject(GdrWorkspaceService);
   readonly inventoryOnly = input(false);
-  readonly fields = input<
-    { key: string; label: string; type: string; min?: number; max?: number; long?: boolean }[]
-  >([]);
-  protected readonly resourceKeys = ['stressCurrent', 'spellSlotsCurrent'];
+  readonly adventureChanged = output<string>();
+  protected readonly newAdventureId = signal('');
+  protected readonly creationAdventure = computed(()=>this.newAdventureId() || this.workspace.selectedId());
+  protected readonly creationSystem = computed(()=>this.workspace.adventures().find(a=>a.id===this.creationAdventure())?.systemName ?? '');
+  readonly fields = input<SystemSheetField[]>([]);
+  protected readonly resourceKeys = computed(() => this.fields().filter(f => f.role === 'resource' || (f.role === undefined && ['stressCurrent','spellSlotsCurrent'].includes(f.key))).map(f=>f.key));
   protected readonly resources = computed(() =>
-    this.extraFields().filter((f) => this.resourceKeys.includes(f.key)),
+    this.extraFields().filter((f) => this.resourceKeys().includes(f.key)),
   );
   protected async adjustResource(fieldKey: string, delta: number): Promise<void> {
     const c = this.workspace.active();
@@ -59,30 +63,24 @@ export class GdrCharacters {
       delta,
     });
   }
-  protected readonly statKeys = ['statMente', 'statCuore', 'statCorpo', 'statMagia'];
-  private readonly statLabels: Record<string, string> = {
-    statMente: '🧠 Mente',
-    statCuore: '💛 Cuore',
-    statCorpo: '⚡ Corpo',
-    statMagia: '✨ Magia',
-  };
+  protected readonly statKeys = computed(() => this.fields().filter(f => f.role === 'stat' || (f.role === undefined && ['statMente','statCuore','statCorpo','statMagia'].includes(f.key))).map(f=>f.key));
   protected readonly statDraft = signal<Record<string, string>>({});
   protected readonly statsDirty = signal(false);
   protected readonly statsBudget = signal(12);
   protected readonly baseStats = computed(() =>
-    this.extraFields().filter((f) => this.statKeys.includes(f.key)),
+    this.extraFields().filter((f) => this.statKeys().includes(f.key)),
   );
   protected readonly statTotal = computed(() =>
     this.baseStats().reduce((sum, f) => sum + Number(this.statDraft()[f.key] ?? 1), 0),
   );
   protected readonly validStats = computed(
     () =>
-      this.baseStats().length === 4 &&
+      this.baseStats().length > 0 &&
       this.baseStats().every(
         (f) =>
           Number.isInteger(Number(this.statDraft()[f.key])) &&
-          Number(this.statDraft()[f.key]) >= 1 &&
-          Number(this.statDraft()[f.key]) <= 5,
+          Number(this.statDraft()[f.key]) >= (f.min ?? 1) &&
+          Number(this.statDraft()[f.key]) <= (f.max ?? 5),
       ) &&
       this.statTotal() === (this.workspace.active()?.statsBudget ?? 12),
   );
@@ -93,7 +91,7 @@ export class GdrCharacters {
   protected discardStats(): void {
     const c = this.workspace.active();
     this.statDraft.set(
-      Object.fromEntries(this.statKeys.map((k) => [k, c?.characterFields?.[k] ?? '1'])),
+      Object.fromEntries(this.statKeys().map((k) => [k, c?.characterFields?.[k] ?? String(this.fields().find(f=>f.key===k)?.default ?? this.fields().find(f=>f.key===k)?.min ?? 1)])),
     );
     this.statsDirty.set(false);
   }
@@ -126,12 +124,10 @@ export class GdrCharacters {
   }
   protected readonly sheetFields = signal<Record<string, string>>({});
   protected readonly extraFields = computed(() =>
-    this.workspace.active()?.kind === 'pg'
-      ? this.fields().filter(
+    this.fields().filter(
           (f) =>
             !/^(name|nome|surname|cognome|nome_personaggio|character_name|inventory|catName)$/i.test(f.key),
-        ).map(f => this.statLabels[f.key] ? { ...f, label: this.statLabels[f.key] } : f)
-      : [],
+        ).map(f => f)
   );
   protected changeField(key: string, value: string): void {
     this.sheetFields.update((fields) => ({ ...fields, [key]: String(value) }));
@@ -178,7 +174,7 @@ export class GdrCharacters {
   protected readonly numericFields = computed(() =>
     this.extraFields().filter(
       (f) =>
-        f.type === 'number' && !this.statKeys.includes(f.key) && !this.resourceKeys.includes(f.key),
+        f.type === 'number' && !this.statKeys().includes(f.key) && !this.resourceKeys().includes(f.key),
     ),
   );
   protected readonly textFields = computed(() =>
@@ -436,7 +432,7 @@ export class GdrCharacters {
     this.sheet.set(c.sheet);
     this.sheetFields.set({ ...c.characterFields });
     this.statDraft.set(
-      Object.fromEntries(this.statKeys.map((k) => [k, c.characterFields?.[k] ?? '1'])),
+      Object.fromEntries(this.statKeys().map((k) => [k, c.characterFields?.[k] ?? String(this.fields().find(f=>f.key===k)?.default ?? this.fields().find(f=>f.key===k)?.min ?? 1)])),
     );
     this.statsDirty.set(false);
     this.statsBudget.set(c.statsBudget ?? 12);
@@ -519,13 +515,13 @@ export class GdrCharacters {
     }
   }
   protected async create(copy = false): Promise<void> {
-    const id = this.createId;
+    const id = this.createId,adventureId=copy?this.workspace.selectedId():this.creationAdventure();
     if (this.hasChanges() || this.mediaBusy() || !!this.cropSource()) return;
     if (
       await this.workspace.save({
         action: 'createCharacter',
         id,
-        adventureId: this.workspace.selectedId(),
+        adventureId,
         kind: copy ? 'pg' : this.newKind(),
         name: copy
           ? this.legacyName()
@@ -547,6 +543,8 @@ export class GdrCharacters {
           ? 'PG creato. Scegli a chi assegnarlo.'
           : 'PNG creato. Puoi completare la scheda.',
       );
+      this.newAdventureId.set('');
+      if(adventureId!==this.workspace.selectedId())this.adventureChanged.emit(adventureId);
     }
   }
   protected changeProfile(key: keyof CharacterProfile, value: string): void {

@@ -26,7 +26,8 @@
   @if (canManagePowers()) {
     <p><a class="btn" [routerLink]="management ? '/tavolo-da-gioco/gdr/gestione/poteri' : '/tavolo-da-gioco/gdr/gestione'">{{ management ? 'Catalogo abilità e magie' : 'Gestione GDR' }}</a></p>
   }
-  @if (management) { <p class="tavolo-intro">Scegli un’avventura per gestire PG e PNG, regole e contenuti. Il catalogo di abilità e magie è condiviso tra le avventure.</p> }
+  @if (management && canManagePowers()) { <p><a class="btn" routerLink="/tavolo-da-gioco/gdr/gestione/sistemi">Sistemi di gioco</a></p> }
+  @if (management) { <p class="tavolo-intro">Scegli un’avventura per gestire PG e PNG, sistema e contenuti. Riusa sistemi, regole, abilità e magie tra le avventure.</p> }
   <section class="tavolo-games" aria-labelledby="adventures-title">
     <div class="tavolo-section-heading">
       <p class="tavolo-eyebrow">Le storie</p>
@@ -84,7 +85,8 @@
                   [disabled]="workspace.saving()"
                 />
               </label>
-              <button class="btn" type="submit" [disabled]="workspace.saving() || !title().trim()">
+              <label class="form-field">Sistema di gioco<select aria-label="Sistema di gioco" [ngModel]="systemId()" (ngModelChange)="systemId.set($event)" name="systemId" [disabled]="workspace.saving()"><option value="">Scegli un sistema…</option>@for(system of systems();track system.id){<option [value]="system.id">{{system.name}}</option>}</select></label>
+              <button class="btn" type="submit" [disabled]="workspace.saving() || !title().trim() || !systemId()">
                 Crea e inizia a scrivere
               </button>
               <button
