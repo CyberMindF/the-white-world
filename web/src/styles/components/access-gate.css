@@ -131,7 +131,7 @@ body.access-locked .app-shell {
 }
 
 .access-submit-button:disabled {
-  cursor: wait;
+  cursor: default;
   opacity: 0.7;
 }
 

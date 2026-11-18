@@ -60,7 +60,7 @@ body.portone-page.safe-mode .portone-layout { grid-template-columns: minmax(0, 3
   color: var(--accent-color);
 }
 .safe-mode-button:focus-visible { outline: 3px solid var(--focus-color); outline-offset: 3px; }
-.safe-mode-button:disabled { cursor: wait; opacity: .65; }
+.safe-mode-button:disabled { cursor: default; opacity: .65; }
 .safe-mode-icon { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 @media (prefers-reduced-motion: reduce) {
   .safe-mode-button, .safe-mode-button .settings-toggle-switch, .safe-mode-button .settings-toggle-switch::before { transition: none; }

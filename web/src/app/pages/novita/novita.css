@@ -30,7 +30,7 @@
 .promo-master-toggle input:checked { border-color: var(--accent-color); background: var(--accent-color); }
 .promo-master-toggle input:checked::after { transform: translateX(1.23rem); background: var(--bg-color); }
 .promo-master-toggle input:focus-visible { outline: 2px solid var(--focus-color); outline-offset: 2px; }
-.promo-master-toggle input:disabled { opacity: .6; cursor: wait; }
+.promo-master-toggle input:disabled { opacity: .6; cursor: default; }
 .editor-form { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.2rem; }
 .editor-form label { display: grid; align-content: start; gap: .4rem; color: var(--muted-color); font-size: .82rem; }
 .editor-form label > span { font-size: .72rem; }

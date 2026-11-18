@@ -49,7 +49,6 @@
 .clear-dice:hover:not(:disabled) { border-color: var(--focus-color); background: var(--button-hover-bg); color: var(--text-color); }
 .roll-all { width: 100%; min-height: 2.8rem; padding: .7rem 1rem; }
 button:disabled { cursor: not-allowed; opacity: .45; }
-.roll-all:disabled { cursor: wait; }
 .dice-history { border-top: 1px solid var(--panel-border-color); padding-top: .7rem; }
 .dice-history summary { color: var(--muted-color); font-size: .75rem; cursor: pointer; }
 .dice-history ol { display: grid; gap: .35rem; margin: .55rem 0 0; padding: 0; list-style: none; }

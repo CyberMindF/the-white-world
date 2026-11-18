@@ -51,7 +51,7 @@
 }
 
 .btn-submit:disabled {
-  cursor: wait;
+  cursor: default;
   opacity: 0.58;
 }
 

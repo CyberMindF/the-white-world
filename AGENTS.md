@@ -1,5 +1,9 @@
 # Istruzioni di progetto
 
+## Pulsanti disabilitati
+
+Lo stato `disabled` non indica un caricamento. Usare `cursor: default` o `not-allowed` sui controlli disabilitati; non associare `cursor: wait` o `progress` a `:disabled`. Un eventuale indicatore di caricamento deve dipendere da uno stato esplicito di operazione in corso.
+
 ## Pubblicazione
 
 Per questo progetto si pubblica esclusivamente tramite GitHub, sul branch `main`. Seguire l’iter completo nella sezione Pubblicazione di `README.md`.

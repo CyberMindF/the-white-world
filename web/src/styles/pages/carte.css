@@ -481,7 +481,7 @@ app-carta-back { display: block; width: 100%; }
   transform: translateY(-.18rem);
   outline: none;
 }
-.carte-evocazione-option:disabled { cursor: wait; opacity: .65; transform: none; }
+.carte-evocazione-option:disabled { cursor: default; opacity: .65; transform: none; }
 .carte-evocazione-option app-carta-tilt { width: 100%; max-width: 13rem; }
 .carte-evocazione-option strong { margin-top: .25rem; font-size: .9rem; }
 .carte-evocazione-option small { color: var(--modal-muted-color); font-size: .68rem; line-height: 1.25; }
@@ -626,7 +626,5 @@ app-carta-back { display: block; width: 100%; }
   to { opacity: 1; transform: none; }
 }
 
-/* .btn-submit:disabled usa cursor:wait ovunque nel sito (giusto: sempre "sta salvando/
-   inviando"), ma questo bottone si disattiva anche solo perché non ci sono bustine da aprire,
-   non solo mentre sta caricando — in quel caso "wait" è fuorviante, non sta succedendo nulla. */
+/* Nessuna bustina disponibile: il controllo è disabilitato, senza indicare un'attesa. */
 .carte-bustina-btn--vuota { cursor: not-allowed; }
