@@ -79,6 +79,7 @@ export async function onRequestGet(context) {
         kind: p.kind,
         name: p.name,
         description: p.description,
+        components: p.components,
         effects: JSON.parse(p.effects_json),
         revision: p.revision,
         systemIds:systemLinks.filter(l=>l.power_id===p.id).map(l=>l.system_id),
@@ -119,7 +120,7 @@ export async function onRequestPost(context) {
     const characterIds = preserveAssignments ? null : ids(body.characterIds);
     const db = context.env.DB.withSession("first-primary");
     const previous = await db
-      .prepare("SELECT revision FROM gdr_powers WHERE id=?")
+      .prepare("SELECT revision,components FROM gdr_powers WHERE id=?")
       .bind(body.id)
       .first();
     const creating = body.revision === null;
@@ -133,6 +134,11 @@ export async function onRequestPost(context) {
         "La voce è cambiata. Ricarica il catalogo prima di salvare; la bozza resta disponibile.",
         409,
       );
+    // I client precedenti alla migrazione non devono cancellare le componenti salvate.
+    const components=body.components===undefined
+      ? (body.kind==='spell' ? previous?.components ?? '' : '') : body.components;
+    if(typeof components!=='string'||!/^V?S?M?$/.test(components)||(body.kind!=='spell'&&components!==''))
+      throw new WorkspaceError('Seleziona solo le componenti V, S e M delle magie.',400);
     const adventures = (
       await db.prepare("SELECT id,system_id FROM gdr_workspace_adventures").all()
     ).results;
@@ -177,8 +183,8 @@ export async function onRequestPost(context) {
       statements.push(
         db
           .prepare(
-            `INSERT INTO gdr_powers(id,kind,name,description,effects_json,created_by,created_at,updated_at)
-      VALUES(?,?,?,?,?,?,?,?)`,
+            `INSERT INTO gdr_powers(id,kind,name,description,effects_json,components,created_by,created_at,updated_at)
+      VALUES(?,?,?,?,?,?,?,?,?)`,
           )
           .bind(
             body.id,
@@ -186,6 +192,7 @@ export async function onRequestPost(context) {
             name,
             description,
             JSON.stringify(effects),
+            components,
             session.user.id,
             now,
             now,
@@ -227,13 +234,14 @@ export async function onRequestPost(context) {
       statements.push(
         db
           .prepare(
-            `UPDATE gdr_powers SET kind=?,name=?,description=?,effects_json=?,revision=revision+1,updated_at=? WHERE id=? AND ${guard}`,
+            `UPDATE gdr_powers SET kind=?,name=?,description=?,effects_json=?,components=?,revision=revision+1,updated_at=? WHERE id=? AND ${guard}`,
           )
           .bind(
             body.kind,
             name,
             description,
             JSON.stringify(effects),
+            components,
             now,
             body.id,
             ...guardBindings,

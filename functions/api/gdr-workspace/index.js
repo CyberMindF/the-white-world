@@ -60,7 +60,7 @@ export async function onRequestGet(context) {
         AND (g.can_speak=1 OR g.can_edit_sheet=1 OR g.can_inventory=1))))
       ORDER BY p.kind,p.sort_order,p.name,p.id`).bind(adventure,isMaster(user)?1:0,user.id).all()).results : [];
     characters=characters.map(c=>({...c,powers:assignedPowers.filter(p=>p.character_id===c.id).map(p=>({
-      id:p.id,kind:p.kind,name:p.name,description:p.description,effects:JSON.parse(p.effects_json),revision:p.revision
+      id:p.id,kind:p.kind,name:p.name,description:p.description,components:p.components,effects:JSON.parse(p.effects_json),revision:p.revision
     }))}));
     // Solo i pet dei PG visibili, senza concedere accesso alla scheda privata del PNG.
     const pets = adventure ? (await db.prepare(`

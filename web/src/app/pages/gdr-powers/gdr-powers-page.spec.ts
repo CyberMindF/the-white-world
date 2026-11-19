@@ -13,6 +13,7 @@ async function setup() {
     name: 'Scudo',
     kind: 'spell',
     description: 'Descrizione originale',
+    components: 'VS',
     effects: [],
     revision: 1,
     systemIds: ['a'],
@@ -125,6 +126,7 @@ describe('catalogo condiviso di abilità e magie', () => {
   it('un rifiuto conserva la bozza e non invia richieste aggiuntive', async () => {
     const h = await setup();
     h.reject();
+    h.check('Materiale');
     const description = h.fixture.nativeElement.querySelector('[name="description"]');
     description.value = 'Da conservare';
     description.dispatchEvent(new Event('input'));
@@ -140,6 +142,7 @@ describe('catalogo condiviso di abilità e magie', () => {
     expect(h.fixture.nativeElement.textContent).toContain('La voce è cambiata.');
     expect(h.button('+ Nuova voce').disabled).toBe(true);
     expect(h.fetchMock.mock.calls).toHaveLength(2);
+    expect(h.fixture.nativeElement.querySelectorAll('input[type="checkbox"]:checked').length).toBe(3);
   });
   it('non mostra assegnazioni ai personaggi nel catalogo', async () => {
     const h = await setup();
@@ -153,6 +156,27 @@ describe('catalogo condiviso di abilità e magie', () => {
     await vi.waitFor(()=>{h.fixture.detectChanges();expect(h.fixture.nativeElement.textContent).toContain('Puoi includerla nei sistemi');});
     const [,init]=h.fetchMock.mock.calls.find(([,options])=>options?.method==='POST')!;
     expect(JSON.parse(init.body).systemIds).toEqual([]);
+  });
+  it('salva le componenti selezionate nell’ordine VSM e permette di svuotarle',async()=>{
+    const h=await setup();
+    h.check('Verbale');h.check('Materiale');h.button('Salva voce').click();
+    await vi.waitFor(()=>{h.fixture.detectChanges();expect(h.fixture.nativeElement.textContent).toContain('Voce salvata.');});
+    let post=h.fetchMock.mock.calls.filter(([,init])=>init?.method==='POST');
+    expect(JSON.parse(post[0][1].body).components).toBe('SM');
+    expect(h.fixture.nativeElement.querySelector('app-gdr-spell-components abbr').textContent).toBe('SM');
+    h.check('Somatica');h.check('Materiale');h.button('Salva voce').click();
+    await vi.waitFor(()=>{h.fixture.detectChanges();expect(h.fixture.nativeElement.textContent).toContain('Voce salvata.');});
+    post=h.fetchMock.mock.calls.filter(([,init])=>init?.method==='POST');expect(JSON.parse(post[1][1].body).components).toBe('');
+    expect(h.fixture.nativeElement.querySelector('app-gdr-spell-components abbr')).toBeNull();
+  });
+  it('nelle nuove magie parte senza componenti e le svuota passando al tipo abilità',async()=>{
+    const h=await setup();h.button('+ Nuova voce').click();h.fixture.detectChanges();await h.fixture.whenStable();
+    const kind=h.fixture.nativeElement.querySelector('select[name="kind"]');
+    const select=async(value:string)=>{kind.value=value;kind.dispatchEvent(new Event('change'));h.fixture.detectChanges();await h.fixture.whenStable();h.fixture.detectChanges();};
+    await select('spell');expect(h.fixture.nativeElement.querySelectorAll('input[type="checkbox"]').length).toBe(3);
+    expect(h.fixture.nativeElement.querySelectorAll('input[type="checkbox"]:checked').length).toBe(0);
+    h.check('Verbale');await select('ability');expect(h.fixture.nativeElement.querySelectorAll('input[type="checkbox"]').length).toBe(0);
+    await select('spell');expect(h.fixture.nativeElement.querySelectorAll('input[type="checkbox"]:checked').length).toBe(0);
   });
 
 });

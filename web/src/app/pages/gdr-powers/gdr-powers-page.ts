@@ -5,6 +5,7 @@ import { GdrManagementShell } from '../../shared/gdr-management/gdr-management-s
 import { AuthService } from '../../core/auth.service';
 import { SafeModeService } from '../../core/safe-mode.service';
 import { GdrBlocks } from '../../shared/gdr-blocks/gdr-blocks';
+import { GdrSpellComponents, SPELL_COMPONENTS } from '../../shared/gdr-spell-components';
 import { GdrReferenceBlock, referenceRows } from '../../shared/gdr-blocks/gdr-block.types';
 import { parseGdrMarkdown } from '../../shared/gdr-blocks/gdr-markdown.parser';
 import { serializeGdrBlocks } from '../../shared/gdr-blocks/gdr-markdown.serializer';
@@ -14,6 +15,7 @@ export interface CatalogPower {
   kind: 'ability' | 'spell';
   name: string;
   description: string;
+  components?: string;
   effects: GdrReferenceBlock[];
   revision: number | null;
   systemIds: string[];
@@ -28,6 +30,7 @@ const empty = (): CatalogPower => ({
   kind: 'ability',
   name: '',
   description: '',
+  components: '',
   effects: [],
   revision: null,
   systemIds: [],
@@ -37,7 +40,7 @@ const empty = (): CatalogPower => ({
 @Component({
   selector: 'app-gdr-powers-page',
   standalone: true,
-  imports: [FormsModule, GdrManagementShell, GdrBlocks],
+  imports: [FormsModule, GdrManagementShell, GdrBlocks, GdrSpellComponents],
   templateUrl: './gdr-powers-page.html',
   styleUrl: './gdr-powers-page.css',
 })
@@ -78,6 +81,7 @@ export class GdrPowersPage implements OnInit {
   protected effectsSource = '';
   protected readonly parseGdrMarkdown = parseGdrMarkdown;
   protected readonly referenceRows = referenceRows;
+  protected readonly spellComponents = SPELL_COMPONENTS;
 
   canLeave(): boolean { return !this.dirty() && !this.saving(); }
 
@@ -121,6 +125,15 @@ export class GdrPowersPage implements OnInit {
   protected change(): void {
     this.dirty.set(true);
     this.notice.set('');
+  }
+  protected changeKind(): void {
+    if(this.draft.kind!=='spell')this.draft.components='';
+    this.change();
+  }
+  protected toggleComponent(code:string,checked:boolean): void {
+    const selected=this.draft.components??'';
+    this.draft.components=SPELL_COMPONENTS.filter(c=>c.code===code?checked:selected.includes(c.code)).map(c=>c.code).join('');
+    this.change();
   }
   protected async cancel(): Promise<void> {
     this.dirty.set(false);

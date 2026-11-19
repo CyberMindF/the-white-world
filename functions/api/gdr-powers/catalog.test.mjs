@@ -131,6 +131,68 @@ const power = (values = {}) => ({
   ...values,
 });
 
+test('componenti: facoltative, condivise fra schede e catalogo, aggiornabili e cancellabili senza cambiare assegnazioni',async()=>{
+  const h=harness();try{
+    await h.character('daisy');await h.character('npc','png',otherAdventure);
+    const base=power({adventureIds:[adventure,otherAdventure]});
+    assert.equal((await h.catalog('POST',{...base,components:'VS',characterIds:['daisy','npc']})).status,201);
+    await mutate(h.db,master,{action:'grant',characterId:'daisy',revision:1,userId:2,canSpeak:true,canEditSheet:true,canInventory:false});
+    for(const components of ['','V','S','M','VS','VM','SM','VSM']){
+      const p=(await(await h.catalog('GET')).json()).powers[0];
+      assert.equal((await h.catalog('POST',{...base,revision:p.revision,characterIds:undefined,components})).status,200);
+      const saved=(await(await h.catalog('GET')).json()).powers[0];
+      assert.equal(saved.components,components);assert.deepEqual(saved.characterIds.sort(),['daisy','npc']);
+      for(const [user,id] of [[1,adventure],[2,adventure],[1,otherAdventure]]){
+        const state=await(await h.call(user,'GET',undefined,id)).json();
+        assert.equal(state.characters[0].powers[0].components,components);
+      }
+    }
+    let p=(await(await h.catalog('GET')).json()).powers[0];
+    // Un client precedente senza il nuovo campo conserva il valore già salvato.
+    assert.equal((await h.catalog('POST',{...base,revision:p.revision,characterIds:undefined})).status,200);
+    assert.equal((await(await h.catalog('GET')).json()).powers[0].components,'VSM');
+    p=(await(await h.catalog('GET')).json()).powers[0];
+    for(const components of [null,[],true,1,'VV','SV','X','v','V S','VSM\n']){
+      assert.equal((await h.catalog('POST',{...base,revision:p.revision,characterIds:undefined,components})).status,400);
+      assert.equal((await(await h.catalog('GET')).json()).powers[0].components,'VSM');
+    }
+    assert.equal((await h.catalog('POST',{...base,revision:p.revision,kind:'ability',components:'V'})).status,400);
+    assert.equal((await h.catalog('POST',{...base,revision:1,components:''})).status,409);
+    assert.equal((await h.catalog('POST',{...base,revision:p.revision,kind:'ability',characterIds:undefined})).status,200);
+    assert.equal((await(await h.catalog('GET')).json()).powers[0].components,'');
+  }finally{h.sqlite.close();}
+});
+
+test('migrazione componenti: compila solo le sei magie originali concordate e conserva dati, sistemi e assegnazioni',()=>{
+  const h=fixture({powerCatalog:false});try{
+    h.sqlite.exec(readFileSync('migrations/0160_add_gdr_power_catalog.sql','utf8'));
+    h.sqlite.exec(readFileSync('migrations/0163_add_gdr_systems.sql','utf8'));
+    const names=['Dardo magico','Scudo magico','Individuazione del magico','Passo felpato','Amicizia','Illusione minore','Individuazione dei pensieri'];
+    const add=h.sqlite.prepare("INSERT INTO gdr_powers(id,kind,name,description,effects_json) VALUES(?,?,?,?,?)");
+    names.forEach((name,i)=>add.run('legacy-power-78-'+i,'spell',name,'Descrizione '+i,'[]'));
+    add.run('custom','spell','Dardo magico','Magia personalizzata','[]');
+    add.run('legacy-power-75-0','ability','Abilità personale','Da conservare','[]');
+    h.sqlite.exec("INSERT INTO gdr_workspace_characters(id,adventure_id,kind,name,created_by,created_at) VALUES('daisy','il-prezzo-della-verita','pg','Daisy',1,'test'); INSERT INTO gdr_character_powers VALUES('daisy','legacy-power-78-0'); INSERT INTO gdr_system_powers VALUES('il-prezzo-della-verita','legacy-power-78-0');");
+    const before=h.sqlite.prepare('SELECT * FROM gdr_powers ORDER BY id').all();
+    const assignments=h.sqlite.prepare('SELECT * FROM gdr_character_powers').all(),systems=h.sqlite.prepare('SELECT * FROM gdr_system_powers').all();
+    h.sqlite.exec(readFileSync('migrations/0164_add_spell_components.sql','utf8'));
+    const expected=['VS','VS','VS','','S','S','VS'];
+    names.forEach((name,i)=>{
+      const saved=h.sqlite.prepare('SELECT * FROM gdr_powers WHERE id=?').get('legacy-power-78-'+i);
+      assert.equal(saved.components,expected[i]);assert.equal(saved.revision,expected[i]?2:1);
+    });
+    for(const row of before){
+      const {components,revision,updated_at,...saved}=h.sqlite.prepare('SELECT * FROM gdr_powers WHERE id=?').get(row.id);
+      const {revision:oldRevision,updated_at:oldDate,...original}=row;assert.deepEqual(saved,original);
+      if(row.id==='custom'||row.kind==='ability')assert.equal(components,'');
+    }
+    assert.deepEqual(h.sqlite.prepare('SELECT * FROM gdr_character_powers').all(),assignments);
+    assert.deepEqual(h.sqlite.prepare('SELECT * FROM gdr_system_powers').all(),systems);
+    assert.throws(()=>h.sqlite.prepare("UPDATE gdr_powers SET components='X' WHERE id='custom'").run());
+    assert.throws(()=>h.sqlite.prepare("UPDATE gdr_powers SET components='V' WHERE kind='ability'").run());
+  }finally{h.sqlite.close();}
+});
+
 test("catalogo: solo master reale con Modalità admin, validazione e assegnazioni coerenti", async () => {
   const h = harness();
   try {

@@ -124,10 +124,20 @@ try{
       await page.screenshot({path:`/tmp/gdr-systems-${width}.png`,fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
       await mutate(h.db,master,{action:'grant',characterId:pg.id,revision:h.sqlite.prepare('SELECT revision FROM gdr_workspace_characters WHERE id=?').get(pg.id).revision,userId:2,canSpeak:true,canEditSheet:true,canInventory:false});
       h.sqlite.prepare('UPDATE gdr_workspace_adventures SET published=1 WHERE id=?').run(adventureId);
+      for(const [id,name,components] of [['spell-'+width,'Magia con componenti '+width,'VS'],['empty-spell-'+width,'Magia senza componenti '+width,'']]){
+        const created=await h.resource('powers','POST',{id,name,kind:'spell',description:'Componenti condivise nella scheda.',effects:[],components,revision:null,systemIds:[b.id]});
+        assert.equal(created.status,201);
+      }
+      assert.equal((await h.resource('assignments','PUT',{characterId:pg.id,revision:h.sqlite.prepare('SELECT revision FROM gdr_workspace_characters WHERE id=?').get(pg.id).revision,powerIds:['spell-'+width,'empty-spell-'+width]})).status,200);
       user=2;await page.evaluate(()=>sessionStorage.setItem('gdr-test-user','2'));await page.goto(base+'/tavolo-da-gioco/gdr/gioca/'+adventureId);
       await page.getByRole('button',{name:'Scheda',exact:true}).click();
       await page.getByRole('tab',{name:/Regole/}).click();await page.getByText('Solo per il sistema B.',{exact:true}).waitFor();assert.equal(await page.getByRole('link',{name:'Gestisci sistema'}).count(),0);
       await page.getByRole('tab',{name:/Personaggio/}).click();await page.getByRole('button',{name:'Riduci Energia',exact:true}).waitFor();
+      await page.getByRole('tab',{name:/Abilità e incantesimi/}).click();
+      const spell=page.locator('app-gdr-powers .catalog-power').filter({hasText:'Magia con componenti '+width});
+      await spell.locator('abbr').waitFor();assert.equal(await spell.locator('abbr').innerText(),'VS');
+      assert.equal(await page.locator('app-gdr-powers .catalog-power').filter({hasText:'Magia senza componenti '+width}).locator('abbr').count(),0);
+      await page.screenshot({path:`/tmp/gdr-spell-components-sheet-${width}.png`,fullPage:true});
       assert.deepEqual(errors,[]);
     }catch(error){await page.screenshot({path:`/tmp/gdr-systems-error-${width}.png`,fullPage:true});console.error('Browser errors',errors);throw error;}finally{await context.close();}
   }

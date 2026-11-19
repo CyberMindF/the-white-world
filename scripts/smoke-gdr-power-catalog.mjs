@@ -14,7 +14,7 @@ const characters = [
 let power, writes;
 const reset = () => {
   writes = [];
-  power = { id:'scudo', name:'Scudo magico', kind:'spell', description:'Protegge da un colpo.', effects:[], revision:1, systemIds:['a'], characterIds:['daisy'] };
+  power = { id:'scudo', name:'Scudo magico', kind:'spell', components:'VS', description:'Protegge da un colpo.', effects:[], revision:1, systemIds:['a'], characterIds:['daisy'] };
 };
 reset();
 const server = createServer(async (req,res) => {
@@ -58,14 +58,22 @@ try {
     await page.goto(base+'/tavolo-da-gioco/gdr/poteri?system=a');
     await page.getByRole('heading',{name:'Scudo magico',exact:true}).waitFor();
     await page.getByLabel('Descrizione',{exact:true}).fill('Protezione condivisa aggiornata.');
-    assert.equal(await page.locator('form input[type=checkbox]').count(),0);
+    assert.equal(await page.locator('form input[type=checkbox]').count(),3);
+    await page.getByRole('checkbox',{name:'S · Somatica',exact:true}).uncheck();
+    await page.getByRole('checkbox',{name:'M · Materiale',exact:true}).check();
     await page.getByRole('button',{name:'Salva voce',exact:true}).click();
     await page.getByRole('status').filter({hasText:'Voce salvata.'}).waitFor();
     assert.deepEqual(writes[0].systemIds,['a']);
+    assert.equal(writes[0].components,'VM');
     assert.equal('characterIds' in writes[0],false);
     assert.deepEqual(power.characterIds,['daisy']);
     assert.ok(page.url().includes('/gestione/poteri'));
     assert.equal(await page.getByLabel('Descrizione',{exact:true}).inputValue(),'Protezione condivisa aggiornata.');
+    await page.reload();await page.getByRole('heading',{name:'Scudo magico',exact:true}).waitFor();
+    assert.equal(await page.getByRole('checkbox',{name:'V · Verbale',exact:true}).isChecked(),true);
+    assert.equal(await page.getByRole('checkbox',{name:'M · Materiale',exact:true}).isChecked(),true);
+    assert.equal(await page.getByRole('checkbox',{name:'S · Somatica',exact:true}).isChecked(),false);
+    assert.equal(await page.locator('app-gdr-spell-components abbr').innerText(),'VM');
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Nessuno scorrimento orizzontale');
     await page.screenshot({path:`/tmp/gdr-power-catalog-${width}.png`,fullPage:true});
     assert.deepEqual(errors,[]);

@@ -61,4 +61,20 @@ describe('consultazione delle abilità del personaggio', () => {
     workspace.characters.update(cs=>cs.map(c=>({...c,powers:[]})));fixture.detectChanges();
     expect(fixture.nativeElement.textContent).not.toContain('Scudo condiviso');expect(fixture.nativeElement.textContent).not.toContain('Un potere personale');
   });
+  it('mostra solo le componenti valorizzate delle magie per PG e PNG',()=>{
+    TestBed.configureTestingModule({imports:[GdrPowers],providers:[GdrWorkspaceService]});
+    const workspace=TestBed.inject(GdrWorkspaceService);workspace.available.set(true);
+    const spell={id:'spell',kind:'spell' as const,name:'Scudo',description:'',effects:[],revision:1};
+    workspace.characters.set([
+      {...character('Daisy',false),powers:[{...spell,components:'VS'},{...spell,id:'empty',components:''},{...spell,id:'ability',kind:'ability',components:''}]},
+      {...character('PNG',false),kind:'png',powers:[{...spell,components:'M'}]},
+    ]);
+    const fixture=TestBed.createComponent(GdrPowers);fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('abbr').length).toBe(1);
+    expect(fixture.nativeElement.querySelector('abbr').textContent).toBe('VS');
+    expect(fixture.nativeElement.querySelector('abbr').getAttribute('aria-label')).toBe('Componenti: verbale, somatica');
+    workspace.activeId.set('PNG');fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('abbr').length).toBe(1);
+    expect(fixture.nativeElement.querySelector('abbr').textContent).toBe('M');
+  });
 });

@@ -16,7 +16,7 @@
   }
   @for (power of c.powers ?? []; track power.id) {
     <details class="catalog-power">
-      <summary>{{ power.name }} <small>· {{ power.kind === 'spell' ? 'Magia' : 'Abilità' }}</small></summary>
+      <summary>{{ power.name }} <small>· {{ power.kind === 'spell' ? 'Magia' : 'Abilità' }}</small>@if(power.kind==='spell'){<app-gdr-spell-components [components]="power.components??''" />}</summary>
       <div class="power-description">
         @if (power.description) { <app-gdr-turn [source]="power.description" /> }
         <app-gdr-blocks [blocks]="referenceRows(power.effects)" />

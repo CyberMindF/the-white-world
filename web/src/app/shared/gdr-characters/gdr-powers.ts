@@ -4,11 +4,12 @@ import { GdrWorkspaceService } from '../../core/gdr-workspace.service';
 import { GdrBlocks } from '../gdr-blocks/gdr-blocks';
 import { GdrBlockRow, GdrHeadingData, GdrListData, referenceRows } from '../gdr-blocks/gdr-block.types';
 import { GdrTurn } from '../gdr-turn/gdr-turn';
+import { GdrSpellComponents } from '../gdr-spell-components';
 
 @Component({
   selector: 'app-gdr-powers',
   standalone: true,
-  imports: [FormsModule, GdrBlocks, GdrTurn],
+  imports: [FormsModule, GdrBlocks, GdrTurn, GdrSpellComponents],
   templateUrl: './gdr-powers.html',
   styleUrl: './gdr-powers.css',
 })

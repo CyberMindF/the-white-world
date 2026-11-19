@@ -2,7 +2,7 @@ import { Injectable, computed, signal } from '@angular/core';
 import { GdrReferenceBlock } from '../shared/gdr-blocks/gdr-block.types';
 export interface CharacterPower {
   id: string; kind: 'ability' | 'spell'; name: string; description: string;
-  effects: GdrReferenceBlock[]; revision: number;
+  effects: GdrReferenceBlock[]; revision: number; components?: string;
 }
 export interface SystemSheetField {
   key: string; label: string; type: string; min?: number; max?: number; long?: boolean;
