@@ -192,6 +192,7 @@ export async function getAuthenticatedSession(request, env, options = {}) {
   return {
     user,
     impersonation,
+    impersonationActive: Boolean(session.impersonation_active),
     sessionId: session.session_id,
     adminModeEnabled:
       !impersonation && session.admin_mode_enabled === 1 && !actor.safeMode,

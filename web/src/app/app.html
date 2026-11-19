@@ -1,4 +1,4 @@
-@if (authService.impersonation()) {
+@if (!onLoginPage() && authService.impersonation()) {
   <aside class="impersonation-banner" aria-label="Impersonazione attiva">
     <div>
       <strong>Stai impersonando {{ authService.currentUser()?.nickname }}</strong

@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { vi } from 'vitest';
 import { AuthService } from './core/auth.service';
 import { SafeModeService } from './core/safe-mode.service';
@@ -56,6 +56,17 @@ describe('App', () => {
       expect(fixture.nativeElement.querySelector('.impersonation-banner').textContent).toContain('premi automatici e letture restano invariati');
       expect(connect).toHaveBeenCalled();
     }finally{vi.unstubAllGlobals();}
+  });
+  it('never shows the impersonation banner on the login page',async()=>{
+    vi.stubGlobal('fetch',vi.fn().mockResolvedValue(Response.json({})));
+    try {
+      vi.spyOn(TestBed.inject(Router),'url','get').mockReturnValue('/login?returnTo=%2Fgdr');
+      const fixture=TestBed.createComponent(App),auth=TestBed.inject(AuthService);
+      auth.impersonation.set({actorId:1,actorNickname:'Rory',readOnly:false});
+      auth.currentUser.set({id:2,nickname:'Desy',email:'test@example.test',identity:'lei',role:'member',isTest:false});
+      fixture.detectChanges();await fixture.whenStable();
+      expect(fixture.nativeElement.querySelector('.impersonation-banner')).toBe(null);
+    }finally{vi.restoreAllMocks();vi.unstubAllGlobals();}
   });
 
 });

@@ -90,6 +90,7 @@ export class App {
   protected readonly updateAvailable = signal(false);
   protected readonly stoppingImpersonation = signal(false);
   protected readonly impersonationError = signal('');
+  protected readonly onLoginPage = signal(this.router.url.split('?')[0] === '/login');
   protected async stopImpersonation():Promise<void>{
     this.stoppingImpersonation.set(true);this.impersonationError.set('');
     if(await this.authService.setImpersonation(null)){window.location.reload();return;}
@@ -110,6 +111,7 @@ export class App {
         takeUntilDestroyed(this.destroyRef)
       )
       .subscribe((event) => {
+        this.onLoginPage.set(event.urlAfterRedirects.split('?')[0] === '/login');
         this.applyRouteBodyClasses();
         this.restartBustinePresenceTimer();
         const showChat = !['/ponti-chat', '/login'].includes(event.urlAfterRedirects.split('?')[0]);

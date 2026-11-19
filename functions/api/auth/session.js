@@ -13,7 +13,8 @@ import {
 export async function onRequestGet({ request, env }) {
   try {
     // Il frontend usa questa rotta all'avvio per controllare il cookie esistente.
-    const session = await getAuthenticatedSession(request, env);
+    const access = new URL(request.url).searchParams.get("access") === "1";
+    const session = await getAuthenticatedSession(request, env, { ignoreImpersonation: access });
     if (!session) {
       return json({ authenticated: false }, 401);
     }
@@ -22,6 +23,7 @@ export async function onRequestGet({ request, env }) {
       authenticated: true,
       user: session.user,
       impersonation: session.impersonation,
+      ...(access ? { accessImpersonationActive: session.impersonationActive } : {}),
       expiresAt: session.expiresAt,
       adminModeEnabled: session.adminModeEnabled
     });
@@ -42,9 +44,19 @@ export async function onRequestPost(context) {
     }
 
     // La chiave corretta rinnova la sessione soltanto se anche il cookie è ancora valido.
-    const session = await getAuthenticatedSession(request, env, { refresh: true });
+    const access = body.access === true;
+    const session = await getAuthenticatedSession(request, env, { refresh: true, ignoreImpersonation: access });
     if (!session) {
       return json({ authenticated: false }, 401);
+    }
+
+    // Il Portone apre l'account reale: una vecchia impersonazione non deve
+    // sopravvivere a un nuovo accesso, né bloccarlo se il target non è più attivo.
+    if (access) {
+      await env.DB.prepare(`UPDATE sessions SET impersonated_user_id = NULL,
+        impersonation_active = 0, admin_mode_enabled = 0 WHERE id = ? AND user_id = ?`)
+        .bind(session.sessionId, session.user.id).run();
+      session.adminModeEnabled = false;
     }
 
     // La conferma viene conservata come evento permanente e collega la visita alla sessione.
@@ -60,7 +72,7 @@ export async function onRequestPost(context) {
       {
         authenticated: true,
         user: session.user,
-      impersonation: session.impersonation,
+        impersonation: session.impersonation,
         expiresAt: session.expiresAt,
         adminModeEnabled: session.adminModeEnabled
       },

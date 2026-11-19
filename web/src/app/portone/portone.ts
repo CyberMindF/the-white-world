@@ -123,12 +123,14 @@ export class Portone implements OnInit {
       return;
     }
 
-    const session = await this.authService.loadAuthSession();
-    this.safe.entryAuthenticated.set(session.authenticated && Boolean(session.user));
+    const session = await this.authService.loadAuthSession(true);
+    // Finché il cookie impersona un altro utente, le preferenze d'ingresso
+    // restano locali e vengono salvate dopo la conferma della chiave.
+    this.safe.entryAuthenticated.set(session.authenticated && Boolean(session.user) && !session.accessImpersonationActive);
     if (session.user) {
       const choice = this.safe.entryChoice();
       if (choice === null) this.safe.apply(session.user.safeMode === true);
-      else if (choice !== session.user.safeMode) await this.safe.save(choice);
+      else this.safe.apply(choice);
     }
     if (!session.authenticated) {
       this.mode.set(this.authService.getInitialAccessMode());

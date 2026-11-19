@@ -21,6 +21,7 @@ export interface Impersonation {
   readOnly: false;
 }
 export interface AuthSessionResponse {
+  accessImpersonationActive?: boolean;
   impersonation?: Impersonation | null;
   authenticated: boolean;
   user?: AuthUser;
@@ -76,9 +77,14 @@ export class AuthService {
   }
 
   // Chiede al backend se il cookie HttpOnly identifica ancora una sessione valida.
-  async loadAuthSession(): Promise<AuthSessionResponse> {
+  async loadAuthSession(forAccess = false): Promise<AuthSessionResponse> {
+    if (forAccess) {
+      this.currentUser.set(null);
+      this.adminModeEnabled.set(false);
+      this.impersonation.set(null);
+    }
     try {
-      const response = await fetch('/api/auth/session', {
+      const response = await fetch(forAccess ? '/api/auth/session?access=1' : '/api/auth/session', {
         method: 'GET',
         credentials: 'same-origin',
         headers: { Accept: 'application/json' },
@@ -95,6 +101,7 @@ export class AuthService {
       this.impersonation.set(data.impersonation ?? null);
       return data;
     } catch (error) {
+      this.impersonation.set(null);
       console.warn('Impossibile verificare la sessione:', error);
       return { authenticated: false };
     }
@@ -108,6 +115,7 @@ export class AuthService {
     const endpoint = mode === 'key' ? '/api/auth/session' : `/api/auth/${mode}`;
     const normalizedPayload = {
       ...payload,
+      ...(mode === 'key' ? { access: true } : {}),
       ...(typeof payload['email'] === 'string' ? { email: payload['email'].trim() } : {}),
       ...(typeof payload['password'] === 'string' ? { password: payload['password'].trim() } : {}),
       ...(typeof payload['worldKey'] === 'string' ? { worldKey: payload['worldKey'].trim() } : {}),
@@ -119,12 +127,9 @@ export class AuthService {
       body: JSON.stringify(normalizedPayload),
     });
 
-    return {
-      response,
-      result: (await this.api.readApiResponse<AuthSessionResponse>(
-        response,
-      )) as AuthSessionResponse,
-    };
+    const result = await this.api.readApiResponse<AuthSessionResponse>(response) as AuthSessionResponse;
+    if (response.ok && result.authenticated) this.impersonation.set(result.impersonation ?? null);
+    return { response, result };
   }
 
   // Aggiorna il nickname dell'utente autenticato.
@@ -270,6 +275,7 @@ export class AuthService {
 
   // Memorizza lo sblocco della scheda e, dopo login o registrazione, la presenza dell'account.
   rememberAccessUnlock(userId: number | string, rememberAccount = false): void {
+    userId = this.impersonation()?.actorId ?? userId;
     sessionStorage.setItem(ACCESS_SESSION_KEY, String(userId));
     sessionStorage.setItem(ACCESS_SESSION_TOUCHED_AT_KEY, String(Date.now()));
     if (rememberAccount) {

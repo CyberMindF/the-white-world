@@ -129,6 +129,37 @@ test('confermare la chiave in una sessione impersonata non registra un accesso d
  assert.equal(response.status,200);assert.equal((await response.json()).user.id,2);h.sql.close();
 });
 
+test('il Portone legge il vero account e termina la vecchia impersonazione solo dopo la chiave corretta',async()=>{
+ const h=await fixture();await h.call('POST','admin-token',{userId:2});
+ const events=[],visits=[],pending=[];
+ const gate=new Function('recordEvent','linkVisitToSession','getAuthEventMetadata','getAuthenticatedSession','isWorldKeyValid','json','readJson','revokeCurrentSession',source('./session.js')+';return {get:onRequestGet,post:onRequestPost};')(
+  async(_env,session)=>events.push(session.userId),async(_req,_env,userId)=>visits.push(userId),()=>({}),auth.getAuthenticatedSession,key=>key==='test',auth.json,auth.readJson,()=>{},
+ );
+ const get=async(path)=>gate.get({env:h.env,request:h.request(path)});
+ const enter=async(worldKey,token='admin-token')=>gate.post({env:h.env,request:h.request('/api/auth/session','POST',token,{worldKey,access:true}),waitUntil(promise){pending.push(promise);}});
+ assert.equal((await (await get('/api/auth/session')).json()).user.id,2);
+ const preview=await (await get('/api/auth/session?access=1')).json();
+ assert.equal(preview.user.id,1);assert.equal(preview.impersonation,null);
+ assert.equal(preview.accessImpersonationActive,true);
+ assert.equal((await h.session()).user.id,2);
+ assert.equal((await enter('wrong')).status,403);assert.equal((await h.session()).user.id,2);
+ // Un target disattivato può bloccare la vista impersonata, mai il nuovo accesso reale.
+ h.sql.prepare('UPDATE users SET is_activated=0 WHERE id=2').run();
+ assert.equal(await h.session(),null);
+ assert.equal((await (await get('/api/auth/session?access=1')).json()).user.id,1);
+ assert.equal((await enter('test','invalid-token')).status,401);
+ const response=await enter('test');assert.equal(response.status,200);
+ const result=await response.json();assert.equal(result.user.id,1);assert.equal(result.impersonation,null);assert.equal(result.adminModeEnabled,false);
+ assert.ok(response.headers.get('Set-Cookie'));await Promise.all(pending);
+ assert.deepEqual(events,[1]);assert.deepEqual(visits,[1]);
+ const restored=await h.session();assert.equal(restored.user.id,1);assert.equal(restored.impersonation,null);assert.equal(restored.adminModeEnabled,false);
+ assert.equal((await (await get('/api/auth/session?access=1')).json()).accessImpersonationActive,false);
+ assert.equal(h.sql.prepare('SELECT impersonation_active FROM sessions WHERE id=1').get().impersonation_active,0);
+ h.sql.prepare('UPDATE users SET is_activated=1 WHERE id=2').run();
+ assert.equal((await h.session('member-token')).user.id,2);
+ assert.equal((await h.session('member-token')).impersonation,null);h.sql.close();
+});
+
 test('saldo, streak e tick bustine sono consultabili senza maturare premi; il prossimo accesso reale li assegna ancora',async()=>{
  const h=await fixture();await h.call('POST','admin-token',{userId:2});
  h.sql.exec(`CREATE TABLE carte_bustine(user_id INTEGER PRIMARY KEY,quantita_disponibile INTEGER DEFAULT 0,minuti_residui INTEGER DEFAULT 0,evocazioni_disponibili INTEGER DEFAULT 0,bustine_senza_evocazione INTEGER DEFAULT 0,updated_at TEXT,ultimo_minuto_attivo TEXT);

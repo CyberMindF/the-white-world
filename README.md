@@ -58,6 +58,8 @@ Gli endpoint sono organizzati in `functions/api/auth/`:
 
 Il token originale viene inviato in un cookie `HttpOnly`; D1 conserva soltanto il suo hash. La sessione scade dopo 7 giorni e viene rinnovata per altri 7 giorni soltanto quando la chiave viene inviata correttamente. Il controllo automatico eseguito all'apertura non prolunga la sessione. La verifica della chiave vale solo per la scheda corrente tramite `sessionStorage`, quindi viene richiesta nuovamente dopo la chiusura della sessione browser.
 
+Al Portone la sessione viene letta nell'identità dell'account reale (`GET /api/auth/session?access=1`). La conferma della chiave con `access: true` termina un'eventuale vecchia impersonazione e riporta la modalità admin spenta; una chiave errata non cambia identità. Se il cookie conserva un'impersonazione, le scelte Safe fatte all'ingresso si salvano dopo il rientro sul proprio account. Un'impersonazione esplicita già sbloccata resta attiva nelle pagine interne. Verifiche: `node --test functions/api/auth/impersonation.test.mjs`, test Angular `impersonation.spec.ts` e `app.spec.ts`, e dopo la build `node scripts/smoke-login-impersonation.mjs` (API simulate).
+
 ### Account di prova e rollback
 
 `identity` (`lui`/`lei`) è soltanto una label narrativa. Proprietà e autorizzazioni usano sempre
