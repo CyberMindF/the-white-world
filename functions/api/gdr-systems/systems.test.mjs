@@ -12,6 +12,7 @@ async function save(h,p){const r=await h.resource('systems','POST',p);assert.equ
 async function adventure(h,id,systemId){await mutate(h.db,master,{action:'createAdventure',id,title:id,source:'Testo originale',systemId});h.sqlite.prepare('UPDATE gdr_workspace_adventures SET published=1 WHERE id=?').run(id);}
 async function character(h,id='pg',adventureId='story-a',kind='pg'){await mutate(h.db,master,{action:'createCharacter',id,adventureId,kind,name:id});}
 const revision=(h,id)=>h.sqlite.prepare('SELECT revision FROM gdr_workspace_characters WHERE id=?').get(id).revision;
+const ruleRevision=(h,id='rule-a')=>h.sqlite.prepare('SELECT revision FROM gdr_rule_blocks WHERE id=?').get(id).revision;
 
 test('sistemi: permessi reali, modalità admin, account test e Safe controllati sul server',async()=>{
   const h=systemsHarness();try{
@@ -44,14 +45,61 @@ test('blocchi condivisi: una modifica si propaga a due sistemi e alle rispettive
   const h=systemsHarness();try{
     await save(h,rule());await save(h,system('sys-a',{ruleIds:['rule-a']}));await save(h,system('sys-b',{ruleIds:['rule-a']}));
     await adventure(h,'story-a','sys-a');await adventure(h,'story-b','sys-b');
-    await save(h,rule({revision:1,blocks:[{type:'paragraph',data:{text:'Regola aggiornata.'}}]}));
+    await save(h,rule({revision:ruleRevision(h),blocks:[{type:'paragraph',data:{text:'Regola aggiornata.'}}]}));
     for(const id of ['story-a','story-b']){const a=(await(await h.call(2,'GET',undefined,id)).json()).adventures.find(a=>a.id===id);assert.equal(a.rules[0].data.text,'Regola aggiornata.');assert.equal(a.fields[2].key,'hp');}
     assert.ok(h.events.some(e=>e.adventure==='story-a'));assert.ok(h.events.some(e=>e.adventure==='story-b'));
     await save(h,rule({id:'rule-copy',blocks:[{type:'paragraph',data:{text:'Versione indipendente.'}}]}));
     let b=await getSystem(h,'sys-b');await save(h,{...b,action:'saveSystem',ruleIds:['rule-copy']});
-    await save(h,rule({revision:2,blocks:[{type:'paragraph',data:{text:'Solo originale.'}}]}));
+    await save(h,rule({revision:ruleRevision(h),blocks:[{type:'paragraph',data:{text:'Solo originale.'}}]}));
     assert.equal((await(await h.call(2,'GET',undefined,'story-b')).json()).adventures.find(a=>a.id==='story-b').rules[0].data.text,'Versione indipendente.');
     assert.equal((await h.resource('systems','POST',rule({revision:1}))).status,409);
+  }finally{h.sqlite.close();}
+});
+test('editor regole: crea in più sistemi, cambia i collegamenti conservando ordine e altre regole, scollega senza eliminare',async()=>{
+  const h=systemsHarness();try{
+    await save(h,rule({id:'first'}));await save(h,rule({id:'last'}));
+    await save(h,system('sys-a',{ruleIds:['first','last']}));await save(h,system('sys-b'));await save(h,system('sys-c',{ruleIds:['last']}));
+    await adventure(h,'story-a','sys-a');await adventure(h,'story-b','sys-b');await adventure(h,'story-c','sys-c');
+    await save(h,rule({systemIds:['sys-a','sys-b']}));
+    assert.deepEqual((await getSystem(h,'sys-a')).ruleIds,['first','last','rule-a']);
+    assert.deepEqual((await getSystem(h,'sys-b')).ruleIds,['rule-a']);
+    // L'ordine scelto nel sistema deve sopravvivere al salvataggio della regola.
+    let a=await getSystem(h,'sys-a');await save(h,{...a,action:'saveSystem',ruleIds:['first','rule-a','last']});
+    const staleSystem=await getSystem(h,'sys-b');h.events.length=0;
+    await save(h,rule({revision:ruleRevision(h),title:'Regola spostata',systemIds:['sys-a','sys-c']}));
+    assert.deepEqual((await getSystem(h,'sys-a')).ruleIds,['first','rule-a','last']);
+    assert.deepEqual((await getSystem(h,'sys-b')).ruleIds,[]);
+    assert.deepEqual((await getSystem(h,'sys-c')).ruleIds,['last','rule-a']);
+    assert.deepEqual(h.events.map(e=>e.adventure).sort(),['story-a','story-b','story-c']);
+    assert.equal((await h.resource('systems','POST',{...staleSystem,action:'saveSystem'})).status,409);
+    const current=ruleRevision(h),before=h.sqlite.prepare('SELECT * FROM gdr_system_rules ORDER BY system_id,position').all();
+    for(const systemIds of [['missing'],['sys-a','sys-a'],'sys-a']){
+      assert.equal((await h.resource('systems','POST',rule({revision:current,systemIds}))).status,400);
+      assert.deepEqual(h.sqlite.prepare('SELECT * FROM gdr_system_rules ORDER BY system_id,position').all(),before);
+      assert.equal(ruleRevision(h),current);
+    }
+    await save(h,rule({revision:current,systemIds:[]}));
+    const data=await(await h.resource()).json();assert.deepEqual(data.rules.find(r=>r.id==='rule-a').systemIds,[]);
+    assert.deepEqual((await getSystem(h,'sys-a')).ruleIds,['first','last']);
+    for(const [user,headers,status] of [[0,{},401],[2,{},403],[1,{'x-no-admin':'1'},403],[1,{'x-test':'1'},403],[1,{'x-safe':'1'},403]])
+      assert.equal((await h.resource('systems','POST',rule({revision:ruleRevision(h),systemIds:['sys-a']}),user,headers)).status,status);
+  }finally{h.sqlite.close();}
+});
+test('collegamenti concorrenti dal sistema invalidano la bozza della regola senza salvataggi parziali',async()=>{
+  const h=systemsHarness();try{
+    await save(h,system());await save(h,system('sys-b'));await save(h,rule({systemIds:['sys-a']}));
+    const payload=rule({revision:ruleRevision(h),systemIds:[],title:'Modifica obsoleta'}),batch=h.db.batch.bind(h.db);
+    h.db.batch=async statements=>{
+      h.db.batch=batch;
+      const b=await getSystem(h,'sys-b');await save(h,{...b,action:'saveSystem',ruleIds:['rule-a']});
+      return batch(statements);
+    };
+    assert.equal((await h.resource('systems','POST',payload)).status,409);
+    const current=(await(await h.resource()).json()).rules.find(r=>r.id==='rule-a');
+    assert.equal(current.title,'Prova di coraggio');assert.deepEqual(current.systemIds.sort(),['sys-a','sys-b']);
+    const before=h.sqlite.prepare('SELECT * FROM gdr_systems ORDER BY id').all();
+    assert.equal((await h.resource('systems','POST',payload)).status,409);
+    assert.deepEqual(h.sqlite.prepare('SELECT * FROM gdr_systems ORDER BY id').all(),before);
   }finally{h.sqlite.close();}
 });
 test('schede ereditate: valori iniziali, risorse e distribuzione punti funzionano anche in una nuova avventura',async()=>{

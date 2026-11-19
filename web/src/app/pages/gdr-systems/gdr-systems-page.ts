@@ -90,6 +90,9 @@ export class GdrSystemsPage implements OnInit {
   protected removeRule(id:string):void{this.draft.ruleIds=this.draft.ruleIds.filter(value=>value!==id);this.change();}
   protected moveRule(index:number,delta:number):void{const target=index+delta;if(target<0||target>=this.draft.ruleIds.length)return;[this.draft.ruleIds[index],this.draft.ruleIds[target]]=[this.draft.ruleIds[target],this.draft.ruleIds[index]];this.change();}
   protected togglePower(id:string,checked:boolean):void{this.draft.powerIds=checked?[...this.draft.powerIds,id]:this.draft.powerIds.filter(value=>value!==id);this.change();}
+  protected toggleRuleSystem(id:string,checked:boolean):void{
+    this.ruleDraft.systemIds=checked?[...this.ruleDraft.systemIds,id]:this.ruleDraft.systemIds.filter(value=>value!==id);this.ruleChange();
+  }
   protected editRule(rule?:Rule,copy=false):void{
     if(this.ruleDirty()||this.saving())return;
     this.ruleDraft=rule?{...structuredClone(rule),...(copy?{id:crypto.randomUUID(),title:('Copia di '+rule.title).slice(0,160),revision:null,systemIds:[]}: {})}:newRule();
@@ -127,7 +130,7 @@ export class GdrSystemsPage implements OnInit {
     this.saving.set(true);this.error.set('');
     try{
       const id=this.ruleDraft.id;
-      await this.write({action:'saveRule',id,title:this.ruleDraft.title,revision:this.ruleDraft.revision,blocks:this.parsed().blocks});await this.refresh();
+      await this.write({action:'saveRule',id,title:this.ruleDraft.title,revision:this.ruleDraft.revision,blocks:this.parsed().blocks,systemIds:this.ruleDraft.systemIds});await this.refresh();
       this.ruleDraft=structuredClone(this.rules().find(r=>r.id===id)!);this.ruleDirty.set(false);
       this.notice.set('Regola salvata.');
     }catch(error){this.fail(error);}finally{this.saving.set(false);}

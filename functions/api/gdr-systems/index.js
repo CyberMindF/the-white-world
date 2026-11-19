@@ -44,15 +44,35 @@ export async function onRequestPost(context){
     if(p.action==='saveRule'){
       const title=text(p.title,160).trim(),blocks=referenceBlocks(p.blocks);
       if(!blocks.length)throw new WorkspaceError('Scrivi almeno un blocco per la regola.',400);
-      if(p.revision===null){
-        const result=await db.prepare("INSERT INTO gdr_rule_blocks(id,title,type,data_json,created_by) VALUES(?,?,'document',?,?) ON CONFLICT(id) DO NOTHING").bind(p.id,title,JSON.stringify(blocks),session.user.id).run();
-        if(!result.meta.changes)throw conflict();
-      }else{
-        if(!Number.isSafeInteger(p.revision))throw conflict();
-        const result=await db.prepare("UPDATE gdr_rule_blocks SET title=?,type='document',data_json=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?").bind(title,JSON.stringify(blocks),new Date().toISOString(),p.id,p.revision).run();
-        if(!result.meta.changes)throw conflict();
+      const creating=p.revision===null;
+      const previous=await db.prepare('SELECT revision FROM gdr_rule_blocks WHERE id=?').bind(p.id).first();
+      if(creating?!!previous:(!Number.isSafeInteger(p.revision)||previous?.revision!==p.revision))throw conflict();
+      const previousSystems=(await db.prepare('SELECT system_id FROM gdr_system_rules WHERE rule_id=?').bind(p.id).all()).results.map(r=>r.system_id);
+      const systemIds=p.systemIds===undefined?previousSystems:ids(p.systemIds);
+      const systems=(await db.prepare('SELECT id FROM gdr_systems WHERE id IN(SELECT value FROM json_each(?))').bind(JSON.stringify(systemIds)).all()).results;
+      if(systems.length!==systemIds.length)throw new WorkspaceError('Uno dei sistemi selezionati non esiste più.',400);
+      affected=[...new Set([...previousSystems,...systemIds])];
+      const guard='EXISTS(SELECT 1 FROM gdr_rule_blocks WHERE id=? AND revision=?)';
+      const bindings=[p.id,creating?1:p.revision],statements=[];
+      if(creating)statements.push(db.prepare("INSERT INTO gdr_rule_blocks(id,title,type,data_json,created_by) VALUES(?,?,'document',?,?)").bind(p.id,title,JSON.stringify(blocks),session.user.id));
+      statements.push(
+        // Conserva la posizione dei collegamenti esistenti; aggiunge i nuovi in fondo.
+        db.prepare(`DELETE FROM gdr_system_rules WHERE rule_id=? AND system_id NOT IN(SELECT value FROM json_each(?)) AND ${guard}`).bind(p.id,JSON.stringify(systemIds),...bindings),
+        db.prepare(`INSERT INTO gdr_system_rules(system_id,rule_id,position)
+          SELECT j.value,?,coalesce((SELECT max(position)+1 FROM gdr_system_rules WHERE system_id=j.value),0)
+          FROM json_each(?) j WHERE NOT EXISTS(SELECT 1 FROM gdr_system_rules WHERE system_id=j.value AND rule_id=?) AND ${guard}`)
+          .bind(p.id,JSON.stringify(systemIds),p.id,...bindings),
+        db.prepare(`UPDATE gdr_systems SET revision=revision+1,updated_at=? WHERE id IN(SELECT value FROM json_each(?)) AND ${guard}`)
+          .bind(new Date().toISOString(),JSON.stringify(affected),...bindings),
+        db.prepare(`UPDATE gdr_rule_blocks SET title=?,type='document',data_json=?,revision=revision+?,updated_at=? WHERE id=? AND ${guard}`)
+          .bind(title,JSON.stringify(blocks),creating?0:1,new Date().toISOString(),p.id,...bindings),
+      );
+      let results;
+      try{results=await db.batch(statements);}catch(error){
+        if(creating&&String(error.message).includes('UNIQUE constraint failed: gdr_rule_blocks.id'))throw conflict();
+        throw error;
       }
-      affected=(await db.prepare('SELECT system_id FROM gdr_system_rules WHERE rule_id=?').bind(p.id).all()).results.map(r=>r.system_id);
+      if(!results.at(-1).meta.changes)throw conflict();
     }else if(p.action==='saveSystem'){
       const name=text(p.name,160).trim(),description=text(p.description??'',6000,true),fields=systemFields(p.fields),ruleIds=ids(p.ruleIds),powerIds=ids(p.powerIds);
       if(!Number.isSafeInteger(p.statBudget)||p.statBudget<4||p.statBudget>20)throw new WorkspaceError('Usa un totale da 4 a 20 punti.',400);
@@ -76,6 +96,11 @@ export async function onRequestPost(context){
       const statements=[];
       if(creating)statements.push(db.prepare('INSERT INTO gdr_systems(id,name,description,fields_json,stat_budget,created_by) VALUES(?,?,?,?,?,?)').bind(p.id,name,description,JSON.stringify(fields),p.statBudget,session.user.id));
       statements.push(
+        // Anche l'editor della regola deve rilevare collegamenti cambiati dal sistema.
+        db.prepare(`UPDATE gdr_rule_blocks SET revision=revision+1 WHERE id IN(
+          SELECT rule_id FROM gdr_system_rules WHERE system_id=? AND rule_id NOT IN(SELECT value FROM json_each(?))
+          UNION SELECT value FROM json_each(?) WHERE value NOT IN(SELECT rule_id FROM gdr_system_rules WHERE system_id=?)
+        ) AND ${guard}`).bind(p.id,JSON.stringify(ruleIds),JSON.stringify(ruleIds),p.id,...bindings),
         db.prepare(`DELETE FROM gdr_system_rules WHERE system_id=? AND ${guard}`).bind(p.id,...bindings),
         db.prepare(`INSERT INTO gdr_system_rules(system_id,rule_id,position) SELECT ?,value,CAST(key AS INTEGER) FROM json_each(?) WHERE ${guard}`).bind(p.id,JSON.stringify(ruleIds),...bindings),
         // Il catalogo dei poteri controlla la sua revisione anche se cambia la disponibilità dal sistema.

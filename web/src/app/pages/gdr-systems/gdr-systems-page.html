@@ -21,11 +21,15 @@
         <section class="panel system-editor">
           @if (ruleEditorOpen()) {
             <h2>{{ruleDraft.revision===null?'Nuova regola':ruleDraft.title}}</h2>
-            @if (ruleDraft.systemIds.length) {
-              <p class="hint">Le modifiche si applicano a tutti i sistemi che usano questa regola:</p><ul>@for(id of ruleDraft.systemIds;track id){<li>{{systemName(id)}}</li>}</ul>
-            }
             <fieldset [disabled]="!canManage() || saving()">
               <label>Nome della regola<input [(ngModel)]="ruleDraft.title" (ngModelChange)="ruleChange()" maxlength="160" /></label>
+              <fieldset class="rule-systems">
+                <legend>Sistemi che usano questa regola</legend>
+                <p class="hint">Puoi scegliere più sistemi. Il contenuto è condiviso; senza selezioni la regola resta solo nella libreria.</p>
+                @for(system of systems();track system.id){
+                  <label class="check"><input type="checkbox" [checked]="ruleDraft.systemIds.includes(system.id)" (change)="toggleRuleSystem(system.id,$any($event.target).checked)" /><span>{{system.name}}</span></label>
+                } @empty {<p>Non ci sono ancora sistemi. Puoi salvare la regola e associarla in seguito.</p>}
+              </fieldset>
               <label>Contenuto della regola<textarea rows="12" [ngModel]="ruleSource()" (ngModelChange)="ruleSource.set($event);ruleChange()" maxlength="200000"></textarea></label>
               <p class="hint">Puoi usare titoli (##), elenchi (-) e tabelle con le barre |.</p>
               @for(issue of parsed().errors;track $index){<p class="error">{{issue.message}}</p>}
