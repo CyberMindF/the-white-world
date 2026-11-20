@@ -108,8 +108,8 @@
         (focus)="setScrollDriver('source')" (pointerdown)="setScrollDriver('source')"
         (wheel)="setScrollDriver('source')" (keydown)="setScrollDriver('source')"
         (scroll)="syncScroll('source')"
-        [ngModel]="source()"
-        (ngModelChange)="sourceChange.emit($event)"
+        [ngModel]="visibleSource().text"
+        (ngModelChange)="updateSource($event)"
         spellcheck="true"
         placeholder="Scrivi qui…"
       ></textarea>

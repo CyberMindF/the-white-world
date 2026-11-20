@@ -8,6 +8,7 @@ import { BLOCK_TYPES, SNIPPET_LABELS } from '../gdr-blocks/gdr-snippets';
 import { NarrativeCharacter, findNarrativeCharacter, narrativeNameMatches, insertNarrativeBlock, narrativeSnippet, replaceNarrativeSelection } from './gdr-writing';
 import {CharacterDraft,readCharacterDraft,writeCharacterDraft} from './gdr-character-draft';
 import { CorrespondenceDraft, writeCorrespondence } from './gdr-correspondence';
+import { storedSourceOffset, updateVisibleNarrativeSource, visibleNarrativeSource, visibleSourceOffset } from './gdr-visible-source';
 import { NarrativeSection, parseNarrative, safeNarrativeImage } from './gdr-turn.parser';
 import { GdrBlockRow, GdrParagraphData } from '../gdr-blocks/gdr-block.types';
 import { serializeGdrBlocks } from '../gdr-blocks/gdr-markdown.serializer';
@@ -236,13 +237,8 @@ interface RenderedSection extends NarrativeSection {
         }
       </section>
     </ng-template>
-    <ng-template #content let-section let-canEdit="canEdit">
-      @switch (section.kind) {
-        @case ('document') {
-          <app-gdr-blocks [blocks]="section.blocks" (characterOpen)="openNpc($event)" />
-        }
-        @case ('dialogo') {
-          <div class="dialogue" [class.unlinked]="!canOpenCharacter(section)">
+    <ng-template #voiceContent let-section let-canEdit="canEdit">
+          <div class="voice-block" [class.dialogue]="section.kind === 'dialogo'" [class.thought]="section.kind === 'pensiero'" [attr.aria-label]="(section.kind === 'pensiero' ? 'Pensiero di ' : 'Dialogo di ') + section.speaker">
             <div class="speaker">
               @if(canOpenCharacter(section)){
               <button type="button" class="view-character portrait-trigger" aria-label="Apri scheda personaggio" (click)="openCharacter(section)">
@@ -254,9 +250,11 @@ interface RenderedSection extends NarrativeSection {
                 }}</span>
               }
               </button>
+              } @else {
+                <span class="initial avatar-placeholder" aria-hidden="true">{{ section.speaker.slice(0, 1) || '?' }}</span>
               }
               @if (canEdit) {
-                <button type="button" class="edit-speaker" (click)="startEditing(section)">
+                <button type="button" class="edit-speaker" [attr.aria-label]="section.kind === 'pensiero' ? 'Modifica pensiero' : 'Modifica dialogo'" (click)="startEditing(section)">
                   {{ section.speaker || 'Personaggio' }} <span aria-hidden="true">✎</span>
                 </button>
               } @else if(canOpenCharacter(section)) {
@@ -265,8 +263,21 @@ interface RenderedSection extends NarrativeSection {
                 <span class="name-trigger">{{section.speaker || 'Personaggio'}}</span>
               }
             </div>
-            <p>{{ section.text }}</p>
+            <p class="voice-bubble" [class.speech-bubble]="section.kind === 'dialogo'" [class.thought-bubble]="section.kind === 'pensiero'">
+              @if (section.kind === 'pensiero') {
+                <span class="cloud-outline" aria-hidden="true"><span class="cloud-middle"></span><svg class="cloud-side cloud-left" focusable="false"><defs><pattern [attr.id]="fieldId + '-' + section.id + '-cloud'" width="12" height="26" patternUnits="userSpaceOnUse"><path d="M11 0 C-2 2 -2 24 11 26" /></pattern></defs><rect width="100%" height="100%" stroke="none" [attr.fill]="'url(#' + fieldId + '-' + section.id + '-cloud)'" /></svg><svg class="cloud-side cloud-right" focusable="false"><rect width="100%" height="100%" stroke="none" [attr.fill]="'url(#' + fieldId + '-' + section.id + '-cloud)'" /></svg><svg class="cloud-cap cloud-top" viewBox="0 0 400 32" preserveAspectRatio="none" focusable="false"><path vector-effect="non-scaling-stroke" d="M1 32 C1 20 8 14 24 16 C18 6 40 1 56 10 C70 1 89 2 102 11 C118 1 138 2 151 11 C166 1 186 2 199 11 C216 1 237 3 250 12 C268 2 288 4 301 13 C320 3 341 8 350 19 C375 11 399 18 399 32" /></svg><svg class="cloud-cap cloud-bottom" viewBox="0 0 400 32" preserveAspectRatio="none" focusable="false"><path vector-effect="non-scaling-stroke" d="M1 32 C1 20 8 14 24 16 C18 6 40 1 56 10 C70 1 89 2 102 11 C118 1 138 2 151 11 C166 1 186 2 199 11 C216 1 237 3 250 12 C268 2 288 4 301 13 C320 3 341 8 350 19 C375 11 399 18 399 32" /></svg></span>
+                <em>{{ section.text }}</em>
+              } @else {{{ section.text }}}
+            </p>
           </div>
+    </ng-template>
+    <ng-template #content let-section let-canEdit="canEdit">
+      @switch (section.kind) {
+        @case ('document') {
+          <app-gdr-blocks [blocks]="section.blocks" (characterOpen)="openNpc($event)" />
+        }
+        @case ('dialogo') {
+          <ng-container *ngTemplateOutlet="voiceContent; context: { $implicit: section, canEdit: canEdit }" />
         }
         @case ('azione') {
           @if (canEdit) {
@@ -277,13 +288,7 @@ interface RenderedSection extends NarrativeSection {
           <p class="action">{{ section.text }}</p>
         }
         @case ('pensiero') {
-          <div class="thought">
-            <div class="thought-heading">
-              <span>{{ section.speaker || 'Personaggio' }} · Pensiero</span>
-              @if (canEdit) { <button type="button" class="edit-start" (click)="startEditing(section)" aria-label="Modifica pensiero">✎</button> }
-            </div>
-            <p><em>{{ section.text }}</em></p>
-          </div>
+          <ng-container *ngTemplateOutlet="voiceContent; context: { $implicit: section, canEdit: canEdit }" />
         }
         @case ('lettera') {
           @if (canEdit) { <button type="button" class="edit-start" (click)="startEditing(section)">✎ Modifica lettera</button> }
@@ -328,7 +333,7 @@ interface RenderedSection extends NarrativeSection {
     .delete-confirm { margin: 0 .7rem .7rem; padding: .8rem; border: 1px solid var(--border-color); border-radius: .65rem; background: var(--panel-color); }
     .delete-confirm p { margin: 0 0 .6rem; font-size: .9rem; }
     .delete-confirm button { padding: .4rem .75rem; margin-right: .5rem; border: 1px solid var(--border-color); border-radius: .5rem; background: var(--button-bg); color: var(--text-color); font: inherit; cursor: pointer; }
-    .dialogue {
+    .voice-block {
       display: grid;
       grid-template-columns: 40px minmax(0, 1fr);
       column-gap: 0.7rem;
@@ -344,8 +349,7 @@ interface RenderedSection extends NarrativeSection {
     .view-character { background: transparent; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; }
     .speaker > .portrait-trigger { grid-column: 1; grid-row: 1 / span 2; width:40px; height:40px; min-width:0; min-height:0; border-radius:50%; }
     .speaker > .name-trigger { grid-column:2; font-weight:600; line-height:1.4; }
-    .dialogue.unlinked{grid-template-columns:minmax(0,1fr)}
-    .dialogue.unlinked .speaker > .name-trigger,.dialogue.unlinked > p{grid-column:1}
+    .speaker > .avatar-placeholder { grid-column: 1; grid-row: 1 / span 2; }
     .character-backdrop { position:fixed; inset:0; z-index:1500; background:rgb(20 18 16 / .65); backdrop-filter:blur(6px); display:grid; place-items:center; padding:24px; }
     .character-modal { width:min(900px,100%); max-height:90dvh; overflow:auto; background:var(--bg-color, #f7f4ee); color:var(--text-color); border:1px solid var(--border-color); border-radius:20px; box-shadow:0 24px 80px #0005; }
     .character-modal header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:20px 24px; border-bottom:1px solid var(--border-color); }
@@ -395,7 +399,7 @@ interface RenderedSection extends NarrativeSection {
       grid-column: 2;
       line-height: 1.4;
     }
-    .dialogue p {
+    .voice-block .voice-bubble {
       grid-column: 2;
       margin: 0;
       line-height: 1.65;
@@ -403,9 +407,23 @@ interface RenderedSection extends NarrativeSection {
     .action {
       font-style: italic;
     }
-    .thought { margin: 1.5rem 0; padding-inline-start: 1rem; border-inline-start: 2px solid var(--border-color); }
-    .thought-heading { display: flex; gap: .7rem; align-items: center; color: var(--muted-color); font-size: .8rem; }
-    .thought p { margin: .4rem 0; }
+    .voice-bubble { position: relative; width: fit-content; max-width: 100%; min-width: 0; isolation: isolate; box-sizing: border-box; }
+    .speech-bubble { padding: .8rem 1rem; border: 1px solid var(--border-color); border-radius: 1.15rem 1.15rem 1.15rem .35rem; background: var(--panel-color); }
+    .speech-bubble::before { content: ''; position: absolute; top: .85rem; left: -.38rem; width: .65rem; height: .65rem; background: var(--panel-color); border-left: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); transform: rotate(45deg); }
+    .thought-bubble { display: grid; align-content: center; padding: 1.7rem 1.9rem; min-height: 6rem; }
+    .thought-bubble em { position: relative; }
+    .cloud-outline { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+    .cloud-middle { position: absolute; inset: 13px 10px; background: var(--panel-color); }
+    .cloud-side { position: absolute; top: 13px; width: 12px; height: calc(100% - 26px); fill: var(--panel-color); stroke: var(--border-color); stroke-width: 1.4; }
+    .cloud-left { left: 0; }
+    .cloud-right { right: 0; transform: scaleX(-1); }
+    .cloud-cap { position: absolute; left: 0; width: 100%; height: 26px; overflow: visible; fill: var(--panel-color); stroke: var(--border-color); stroke-width: 1.4; }
+    .cloud-top { top: 0; }
+    .cloud-bottom { bottom: 0; transform: scaleY(-1); }
+    .thought-bubble::before, .thought-bubble::after { content: ''; position: absolute; border: 1px solid var(--border-color); border-radius: 50%; background: var(--panel-color); }
+    .thought-bubble::before { width: .65rem; height: .5rem; left: -.3rem; top: 1.9rem; }
+    .thought-bubble::after { width: .35rem; height: .28rem; left: -.9rem; top: 1.45rem; }
+    @media (max-width: 400px) { .voice-block { grid-template-columns: 32px minmax(0, 1fr); column-gap: .6rem; } .speaker > .portrait-trigger, .speaker img, .speaker .initial { width: 32px; height: 32px; } .thought-bubble { padding: 1.4rem 1.3rem; } }
     .letter { margin: 1rem auto 1.5rem; max-width: 42rem; padding: clamp(1.2rem, 4vw, 2.6rem); color: #382c24; border: 1px solid #d9c8a8; border-radius: 3px 8px 5px 3px; background: linear-gradient(125deg, #fffaf0, #f3e7cd); box-shadow: 0 4px 14px #20180d14; font-family: 'Caveat', cursive; font-size: 1.6rem; }
     .letter p { line-height: 1.45; }
     .letter .letter-date { margin: 0 0 1.3rem; text-align: right; font-size: 1.3rem; }
@@ -700,7 +718,8 @@ export class GdrTurn {
   protected readonly draft = signal('');
   protected readonly characterDraft=signal<CharacterDraft|null>(null);
   protected readonly correspondenceDraft = signal<CorrespondenceDraft | null>(null);
-  protected readonly editorValue=computed(()=>this.correspondenceDraft()?.body??this.characterDraft()?.body??this.draft());
+  private readonly visibleDraft = computed(() => visibleNarrativeSource(this.draft(), this.characterRoster().length ? this.characterRoster() : this.characters()));
+  protected readonly editorValue=computed(()=>this.correspondenceDraft()?.body??this.characterDraft()?.body??this.visibleDraft().text);
   protected readonly emptyDialogue=computed(()=>(!!this.correspondenceDraft() || ['dialogo', 'pensiero'].includes(this.characterDraft()?.kind ?? ''))&&!this.editorValue().trim());
   protected readonly selectedVoice=computed(()=>{
     const draft=this.characterDraft();if(!draft)return this.voice();
@@ -736,7 +755,7 @@ export class GdrTurn {
     if (this.correspondenceDraft()) { this.updateCorrespondence({body: value}); return; }
     const current=this.characterDraft();
     if(current){const next={...current,body:value};this.characterDraft.set(next);this.draft.set(writeCharacterDraft(next,this.characterRoster().length?this.characterRoster():this.characters()));}
-    else this.setDraft(value);
+    else this.setDraft(updateVisibleNarrativeSource(this.visibleDraft(), value, this.characterRoster().length ? this.characterRoster() : this.characters()));
   }
   protected setVoice(index:number):void{
     this.voice.set(index);
@@ -811,11 +830,11 @@ export class GdrTurn {
     if (type === 'npc_full' && !this.deletable() && !this.insertable()) return;
     if (!area || !type || (['dialogo', 'pensiero'].includes(type) && !this.characters().length && !this.allowGeneric()))
       return;
-    const start = area.selectionStart,
-      end = area.selectionEnd;
+    const start = storedSourceOffset(this.visibleDraft(), area.selectionStart),
+      end = storedSourceOffset(this.visibleDraft(), area.selectionEnd);
     const snippet = narrativeSnippet(
       type,
-      this.draft().slice(start, end),
+      area.value.slice(area.selectionStart, area.selectionEnd),
       this.characters()[this.voice()] ?? this.characters()[0],
     );
     if (!snippet) {
@@ -824,7 +843,9 @@ export class GdrTurn {
     }
     this.message.set('');
     const replacement = replaceNarrativeSelection(this.draft(), start, end, snippet);
-    updateGdrTextarea(area, () => this.setDraft(replacement.source), readCharacterDraft(replacement.source)?0:replacement.start,readCharacterDraft(replacement.source)?.body.length??replacement.end);
+    const characterDraft = readCharacterDraft(replacement.source);
+    const nextView = visibleNarrativeSource(replacement.source, this.characterRoster().length ? this.characterRoster() : this.characters());
+    updateGdrTextarea(area, () => this.setDraft(replacement.source), characterDraft ? 0 : visibleSourceOffset(nextView, replacement.start), characterDraft?.body.length ?? visibleSourceOffset(nextView, replacement.end));
   }
 
   public startEditing(range: { start: number; end: number; ownerId?:string; ownerStart?:number; ownerEnd?:number }): void {

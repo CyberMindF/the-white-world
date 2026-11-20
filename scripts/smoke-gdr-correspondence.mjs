@@ -12,10 +12,10 @@ const harness = apiHarness(), adventureId = 'il-prezzo-della-verita';
 const master = {id:1, role:'admin', isTest:false};
 const fields = [];
 const avatar = '/assets/images/gdr/il-prezzo-della-verita/valin-fajar.webp';
-const initial = '::: lettera {"signature":"Ada","date":"Terza luna"}\nCara Daisy,\n\nla chiave è sotto la finestra.\n:::\n\n::: pensiero Daisy | | daisy\nDevo trovarla prima degli altri.\n:::\n\n::: messaggio {"name":"Shivay","characterId":"shivay","date":"Ieri","time":"18:42"}\nCi vediamo al castello.\n:::';
+const initial = '::: lettera {"signature":"Ada","date":"Terza luna"}\nCara Daisy,\n\nla chiave è sotto la finestra.\n:::\n\n::: pensiero Daisy | | daisy\nDevo trovarla prima degli altri.\n:::\n\n::: dialogo Daisy | | daisy\nLa cercherò io.\n:::\n\n::: messaggio {"name":"Shivay","characterId":"shivay","date":"Ieri","time":"18:42"}\nCi vediamo al castello.\n:::';
 harness.sqlite.prepare('INSERT INTO gdr_character_schema VALUES(?,?)').run(adventureId,JSON.stringify(fields));
 for (const [id,name,kind] of [['daisy','Daisy','pg']]) {
-  await mutate(harness.db,master,{action:'createCharacter',id,adventureId,name,kind,profile:{}});
+  await mutate(harness.db,master,{action:'createCharacter',id,adventureId,name,kind,portrait:avatar,profile:{}});
 }
 await mutate(harness.db,master,{action:'createCharacter',id:'shivay',adventureId,name:'Shivay',kind:'png',portrait:avatar,profile:{}});
 await mutate(harness.db,master,{action:'grant',characterId:'daisy',revision:1,userId:2,canSpeak:true,canEditSheet:true,canInventory:false});
@@ -111,7 +111,8 @@ try {
           const field=document.querySelector('#lab-turn');
           return document.activeElement===field && field.value.slice(field.selectionStart,field.selectionEnd)==='Non posso fidarmi.';
         });
-        assert.ok((await area.inputValue()).startsWith(`::: ${kind} `));
+        assert.ok((await area.inputValue()).startsWith(`::: ${kind} Daisy`));
+        assert.equal((await area.inputValue()).includes('|'),false);
         assert.equal(await area.isVisible(),true);
         assert.equal(await editor.locator('.inline-editor').count(),0);
         if(mode==='Testo e anteprima') assert.equal(await editor.locator(rendered).innerText(),'Non posso fidarmi.');
@@ -125,6 +126,10 @@ try {
       const letter = editor.locator('.letter'); await letter.waitFor();
       await page.evaluate(()=>document.fonts.ready);
       assert.equal(await letter.evaluate(el=>getComputedStyle(el).fontFamily.includes('Caveat')),true);
+      assert.equal(await editor.locator('.thought .speaker img').getAttribute('src'),avatar);
+      assert.equal(await editor.locator('.dialogue .speaker img').getAttribute('src'),avatar);
+      assert.equal((await editor.locator('.thought').innerText()).includes('Pensiero'),false);
+      assert.equal(await editor.locator('.cloud-outline').count(),1);
       assert.equal(await editor.locator('.thought em').evaluate(el=>getComputedStyle(el).fontStyle),'italic');
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`Overflow ${actor}/${width}`);
       await editor.screenshot({path:join(screenshots,`editor-${actor}-${width}.png`),animations:'disabled'});

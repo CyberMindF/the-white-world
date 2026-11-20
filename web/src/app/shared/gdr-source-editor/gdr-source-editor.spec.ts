@@ -94,6 +94,7 @@ describe('anteprima prima della pubblicazione', () => {
       expect(area.value.slice(area.selectionStart,area.selectionEnd)).toBe('Ciao');
     });
     expect(saved).toBe(`Prima.\n\n::: ${kind} Ada |  | ada-1\nCiao\n:::\n\nDopo.`);
+    expect(area.value).toBe(`Prima.\n\n::: ${kind} Ada\nCiao\n:::\n\nDopo.`);
     expect(fixture.nativeElement.querySelector('.source-pane').hidden).toBe(false);
     expect(fixture.nativeElement.querySelector('.inline-editor')).toBeNull();
     expect(editing).not.toHaveBeenCalledWith(true);
@@ -138,8 +139,26 @@ describe('anteprima prima della pubblicazione', () => {
     button('Azione').click();expect(updated).toBe('::: azione\nDescrivi cosa fa il personaggio.\n:::');
     const source='Prima.\r\n\r\nCiao.\r\n\r\nDopo.';
     fixture.componentRef.setInput('source',source);fixture.detectChanges();await fixture.whenStable();
-    const start=source.indexOf('Ciao.');area.setSelectionRange(start,start+5);
+    const start=area.value.indexOf('Ciao.');area.setSelectionRange(start,start+5);
     button('Nota').click();expect(updated).toBe('Prima.\r\n\r\n::: nota\nCiao.\n:::\r\n\r\nDopo.');
+  });
+  it('conserva ID diversi nascosti durante scrittura, nuovi inserimenti e apertura dei campi della lettera', async () => {
+    const {fixture,button}=setup('::: dialogo Ada | | ada-2\nCiao.\n:::');
+    fixture.componentRef.setInput('characters',[{id:'ada-1',name:'Ada',portrait:'/assets/a.webp'},{id:'ada-2',name:'Ada',portrait:'/assets/b.webp'}]);
+    let saved='';fixture.componentInstance.sourceChange.subscribe(value=>{saved=value;fixture.componentRef.setInput('source',value);});
+    fixture.detectChanges();await fixture.whenStable();
+    const area=fixture.nativeElement.querySelector('.source-pane textarea') as HTMLTextAreaElement;
+    expect(area.value).toBe('::: dialogo Ada\nCiao.\n:::');
+    area.value=area.value.replace('Ciao.','Una nuova battuta.');area.dispatchEvent(new Event('input'));fixture.detectChanges();await fixture.whenStable();
+    expect(parseNarrative(saved).sections[0].characterId).toBe('ada-2');
+    area.setSelectionRange(area.value.length,area.value.length);button('Pensiero').click();fixture.detectChanges();
+    await vi.waitFor(()=>{fixture.detectChanges();expect(area.value).toContain('::: pensiero Ada');});
+    expect(area.value).not.toContain('ada-');expect(area.value).not.toContain('|');
+    expect(parseNarrative(saved).sections.map(s=>s.characterId)).toEqual(['ada-2','ada-1']);
+    area.setSelectionRange(area.value.length,area.value.length);button('Lettera / Messaggio').click();fixture.detectChanges();
+    await vi.waitFor(()=>{fixture.detectChanges();expect(fixture.nativeElement.querySelector('[id$="-format"]')).not.toBeNull();});
+    expect((fixture.nativeElement.querySelector('.inline-editor textarea') as HTMLTextAreaElement).value).toBe('Scrivi qui la lettera.');
+    expect(parseNarrative(saved).sections.map(s=>s.characterId)).toEqual(['ada-2','ada-1','']);
   });
   it('offre gli stessi strumenti per il testo iniziale e per il seguito del master',()=>{
     const {fixture}=setup('');fixture.componentRef.setInput('allowImages',true);fixture.componentRef.setInput('document',true);fixture.detectChanges();

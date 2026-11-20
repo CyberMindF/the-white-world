@@ -8,6 +8,7 @@ import { BLOCK_TYPES, SNIPPET_LABELS } from '../gdr-blocks/gdr-snippets';
 import { GdrImageLibrary, GdrLibraryImage } from '../gdr-characters/gdr-image-library';
 
 import { NarrativeCharacter, narrativeSnippet, replaceNarrativeSelection } from '../gdr-turn/gdr-writing';
+import { storedSourceOffset, updateVisibleNarrativeSource, visibleNarrativeSource, visibleSourceOffset } from '../gdr-turn/gdr-visible-source';
 export type { NarrativeCharacter } from '../gdr-turn/gdr-writing';
 @Component({
   selector: 'app-gdr-source-editor',
@@ -47,6 +48,10 @@ export class GdrSourceEditor {
   );
   protected readonly blockTypes = BLOCK_TYPES;
   protected readonly snippetLabels = SNIPPET_LABELS;
+  protected readonly visibleSource = computed(() => visibleNarrativeSource(this.source(), this.characterRoster().length ? this.characterRoster() : this.characters()));
+  protected updateSource(value: string): void {
+    this.sourceChange.emit(updateVisibleNarrativeSource(this.visibleSource(), value, this.characterRoster().length ? this.characterRoster() : this.characters()));
+  }
 
   constructor() {
     effect(() => {
@@ -117,9 +122,10 @@ export class GdrSourceEditor {
       return;
     }
     const text = this.source();
-    const start = area.selectionStart ?? text.length;
-    const end = area.selectionEnd ?? start;
-    const selected = text.slice(start, end);
+    const view = this.visibleSource();
+    const start = storedSourceOffset(view, area.selectionStart ?? view.text.length);
+    const end = storedSourceOffset(view, area.selectionEnd ?? area.selectionStart ?? view.text.length);
+    const selected = area.value.slice(area.selectionStart, area.selectionEnd);
     const character = this.characters()[this.characterIndex()] ?? this.characters()[0];
     if (['dialogo', 'pensiero'].includes(type) && !character && !this.allowGeneric()) return;
     const snippet = customSnippet ?? narrativeSnippet(type, selected, character);
@@ -134,10 +140,11 @@ export class GdrSourceEditor {
     const contentOffset = fenced ? snippet.indexOf('\n') + 1 : heading ? snippet.indexOf(' ') + 1 : type === 'emphasis' ? 1 : 0;
     const contentLength = fenced ? snippet.lastIndexOf('\n') - contentOffset : type === 'emphasis' ? snippet.length - 2 : snippet.length - contentOffset;
     const opensInlineEditor = ['lettera', 'messaggio', 'npc_grid', 'npc_full'].includes(type);
+    const nextView = visibleNarrativeSource(replacement.source, this.characterRoster().length ? this.characterRoster() : this.characters());
     updateGdrTextarea(area, () => {
       this.sourceChange.emit(replacement.source);
       this.setMode(opensInlineEditor ? 'preview' : this.mode() === 'preview' ? 'split' : this.mode());
-    }, replacement.start + contentOffset, replacement.start + contentOffset + contentLength);
+    }, visibleSourceOffset(nextView, replacement.start + contentOffset), visibleSourceOffset(nextView, replacement.start + contentOffset + contentLength));
     if(opensInlineEditor)requestAnimationFrame(()=>this.narrativeEditor()?.startEditing({start:replacement.start,end:replacement.end}));
   }
 }

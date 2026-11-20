@@ -89,12 +89,27 @@ describe('modifica di lettere, messaggi e pensieri', () => {
   it('mostra il pensiero in corsivo con il personaggio corrente e modifica solo il corpo', async () => {
     const { fixture, root, button } = setup('::: pensiero Vecchio | | ada\nMeglio tacere.\n:::');
     fixture.componentRef.setInput('characters', [{ id: 'ada', name: 'Ada', portrait: '/assets/a.webp' }]); fixture.detectChanges();
-    expect(root.querySelector('.thought-heading')?.textContent).toContain('Ada · Pensiero');
+    expect(root.querySelector('.thought .speaker')?.textContent).toContain('Ada');
+    expect(root.querySelector('.thought')?.textContent).not.toContain('Pensiero');
+    expect(root.querySelector('.thought .speaker img')?.getAttribute('src')).toBe('/assets/a.webp');
+    expect(root.querySelector('.thought .cloud-outline')).not.toBeNull();
     expect(root.querySelector('.thought em')?.textContent).toBe('Meglio tacere.');
     (root.querySelector('[aria-label="Modifica pensiero"]') as HTMLButtonElement).click(); fixture.detectChanges(); await fixture.whenStable();
     const body = root.querySelector('textarea') as HTMLTextAreaElement;
     expect(body.value).toBe('Meglio tacere.'); body.value = 'Devo parlare.'; body.dispatchEvent(new Event('input')); fixture.detectChanges();
     const save = vi.fn(); fixture.componentInstance.sourceChange.subscribe(save); button('Applica al testo').click();
     expect(save).toHaveBeenCalledWith('::: pensiero Ada |  | ada\nDevo parlare.\n:::');
+  });
+
+  it('nasconde i riferimenti anche nei blocchi misti della modifica rapida', async () => {
+    const {fixture,root,button}=setup('Prima.');
+    fixture.componentRef.setInput('characters',[{id:'ada-1',name:'Ada',portrait:''},{id:'ada-2',name:'Ada',portrait:'/assets/b.webp'}]);fixture.detectChanges();
+    button('✎ Modifica paragrafo').click();fixture.detectChanges();await fixture.whenStable();
+    const body=root.querySelector('textarea') as HTMLTextAreaElement;
+    body.value='Prima.\n\n::: pensiero Ada | | ada-2\nMeglio tacere.\n:::';body.dispatchEvent(new Event('input'));fixture.detectChanges();await fixture.whenStable();
+    expect(body.value).not.toContain('ada-2');expect(body.value).not.toContain('|');
+    body.value=body.value.replace('Meglio tacere.','Meglio parlare.');body.dispatchEvent(new Event('input'));fixture.detectChanges();
+    const save=vi.fn();fixture.componentInstance.sourceChange.subscribe(save);button('Applica al testo').click();
+    expect(parseNarrative(save.mock.calls[0][0]).sections[1]).toMatchObject({characterId:'ada-2',text:'Meglio parlare.'});
   });
 });
