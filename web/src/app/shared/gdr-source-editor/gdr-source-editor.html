@@ -11,6 +11,7 @@
       }
       <select
         [id]="editorId() + '-voice'"
+        [disabled]="inlineEditing()"
         [ngModel]="characterIndex()"
         (ngModelChange)="characterIndex.set(+$event)"
       >
@@ -29,7 +30,7 @@
       <button
         class="btn"
         type="button"
-        [disabled]="!characters().length && !allowGeneric()"
+        [disabled]="inlineEditing() || (!characters().length && !allowGeneric())"
         (click)="insert('dialogo', sourceArea)"
       >
         Dialogo

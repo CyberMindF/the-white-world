@@ -85,8 +85,12 @@ try {
       assert.ok((await area.inputValue()).includes('## Titolo riscritto'));
       await area.fill(longText);before=await placeSelection(area);
       await editor.getByRole('button',{name:'Dialogo',exact:true}).click();
-      after=await assertPosition(area,before,`${width}px ${mode} dialogo`);
+      const dialogue=editor.locator('.inline-editor textarea');await dialogue.waitFor();await settled();
+      assert.equal(await dialogue.inputValue(),'Riga 010');
+      assert.equal(await dialogue.evaluate(a=>document.activeElement===a),true);
       assert.ok((await area.inputValue()).includes('::: dialogo Daisy'));
+      assert.ok(!(await dialogue.inputValue()).includes('daisy'));
+      await dialogue.fill('Battuta riscritta.');await editor.getByRole('button',{name:'Applica al testo',exact:true}).click();
     }
   }
   await editor.getByRole('button',{name:'Solo testo',exact:true}).click();

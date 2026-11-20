@@ -43,7 +43,9 @@ function serializeBlock(block: GdrBlockRow): string {
     case 'npc_grid': {
       const data = block.data as GdrNpcGridData;
       const entries = data.entries
-        .map((entry) => `- image: ${entry.image}\n  alt: ${entry.alt}\n  name: ${entry.name}\n  description: ${entry.description}${entry.characterId ? `\n  characterId: ${entry.characterId}` : ''}`)
+        .map((entry) => entry.characterId && !entry.image
+          ? `- characterId: ${entry.characterId}\n  name: ${entry.name}${entry.description?'\n  description: '+entry.description.replace(/\r?\n/g,'\n    '):''}`
+          : `- image: ${entry.image}\n  alt: ${entry.alt}\n  name: ${entry.name}\n  description: ${entry.description.replace(/\r?\n/g,'\n    ')}${entry.characterId ? `\n  characterId: ${entry.characterId}` : ''}`)
         .join('\n');
       return `::: npc${data.layout === 'full' ? ' full' : ''}\n${entries}\n:::`;
     }

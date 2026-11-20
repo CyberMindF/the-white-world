@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GdrSourceEditor } from './gdr-source-editor';
 import { GdrTurn } from '../gdr-turn/gdr-turn';
 import { parseNarrative } from '../gdr-turn/gdr-turn.parser';
@@ -57,6 +57,23 @@ describe('anteprima prima della pubblicazione', () => {
     area.setSelectionRange(0,4);
     button('Dialogo').click(); fixture.detectChanges();
     expect(updated).toContain('::: dialogo Ada\nCiao\n:::');
+  });
+  it('dal comando Dialogo apre solo le parole e mantiene nascosto il riferimento scelto',async()=>{
+    const {fixture,button}=setup('Ciao');
+    fixture.componentRef.setInput('characters',[{id:'ada-1',name:'Ada',portrait:'/assets/ada.webp'},{id:'ada-2',name:'Ada',portrait:'/assets/other.webp'}]);
+    let saved='';fixture.componentInstance.sourceChange.subscribe(value=>{saved=value;fixture.componentRef.setInput('source',value);});
+    fixture.detectChanges();await fixture.whenStable();
+    const source=fixture.nativeElement.querySelector('.source-pane textarea') as HTMLTextAreaElement;source.setSelectionRange(0,4);
+    button('Dialogo').click();fixture.detectChanges();
+    await vi.waitFor(()=>{fixture.detectChanges();expect(fixture.nativeElement.querySelector('.inline-editor textarea')).not.toBeNull();});
+    await fixture.whenStable();fixture.detectChanges();
+    const area=fixture.nativeElement.querySelector('.inline-editor textarea') as HTMLTextAreaElement;
+    expect(area.value).toBe('Ciao');expect(saved).not.toContain('/assets/');expect(saved).toContain('ada-1');
+    expect(fixture.nativeElement.querySelector('.source-pane').hidden).toBe(true);
+    const select=fixture.nativeElement.querySelector('.inline-editor select[id$="-voice"]') as HTMLSelectElement;
+    select.selectedIndex=1;select.dispatchEvent(new Event('change'));fixture.detectChanges();
+    area.value='Nuova battuta';area.dispatchEvent(new Event('input'));fixture.detectChanges();button('Applica al testo').click();fixture.detectChanges();
+    expect(parseNarrative(saved).sections[0]).toMatchObject({characterId:'ada-2',speaker:'Ada',portrait:'',text:'Nuova battuta'});
   });
   it('offre l’impaginazione solo al master e converte la selezione in titoli o riquadri validi', async () => {
     const {fixture,button}=setup('Un incontro');

@@ -50,15 +50,20 @@ describe('inserimento nel racconto', () => {
     const position = spaced.indexOf('Vecchio.');
     expect(replaceNarrativeSelection(spaced, position, position + 8, 'Nuovo.').source).toBe('Prima.\n\n\n\nNuovo.\n\nDopo.');
   });
-  it('inserisce un vero blocco PNG a tutta pagina, con foto completa e metadati conservati nel salvataggio', () => {
+  it('inserisce un PNG collegato senza copiare immagine o descrizione dal personaggio', () => {
     const source = narrativeSnippet('npc_full', '', {id:'shivay',kind:'png',name:'Shivay Lorenne',photo:'/assets/intera.webp',portrait:'/assets/avatar.webp',description:'Una compagna di scuola.'});
     const result = parseNarrative(source);
     expect(result.errors).toEqual([]);
-    expect(result.sections[0].blocks[0]).toMatchObject({type:'npc_grid',data:{layout:'full',entries:[{characterId:'shivay',name:'Shivay Lorenne',alt:'Shivay Lorenne',image:'/assets/intera.webp',description:'Una compagna di scuola.'}]}});
-    expect(source).not.toContain('/assets/avatar.webp');
+    expect(result.sections[0].blocks[0]).toMatchObject({type:'npc_grid',data:{layout:'full',entries:[{characterId:'shivay',name:'Shivay Lorenne',alt:'Shivay Lorenne',image:'',description:''}]}});
+    expect(source).not.toContain('/assets/');
     expect(serializeGdrBlocks(result.sections[0].blocks)).toBe(source);
     expect(narrativeSnippet('npc_full','',{kind:'pg',name:'Daisy',photo:'/assets/intera.webp',portrait:''})).toBe('');
     expect(narrativeSnippet('npc_full','',{kind:'png',name:'Shivay',portrait:'/assets/avatar.webp'})).toBe('');
+  });
+  it('conserva l’ID scelto e non serializza il ritratto nel nuovo dialogo',()=>{
+    const source=narrativeSnippet('dialogo','Ciao.',{id:'ada-1',name:'Ada',portrait:'/assets/avatar.webp'});
+    expect(parseNarrative(source).sections[0]).toMatchObject({characterId:'ada-1',speaker:'Ada',portrait:'',text:'Ciao.'});
+    expect(source).not.toContain('/assets/');
   });
   it('usa la stessa sintassi e la voce scelta in entrambi gli editor', () => {
     const snippet = narrativeSnippet('dialogo', 'Le mie parole.', {

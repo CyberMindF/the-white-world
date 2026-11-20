@@ -168,15 +168,46 @@ describe('nomi correnti nei blocchi esistenti', () => {
   fixture.componentRef.setInput('characterRoster', [{id:'pg-1',name:'Nuovo',portrait:''}]); fixture.detectChanges();
   expect(fixture.nativeElement.querySelector('.speaker img')).toBeNull();
  });
- it('non associa per nome un blocco privo di ID, nemmeno con una corrispondenza univoca', () => {
+ it('riconosce un nome scritto a mano solo quando identifica un unico personaggio', () => {
   const {fixture} = setup('::: dialogo Daisy\nCiao.\n:::');
   fixture.componentRef.setInput('characterRoster', [{id:'1',baseName:'Daisy',name:'Daisy Nuova',portrait:''}]); fixture.detectChanges();
-  expect(fixture.nativeElement.querySelector('.speaker').textContent).not.toContain('Daisy Nuova');
+  expect(fixture.nativeElement.querySelector('.speaker').textContent).toContain('Daisy Nuova');
  });
  it('conserva il nome in caso di omonimi senza indizi univoci', () => {
   const {fixture} = setup('::: dialogo Daisy\nCiao.\n:::');
   fixture.componentRef.setInput('characterRoster', [{id:'1',baseName:'Daisy',name:'Daisy Uno',portrait:''},{id:'2',baseName:'Daisy',name:'Daisy Due',portrait:''}]); fixture.detectChanges();
   expect(fixture.nativeElement.querySelector('.speaker').textContent).not.toContain('Daisy Uno');
   expect(fixture.nativeElement.querySelector('.speaker').textContent).not.toContain('Daisy Due');
+  expect(fixture.nativeElement.querySelector('.portrait-trigger')).toBeNull();
+  fixture.componentRef.setInput('editable',false);fixture.detectChanges();
+  expect(fixture.nativeElement.querySelector('.speaker button')).toBeNull();
+ });
+ it('un riferimento eliminato non viene ricollegato a un omonimo',()=>{
+  const {fixture}=setup('::: dialogo Ada | /assets/old.webp | deleted-id\nCiao.\n:::');
+  fixture.componentRef.setInput('characterRoster',[{id:'other-id',name:'Ada',portrait:'/assets/other.webp'}]);fixture.detectChanges();
+  expect(fixture.nativeElement.querySelector('.speaker img')).toBeNull();
+  expect(fixture.nativeElement.querySelector('.portrait-trigger')).toBeNull();
+ });
+ it('nel blocco dialogo modifica solo le parole e cambia il personaggio mantenendo l’ID corretto',async()=>{
+  const {fixture,buttons}=setup('Prima.\n\n::: dialogo Ada | /assets/old.webp | ada-1\nCiao.\n:::\n\nDopo.');
+  fixture.componentRef.setInput('characters',[{id:'ada-1',name:'Ada',portrait:'/assets/a.webp'},{id:'ada-2',name:'Ada',portrait:'/assets/b.webp'}]);fixture.detectChanges();
+  fixture.nativeElement.querySelector('button.edit-speaker').click();fixture.detectChanges();await fixture.whenStable();
+  const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
+  expect(area.value).toBe('Ciao.');
+  const selector=fixture.nativeElement.querySelector('select[id$="-voice"]') as HTMLSelectElement;
+  selector.selectedIndex=1;selector.dispatchEvent(new Event('change'));fixture.detectChanges();
+  area.value='Una nuova battuta.';area.dispatchEvent(new Event('input'));fixture.detectChanges();
+  const saved=vi.fn();fixture.componentInstance.sourceChange.subscribe(saved);buttons('Applica al testo')[0].click();
+  expect(saved).toHaveBeenCalledWith('Prima.\n\n::: dialogo Ada |  | ada-2\nUna nuova battuta.\n:::\n\nDopo.');
+ });
+ it('rilegge la foto attuale del PNG dal riferimento e nasconde i metadati nella modifica',async()=>{
+  const {fixture}=setup('::: npc\n- characterId: npc-1\n  name: Vecchio nome\n:::');
+  fixture.componentRef.setInput('characterRoster',[{id:'npc-1',name:'Ada Nuova',kind:'png',portrait:'',photo:'/assets/new.webp',description:'Descrizione corrente'}]);fixture.detectChanges();
+  expect(fixture.nativeElement.querySelector('.npc-card img').getAttribute('src')).toBe('/assets/new.webp');
+  expect(fixture.nativeElement.querySelector('.npc-card p').textContent).toBe('Descrizione corrente');
+  fixture.nativeElement.querySelector('button.gdr-edit-start').click();fixture.detectChanges();await fixture.whenStable();
+  expect(fixture.nativeElement.querySelector('textarea').value).toBe('');
+  fixture.componentRef.setInput('characterRoster',[{id:'npc-1',name:'Ada Nuova',kind:'png',portrait:'',photo:'/assets/replaced.webp',description:'Descrizione aggiornata'}]);fixture.detectChanges();
+  expect(fixture.componentInstance.source()).not.toContain('/assets/');
  });
 });

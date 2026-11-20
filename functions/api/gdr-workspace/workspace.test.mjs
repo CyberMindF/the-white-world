@@ -11,6 +11,21 @@ const revision=(sqlite,id)=>sqlite.prepare('SELECT revision FROM gdr_workspace_c
 const grant=(db,sqlite,id,rights={})=>mutate(db,master,{action:'grant',characterId:id,revision:revision(sqlite,id),userId:2,canSpeak:true,canEditSheet:false,canInventory:false,...rights});
 const denied=fn=>assert.rejects(fn,e=>e.status===403);
 
+test('blocchi PNG: il riferimento scelto riusa l’ID; riferimenti mancanti, di altre avventure e omonimi non creano collegamenti arbitrari',async()=>{
+  const {db,sqlite}=fixture();try{
+    await character(db);
+    for(const id of ['npc-one','npc-two'])await mutate(db,master,{action:'createCharacter',id,adventureId,kind:'png',name:'Ada'});
+    await mutate(db,master,{action:'createCharacter',id:'other-story',adventureId:'la-casa-che-trattiene-il-respiro',kind:'png',name:'Ada'});
+    const entries=[{characterId:'npc-one',name:'Ada Lorenne'},{characterId:'deleted',name:'Ada'},{characterId:'other-story',name:'Ada'},{name:'Ada',image:'/assets/old.webp',alt:'Ada',description:'Sconosciuta'}];
+    sqlite.prepare("INSERT INTO gdr_blocks(id,document_key,type,data,position) VALUES(99,'avventura','npc_grid',?,0)").run(JSON.stringify({entries}));
+    await mutate(db,master,{action:'syncLegacy',adventureId});
+    assert.deepEqual(sqlite.prepare("SELECT source_key,character_id FROM gdr_workspace_story_links WHERE source_key LIKE 'npc:%'").all().map(r=>({...r})),[{source_key:'npc:99:0',character_id:'npc-one'}]);
+    assert.equal(sqlite.prepare("SELECT count(*) n FROM gdr_workspace_characters WHERE kind='png'").get().n,3);
+    await mutate(db,master,{action:'syncLegacy',adventureId});
+    assert.equal(sqlite.prepare("SELECT count(*) n FROM gdr_workspace_story_links WHERE source_key LIKE 'npc:%'").get().n,1);
+  }finally{sqlite.close();}
+});
+
 test('solo il master crea avventure e PG, anche più PG assegnati allo stesso giocatore',async()=>{
   const {db,sqlite}=fixture();
   await denied(()=>mutate(db,member,{action:'createAdventure',id:'new',title:'Nuova'}));

@@ -5,7 +5,8 @@ import { updateGdrTextarea } from '../gdr-textarea';
 import { PROFILE_FIELDS } from '../gdr-characters/character-profile';
 import { GdrBlocks } from '../gdr-blocks/gdr-blocks';
 import { BLOCK_TYPES, SNIPPET_LABELS } from '../gdr-blocks/gdr-snippets';
-import { NarrativeCharacter, insertNarrativeBlock, narrativeSnippet, replaceNarrativeSelection } from './gdr-writing';
+import { NarrativeCharacter, findNarrativeCharacter, narrativeNameMatches, insertNarrativeBlock, narrativeSnippet, replaceNarrativeSelection } from './gdr-writing';
+import {CharacterDraft,readCharacterDraft,writeCharacterDraft} from './gdr-character-draft';
 import { NarrativeSection, parseNarrative, safeNarrativeImage } from './gdr-turn.parser';
 import { GdrBlockRow, GdrParagraphData } from '../gdr-blocks/gdr-block.types';
 import { serializeGdrBlocks } from '../gdr-blocks/gdr-markdown.serializer';
@@ -94,6 +95,7 @@ interface RenderedSection extends NarrativeSection {
           ><span>Solo questa parte del racconto.</span>
         </div>
         <div class="inline-tools">
+          @if(!characterDraft()){
           <label [for]="fieldId + '-type'">Inserisci</label>
           <select
             #snippetType
@@ -114,15 +116,17 @@ interface RenderedSection extends NarrativeSection {
             <option value="azione">Azione</option>
             <option value="nota">Fuori personaggio</option>
           </select>
+          }
           @if (characters().length) {
             <label [for]="fieldId + '-voice'">Personaggio</label>
             <select
               [id]="fieldId + '-voice'"
-              [ngModel]="voice()"
-              (ngModelChange)="voice.set(+$event)"
+              [ngModel]="selectedVoice()"
+              (ngModelChange)="setVoice(+$event)"
             >
+              @if(characterDraft() && selectedVoice()===-1){<option [ngValue]="-1">{{characterDraft()!.name}}</option>}
               @for (c of characters(); track $index) {
-                <option [ngValue]="$index">{{ c.name }}</option>
+                <option [ngValue]="$index" [disabled]="characterDraft()?.kind==='npc' && c.kind!=='png'">{{ c.name }}</option>
               }
             </select>
           }
@@ -134,6 +138,7 @@ interface RenderedSection extends NarrativeSection {
             </select>
           }
         </div>
+        @if(characterDraft()?.kind==='npc'){<p class="character-hint">Foto e dati provengono dal personaggio. Puoi aggiungere una descrizione per questa scena.</p>}
         <label class="sr-only" [for]="fieldId">{{
           inserting() ? 'Testo del nuovo blocco' : 'Testo del blocco selezionato'
         }}</label>
@@ -141,8 +146,8 @@ interface RenderedSection extends NarrativeSection {
           #inlineArea
           [id]="fieldId"
           rows="7"
-          [ngModel]="draft()"
-          (ngModelChange)="draft.set($event)"
+          [ngModel]="editorValue()"
+          (ngModelChange)="setEditorValue($event)"
           spellcheck="true"
         ></textarea>
         @if (draftParsed().errors.length) {
@@ -158,7 +163,7 @@ interface RenderedSection extends NarrativeSection {
         <div class="inline-actions">
           <button
             type="button"
-            [disabled]="!!deleting() || (inserting() && !draft().trim()) || draftParsed().errors.length > 0"
+            [disabled]="!!deleting() || (inserting() && !draft().trim()) || emptyDialogue() || draftParsed().errors.length > 0"
             (click)="apply()"
           >
             {{ inserting() ? 'Aggiungi al racconto' : 'Applica al testo' }}</button
@@ -189,7 +194,7 @@ interface RenderedSection extends NarrativeSection {
         }
         @if (preview()) {
           <div class="inline-preview">
-            @for (section of draftParsed().sections; track section.id) {
+            @for (section of resolvedDraft(); track section.id) {
               <ng-container
                 *ngTemplateOutlet="content; context: { $implicit: section, canEdit: false }"
               />
@@ -204,8 +209,9 @@ interface RenderedSection extends NarrativeSection {
           <app-gdr-blocks [blocks]="section.blocks" (characterOpen)="openNpc($event)" />
         }
         @case ('dialogo') {
-          <div class="dialogue">
+          <div class="dialogue" [class.unlinked]="!canOpenCharacter(section)">
             <div class="speaker">
+              @if(canOpenCharacter(section)){
               <button type="button" class="view-character portrait-trigger" aria-label="Apri scheda personaggio" (click)="openCharacter(section)">
               @if (section.portrait) {
                 <img [src]="section.portrait" alt="" loading="lazy" />
@@ -215,12 +221,15 @@ interface RenderedSection extends NarrativeSection {
                 }}</span>
               }
               </button>
+              }
               @if (canEdit) {
                 <button type="button" class="edit-speaker" (click)="startEditing(section)">
                   {{ section.speaker || 'Personaggio' }} <span aria-hidden="true">✎</span>
                 </button>
-              } @else {
+              } @else if(canOpenCharacter(section)) {
                 <button type="button" class="view-character name-trigger" (click)="openCharacter(section)">{{ section.speaker || 'Personaggio' }}</button>
+              } @else {
+                <span class="name-trigger">{{section.speaker || 'Personaggio'}}</span>
               }
             </div>
             <p>{{ section.text }}</p>
@@ -269,6 +278,8 @@ interface RenderedSection extends NarrativeSection {
     .view-character { background: transparent; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; }
     .speaker > .portrait-trigger { grid-column: 1; grid-row: 1 / span 2; width:40px; height:40px; min-width:0; min-height:0; border-radius:50%; }
     .speaker > .name-trigger { grid-column:2; font-weight:600; line-height:1.4; }
+    .dialogue.unlinked{grid-template-columns:minmax(0,1fr)}
+    .dialogue.unlinked .speaker > .name-trigger,.dialogue.unlinked > p{grid-column:1}
     .character-backdrop { position:fixed; inset:0; z-index:1500; background:rgb(20 18 16 / .65); backdrop-filter:blur(6px); display:grid; place-items:center; padding:24px; }
     .character-modal { width:min(900px,100%); max-height:90dvh; overflow:auto; background:var(--bg-color, #f7f4ee); color:var(--text-color); border:1px solid var(--border-color); border-radius:20px; box-shadow:0 24px 80px #0005; }
     .character-modal header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:20px 24px; border-bottom:1px solid var(--border-color); }
@@ -399,6 +410,7 @@ interface RenderedSection extends NarrativeSection {
       font-size: 0.8rem;
       color: var(--muted-color);
     }
+    .character-hint{padding:0 .8rem;font-size:.85rem;color:var(--muted-color)}
     textarea {
       display: block;
       width: 100%;
@@ -485,8 +497,11 @@ export class GdrTurn {
   protected readonly identityFields = PROFILE_FIELDS.filter(field => ['surname','race','age'].includes(field.key));
   protected readonly profileFields = PROFILE_FIELDS.filter(field => ['appearance','history'].includes(field.key));
   private findCharacter(roster: NarrativeCharacter[], id: string | undefined, name: string): NarrativeCharacter | undefined {
-    const normalize = (value: string) => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
-    return roster.find(c => !!id && c.id === id) ?? roster.find(c => normalize(c.name) === normalize(name) || (!!c.baseName && normalize(c.baseName) === normalize(name)));
+    return findNarrativeCharacter(roster,id,name);
+  }
+  protected canOpenCharacter(section:NarrativeSection):boolean{
+    const roster=this.characterRoster().length?this.characterRoster():this.characters();
+    return !!this.findCharacter(roster,section.characterId,section.speaker)||(!section.characterId&&!!section.portrait);
   }
   protected openNpc(entry: import('../gdr-blocks/gdr-block.types').GdrNpcEntry): void {
     const roster = this.characterRoster().length ? this.characterRoster() : this.characters();
@@ -544,24 +559,28 @@ export class GdrTurn {
             : [section],
         );
   });
-  protected readonly rendered = computed(() => {
+  private resolveSections<T extends NarrativeSection>(sections:T[]):T[] {
     const roster = this.characterRoster().length ? this.characterRoster() : this.characters();
-    const resolve = (id: string | undefined) => id ? roster.find(c => c.id === id) : undefined;
-    return this.rawRendered().map(section => {
+    const resolve = (id: string | undefined,name:string) => this.findCharacter(roster,id,name);
+    return sections.map(section => {
       if (section.kind === 'dialogo') {
-        const character = resolve(section.characterId);
-        return character ? {...section, speaker: character.name, portrait: safeNarrativeImage(character.portrait)} : section;
+        const character = resolve(section.characterId,section.speaker);
+        return character ? {...section, characterId:character.id, speaker: character.name, portrait: safeNarrativeImage(character.portrait)} :
+          (section.characterId||narrativeNameMatches(roster,section.speaker).length>1?{...section,portrait:''}:section);
       }
       return {...section, blocks: section.blocks.map(block => {
         if (block.type !== 'npc_grid') return block;
         const data = block.data as import('../gdr-blocks/gdr-block.types').GdrNpcGridData;
         return {...block, data: {...data, entries: data.entries.map(entry => {
-          const character = resolve(entry.characterId);
-          return character ? {...entry, name: character.name, alt: entry.alt === entry.name ? character.name : entry.alt} : entry;
+          const character = resolve(entry.characterId,entry.name);
+          return character ? {...entry,characterId:character.id,name:character.name,alt:character.name,
+            image:safeNarrativeImage(character.photo??''),description:entry.description||character.description||''} :
+            (entry.characterId||narrativeNameMatches(roster,entry.name).length>1?{...entry,characterId:undefined,image:'',description:''}:entry);
         })}};
       })};
     });
-  });
+  }
+  protected readonly rendered = computed(() => this.resolveSections(this.rawRendered()));
   protected readonly deleting = signal<(Pick<RenderedSection, 'start' | 'end' | 'ownerId' | 'ownerStart' | 'ownerEnd' | 'persistentId'> & {snapshot:string}) | null>(null);
   protected readonly canDelete = computed(() => {
     const current = this.editing();
@@ -593,7 +612,29 @@ export class GdrTurn {
   }
   protected readonly inserting = computed(() => this.editing()?.inserting === true);
   protected readonly draft = signal('');
+  protected readonly characterDraft=signal<CharacterDraft|null>(null);
+  protected readonly editorValue=computed(()=>this.characterDraft()?.body??this.draft());
+  protected readonly emptyDialogue=computed(()=>this.characterDraft()?.kind==='dialogo'&&!this.editorValue().trim());
+  protected readonly selectedVoice=computed(()=>{
+    const draft=this.characterDraft();if(!draft)return this.voice();
+    const character=this.findCharacter(this.characters(),draft.characterId,draft.name);
+    return character?this.characters().indexOf(character):-1;
+  });
+  private setDraft(value:string):void{this.draft.set(value);this.characterDraft.set(readCharacterDraft(value));}
+  protected setEditorValue(value:string):void{
+    const current=this.characterDraft();
+    if(current){const next={...current,body:value};this.characterDraft.set(next);this.draft.set(writeCharacterDraft(next,this.characterRoster().length?this.characterRoster():this.characters()));}
+    else this.setDraft(value);
+  }
+  protected setVoice(index:number):void{
+    this.voice.set(index);
+    const current=this.characterDraft(),character=this.characters()[index];
+    if(!current||!character||(current.kind==='npc'&&character.kind!=='png'))return;
+    const next={...current,characterId:character.id,name:character.name,portrait:character.portrait};
+    this.characterDraft.set(next);this.draft.set(writeCharacterDraft(next,[character]));
+  }
   protected readonly draftParsed = computed(() => parseNarrative(this.draft()));
+  protected readonly resolvedDraft=computed(()=>this.resolveSections(this.draftParsed().sections));
   protected readonly npcLayout = computed(() => {
     const parsed = this.draftParsed();
     if (parsed.errors.length || parsed.sections.length !== 1) return null;
@@ -606,8 +647,7 @@ export class GdrTurn {
     const area = this.area?.nativeElement;
     if (!area) return;
     const current = this.draft(), next = current.replace(/^::: npc(?: full)?(?=\r?$)/m, layout === 'full' ? '::: npc full' : '::: npc');
-    const delta = next.length - current.length;
-    updateGdrTextarea(area, () => this.draft.set(next), Math.max(0, area.selectionStart + delta), Math.max(0, area.selectionEnd + delta));
+    updateGdrTextarea(area, () => this.setDraft(next), area.selectionStart, area.selectionEnd);
   }
   protected readonly preview = signal(false);
   protected readonly message = signal('');
@@ -648,7 +688,7 @@ export class GdrTurn {
     if (!this.editable() || !this.insertable() || this.editing() || this.deleting()) return;
     const owner=this.rendered().find(section=>section.ownerId && offset>section.ownerStart! && offset<section.ownerEnd!);
     this.editing.set({ start: offset, end: offset, snapshot: this.source(), inserting: true,anchor,...(owner?{ownerId:owner.ownerId,ownerStart:owner.ownerStart,ownerEnd:owner.ownerEnd}:{}) });
-    this.draft.set('');
+    this.setDraft('');
     this.preview.set(false);
     this.message.set('');
     this.editingChange.emit(true);
@@ -667,12 +707,12 @@ export class GdrTurn {
       this.characters()[this.voice()] ?? this.characters()[0],
     );
     if (!snippet) {
-      if (type === 'npc_grid' || type === 'npc_full') this.message.set('Scegli un PNG con una foto completa nel menu Personaggio.');
+      if (type === 'npc_grid' || type === 'npc_full') this.message.set('Scegli un PNG nel menu Personaggio.');
       return;
     }
     this.message.set('');
     const replacement = replaceNarrativeSelection(this.draft(), start, end, snippet);
-    updateGdrTextarea(area, () => this.draft.set(replacement.source), replacement.start, replacement.end);
+    updateGdrTextarea(area, () => this.setDraft(replacement.source), readCharacterDraft(replacement.source)?0:replacement.start,readCharacterDraft(replacement.source)?.body.length??replacement.end);
   }
 
   public startEditing(range: { start: number; end: number; ownerId?:string; ownerStart?:number; ownerEnd?:number }): void {
@@ -683,7 +723,7 @@ export class GdrTurn {
     }
     const section = this.rendered().find(section => section.start === range.start && section.end === range.end);
     this.editing.set({ ...section, ...range, snapshot: this.source() });
-    this.draft.set(this.source().slice(range.start, range.end));
+    this.setDraft(this.source().slice(range.start, range.end));
     this.preview.set(false);
     this.message.set('');
     this.editingChange.emit(true);
@@ -691,7 +731,7 @@ export class GdrTurn {
   }
   protected apply(): void {
     const current = this.editing();
-    if (!current || this.deleting() || (current.inserting && !this.draft().trim()) || this.draftParsed().errors.length)
+    if (!current || this.deleting() || this.emptyDialogue() || (current.inserting && !this.draft().trim()) || this.draftParsed().errors.length)
       return;
     if (current.snapshot !== this.source()) {
       this.message.set(

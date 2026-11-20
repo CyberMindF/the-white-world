@@ -227,10 +227,11 @@ function parseNpcEntries(
   const errors: GdrParseError[] = [];
   let current: Partial<GdrNpcEntry> | null = null;
   let currentLine = firstLineNo;
+  let descriptionLine = false;
 
   const flush = (lineNo: number) => {
     if (!current) return;
-    const missing = (['image', 'alt', 'name', 'description'] as const).filter(
+    const missing = (current.characterId ? ['name'] as const : ['image', 'alt', 'name', 'description'] as const).filter(
       (key) => !current![key],
     );
     if (missing.length > 0) {
@@ -239,7 +240,7 @@ function parseNpcEntries(
         message: `NPC alla riga ${currentLine}: manca il campo '${missing[0]}'.`,
       });
     } else {
-      entries.push(current as GdrNpcEntry);
+      entries.push({image:'',alt:current.name??'',description:'',...current} as GdrNpcEntry);
     }
     current = null;
   };
@@ -247,19 +248,24 @@ function parseNpcEntries(
   lines.forEach((rawLine, idx) => {
     const lineNo = firstLineNo + idx;
     const trimmed = rawLine.trim();
+    if(current&&descriptionLine&&/^\s{4}/.test(rawLine)){
+      current.description+='\n'+rawLine.slice(4);return;
+    }
     if (trimmed === '') return;
 
-    const entryStart = /^-\s*image:\s*(.*)$/.exec(trimmed);
+    const entryStart = /^-\s*(image|characterId):\s*(.*)$/.exec(trimmed);
     if (entryStart) {
       flush(lineNo);
       currentLine = lineNo;
-      current = { image: entryStart[1].trim() };
+      current = { [entryStart[1]]: entryStart[2].trim() };
+      descriptionLine=false;
       return;
     }
 
     const field = /^(alt|name|description|characterId):\s*(.*)$/.exec(trimmed);
     if (field && current) {
       (current as Record<string, string>)[field[1]] = field[2].trim();
+      descriptionLine=field[1]==='description';
       return;
     }
 

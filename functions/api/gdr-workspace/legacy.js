@@ -151,12 +151,22 @@ export async function syncLegacy(db, user, adventureId) {
           .first()
       )
         continue;
-      const existing = await db
+      // I nuovi blocchi riusano il personaggio scelto, senza importarne una copia.
+      if(npc.characterId){
+        const linked=await db.prepare("SELECT id FROM gdr_workspace_characters WHERE id=? AND adventure_id=? AND kind='png'")
+          .bind(npc.characterId,adventureId).first();
+        if(linked)await db.prepare('INSERT INTO gdr_workspace_story_links(adventure_id,source_key,character_id) VALUES(?,?,?) ON CONFLICT DO NOTHING')
+          .bind(adventureId,key,linked.id).run();
+        continue;
+      }
+      const matches = (await db
         .prepare(
-          "SELECT id FROM gdr_workspace_characters WHERE adventure_id=? AND kind='png' AND name=? ORDER BY created_at,id LIMIT 1",
+          "SELECT id FROM gdr_workspace_characters WHERE adventure_id=? AND kind='png' AND (lower(trim(name))=lower(trim(?)) OR lower(trim(name||' '||coalesce(json_extract(profile_json,'$.surname'),'')))=lower(trim(?))) ORDER BY created_at,id",
         )
-        .bind(adventureId, npc.name)
-        .first();
+        .bind(adventureId, npc.name,npc.name)
+        .all()).results;
+      if(matches.length>1)continue;
+      const existing=matches[0];
       const id = existing?.id ?? `story-npc-${block.id}-${i}`;
       await db.batch([
         db

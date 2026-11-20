@@ -85,10 +85,10 @@
     }
     @case ('npc_grid') {
       <div class="npc-grid" [class.npc-full]="asNpcGrid(block.data).layout === 'full'">
-        @for (entry of asNpcGrid(block.data).entries; track entry.name) {
+        @for (entry of asNpcGrid(block.data).entries; track $index) {
           <article class="npc-card card glass-surface">
-            <button class="image-trigger" type="button" [attr.aria-label]="'Apri scheda di ' + entry.name" (click)="openNpc(entry)"><img [src]="entry.image" [alt]="entry.alt" loading="lazy" /></button>
-            <h4><button class="image-trigger" type="button" (click)="openNpc(entry)">{{ entry.name }}</button></h4>
+            @if(entry.image){<button class="image-trigger" type="button" [attr.aria-label]="'Apri scheda di ' + entry.name" (click)="openNpc(entry)"><img [src]="entry.image" [alt]="entry.alt" loading="lazy" /></button>}
+            <h4>@if(entry.characterId||entry.image){<button class="image-trigger" type="button" (click)="openNpc(entry)">{{ entry.name }}</button>}@else{ {{entry.name}} }</h4>
             <p>{{ entry.description }}</p>
           </article>
         }

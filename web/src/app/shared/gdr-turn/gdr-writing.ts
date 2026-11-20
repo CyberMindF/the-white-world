@@ -13,13 +13,24 @@ export interface NarrativeCharacter {
   kind?: 'pg' | 'png';
 }
 
+export function narrativeNameMatches(roster:NarrativeCharacter[],name:string):NarrativeCharacter[]{
+  const normalize=(value:string)=>value.trim().replace(/\s+/g,' ').toLocaleLowerCase('it');
+  const exact=roster.filter(c=>normalize(c.name)===normalize(name));
+  return exact.length?exact:roster.filter(c=>c.baseName&&normalize(c.baseName)===normalize(name));
+}
+export function findNarrativeCharacter(roster: NarrativeCharacter[], id: string | undefined, name: string): NarrativeCharacter | undefined {
+  if(id)return roster.find(c=>c.id===id);
+  const matches=narrativeNameMatches(roster,name);
+  return matches.length===1?matches[0]:undefined;
+}
+
 export function narrativeSnippet(
   type: string,
   selected: string,
   character?: NarrativeCharacter,
 ): string {
   const name = (character?.name || 'Il mio personaggio').replace(/[|\r\n]/g, ' ').trim();
-  const portrait = safeNarrativeImage(character?.portrait ?? '');
+  const portrait = character?.id ? '' : safeNarrativeImage(character?.portrait ?? '');
   if (type === 'dialogo')
     return `::: dialogo ${name}${portrait || character?.id ? ' | ' + portrait : ''}${character?.id ? ' | ' + character.id : ''}\n${selected || 'Scrivi qui le sue parole.'}\n:::`;
   if (type === 'azione' || type === 'nota')
@@ -32,7 +43,9 @@ export function narrativeSnippet(
   if (type === 'list' && selected) return selected.split(/\r?\n/).filter(line => line.trim()).map(line => '- ' + line).join('\n');
   if (type === 'npc_grid' || type === 'npc_full') {
     const photo = safeNarrativeImage(character?.photo ?? '');
-    if (!photo || character?.kind !== 'png') return '';
+    if (character?.kind !== 'png') return '';
+    if(character.id)return `::: npc${type==='npc_full'?' full':''}\n- characterId: ${character.id}\n  name: ${name}${selected?'\n  description: '+selected.replace(/\r?\n/g,'\n    '):''}\n:::`;
+    if(!photo)return '';
     const description = (selected || character.description || 'Descrizione del personaggio.').replace(/[\r\n]+/g, ' ');
     return `::: npc${type === 'npc_full' ? ' full' : ''}\n- image: ${photo}\n  alt: ${name}\n  name: ${name}\n  description: ${description}${character.id ? '\n  characterId: ' + character.id : ''}\n:::`;
   }

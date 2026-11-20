@@ -19,7 +19,7 @@ for (const [id,name,kind] of [['daisy','Daisy','pg']]) {
   await mutate(harness.db,master,{action:'createCharacter',id,adventureId,name,kind,profile:{}});
 }
 await mutate(harness.db,master,{action:'createCharacter',id:'shivay',adventureId,kind:'png',name:'Shivay Lorenne',photo,portrait:avatar,profile:{appearance:'La compagna di Daisy.'}});
-harness.sqlite.prepare('INSERT INTO gdr_blocks VALUES(?,?,?,?,?)').run(123,'avventura','npc_grid',JSON.stringify(blocks[0].data),0);
+harness.sqlite.prepare('INSERT INTO gdr_blocks(id,document_key,type,data,position) VALUES(?,?,?,?,?)').run(123,'avventura','npc_grid',JSON.stringify(blocks[0].data),0);
 await mutate(harness.db,master,{action:'grant',characterId:'daisy',revision:1,userId:2,canSpeak:true,canEditSheet:true,canInventory:false});
 // Impedisce al sync storico di creare un secondo PG di prova.
 harness.sqlite.prepare("INSERT INTO gdr_workspace_story_links VALUES(?,'pg','daisy')").run(adventureId);
@@ -74,7 +74,10 @@ try {
   await editor.locator('select').first().selectOption({index:1});
   await editor.getByRole('button',{name:'PNG a tutta pagina',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('#lab-turn')?.value.startsWith('::: npc full'));
-  const draft=await area.inputValue();assert.ok(draft.startsWith('::: npc full'));assert.ok(draft.includes(photo));assert.equal(draft.includes(avatar),false);
+  const draft=await area.inputValue();assert.ok(draft.startsWith('::: npc full'));assert.ok(draft.includes('characterId: shivay'));assert.equal(draft.includes(photo),false);assert.equal(draft.includes(avatar),false);
+  const body=editor.locator('.inline-editor textarea');await body.waitFor();assert.equal(await body.inputValue(),'');
+  await body.fill('Una descrizione per questa scena.');await editor.getByRole('button',{name:'Applica al testo',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('#lab-turn')?.value.includes('Una descrizione per questa scena.'));
   assert.equal(await editor.locator('.image-picker').count(),0);
   user=2;await page.evaluate(()=>sessionStorage.setItem('gdr-test-user','2'));await page.reload();
   for(const width of [1280,390,320]) {

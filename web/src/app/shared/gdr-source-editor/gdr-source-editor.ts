@@ -36,6 +36,7 @@ export class GdrSourceEditor {
   protected readonly imagePickerOpen = signal(false);
   private readonly sourceArea = viewChild<ElementRef<HTMLTextAreaElement>>('sourceArea');
   private readonly previewPane = viewChild<ElementRef<HTMLElement>>('previewPane');
+  private readonly narrativeEditor = viewChild(GdrTurn);
   private scrollDriver: 'source' | 'preview' = 'source';
   private readonly syncedPositions = new WeakMap<HTMLElement, number>();
   private readonly parsed = computed(() => parseNarrative(this.source()));
@@ -122,7 +123,7 @@ export class GdrSourceEditor {
     if (type === 'dialogo' && !character && !this.allowGeneric()) return;
     const snippet = customSnippet ?? narrativeSnippet(type, selected, character);
     if (!snippet) {
-      if (type === 'npc_grid' || type === 'npc_full') this.voiceMessage.set('Scegli un PNG con una foto completa nel menu Personaggio.');
+      if (type === 'npc_grid' || type === 'npc_full') this.voiceMessage.set('Scegli un PNG nel menu Personaggio.');
       return;
     }
     this.voiceMessage.set('');
@@ -133,7 +134,8 @@ export class GdrSourceEditor {
     const contentLength = fenced ? snippet.lastIndexOf('\n') - contentOffset : type === 'emphasis' ? snippet.length - 2 : snippet.length - contentOffset;
     updateGdrTextarea(area, () => {
       this.sourceChange.emit(replacement.source);
-      this.setMode(this.mode() === 'preview' ? 'split' : this.mode());
+      this.setMode(['dialogo','npc_grid','npc_full'].includes(type)?'preview':this.mode() === 'preview' ? 'split' : this.mode());
     }, replacement.start + contentOffset, replacement.start + contentOffset + contentLength);
+    if(['dialogo','npc_grid','npc_full'].includes(type))requestAnimationFrame(()=>this.narrativeEditor()?.startEditing({start:replacement.start,end:replacement.end}));
   }
 }
