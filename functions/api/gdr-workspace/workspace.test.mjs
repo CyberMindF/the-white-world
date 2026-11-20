@@ -264,14 +264,16 @@ test('Stress e slot: aggiornamento immediato anche con caratteristiche bloccate 
 const savePet = (h, id, values={}) => mutate(h.db,master,{
  action:'saveCharacter',characterId:id,revision:revision(h.sqlite,id),name:id,portrait:'',sheet:'',...values,
 });
-test('pet: PNG canonico, lettura sulla scheda del PG senza accesso ai dati privati o nuovi permessi',async()=>{
+test('pet: PNG canonico, permessi ereditati dal PG senza creare nuove deleghe persistenti',async()=>{
  const h=apiHarness();await character(h.db,'daisy');await grant(h.db,h.sqlite,'daisy',{canEditSheet:true});
  await mutate(h.db,master,{action:'createCharacter',id:'sally',adventureId,kind:'png',name:'Sally',isPet:true,petOwnerId:'daisy',sheet:'Segreto',portrait:'/assets/sally.webp',profile:{appearance:'Gatta curiosa',history:'Finale segreto'}});
  let player=await (await h.call(2)).json();
- assert.deepEqual(player.characters.map(c=>c.id),['daisy']);assert.deepEqual(player.pets,[{id:'sally',ownerCharacterId:'daisy',name:'Sally',portrait:'/assets/sally.webp',photo:'',description:'Gatta curiosa'}]);
+ assert.deepEqual(player.characters.map(c=>c.id),['daisy','sally']);assert.deepEqual(player.pets,[{id:'sally',ownerCharacterId:'daisy',name:'Sally',portrait:'/assets/sally.webp',photo:'',description:'Gatta curiosa'}]);
+ const playerPet=player.characters.find(c=>c.id==='sally');assert.equal(playerPet.canSpeak,true);assert.equal(playerPet.canEditSheet,true);assert.equal(playerPet.canInventory,false);
  assert.equal(JSON.stringify(player.pets).includes('Segreto'),false);assert.deepEqual((await (await h.call(3)).json()).pets,[]);
  const masterPet=(await (await h.call(1)).json()).characters.find(c=>c.id==='sally');assert.equal(masterPet.isPet,true);assert.equal(masterPet.petOwnerId,'daisy');
- await denied(()=>mutate(h.db,member,{action:'saveCharacter',characterId:'sally',revision:masterPet.revision,name:'No',sheet:'',portrait:''}));
+ await mutate(h.db,member,{action:'saveCharacter',characterId:'sally',revision:masterPet.revision,name:'Sally aggiornata',sheet:'Tentativo',portrait:'',profile:{appearance:'Nuovo aspetto'}});
+ assert.equal(h.sqlite.prepare('SELECT sheet FROM gdr_workspace_characters WHERE id=?').get('sally').sheet,'Segreto');
  await denied(()=>mutate(h.db,member,{action:'saveCharacter',characterId:'daisy',revision:revision(h.sqlite,'daisy'),name:'Daisy',isPet:true,petOwnerId:'daisy'}));
  await savePet(h,'sally',{name:'Sally nuova',portrait:'/assets/new.webp'});
  player=await (await h.call(2)).json();assert.equal(player.pets[0].name,'Sally nuova');assert.equal(player.pets[0].portrait,'/assets/new.webp');assert.equal(player.pets[0].ownerCharacterId,'daisy');
@@ -285,6 +287,88 @@ test('pet: più compagni per PG, riassegnazione e revoca aggiornano la lettura d
  await savePet(h,'luna',{isPet:false,petOwnerId:null});assert.deepEqual((await (await h.call(2)).json()).pets,[]);
  await grant(h.db,h.sqlite,'other-pg');assert.equal((await (await h.call(2)).json()).pets[0].id,'sally');
  await grant(h.db,h.sqlite,'other-pg',{canSpeak:false});assert.deepEqual((await (await h.call(2)).json()).pets,[]);h.sqlite.close();
+});
+
+test('pet: eredita ogni combinazione di permessi, comprese immagini, risorse e poteri',async()=>{
+ const h=apiHarness();try{
+  h.sqlite.prepare('INSERT INTO gdr_character_schema(adventure,fields_json) VALUES(?,?)').run(adventureId,JSON.stringify([
+   {key:'stressCurrent',label:'Stress',type:'number',role:'resource',min:0,max:99,default:0},
+  ]));
+  await character(h.db,'daisy');
+  await mutate(h.db,master,{action:'createCharacter',id:'sally',adventureId,kind:'png',name:'Sally',isPet:true,petOwnerId:'daisy',sheet:'Indicazioni del master',profile:{abilities:'Abilità del master'}});
+  const image=new TextEncoder().encode('RIFF0000WEBPVP8 00000000');
+  for(let mask=0;mask<8;mask++){
+   const rights={canSpeak:!!(mask&1),canEditSheet:!!(mask&2),canInventory:!!(mask&4)};
+   await grant(h.db,h.sqlite,'daisy',rights);
+   const data=await (await h.call(2)).json(),pet=data.characters.find(c=>c.id==='sally');
+   assert.equal(!!pet,mask!==0);
+   if(pet){
+    for(const key of Object.keys(rights))assert.equal(pet[key],rights[key],key+' mask='+mask);
+    assert.equal(pet.canAdjustResources,rights.canSpeak||rights.canEditSheet);
+    assert.equal(pet.powers[0].description,'Abilità del master');
+   }
+   const save={action:'saveCharacter',characterId:'sally',revision:revision(h.sqlite,'sally'),name:'Sally '+mask,portrait:'',sheet:'Testo alterato',profile:{appearance:'Aspetto '+mask,abilities:'Tentativo'}};
+   assert.equal((await h.call(2,'POST',save)).status,rights.canEditSheet?200:403);
+   const items=[{id:'collar',name:'Collare',quantity:1,notes:''}];
+   assert.equal((await h.call(2,'POST',{action:'inventory',characterId:'sally',revision:revision(h.sqlite,'sally'),items})).status,rights.canInventory?200:403);
+   assert.equal((await h.upload(2,'sally','avatar',image)).status,rights.canEditSheet?201:403);
+   assert.equal((await h.call(2,'POST',{action:'adjustResource',characterId:'sally',revision:revision(h.sqlite,'sally'),fieldKey:'stressCurrent',delta:1})).status,(rights.canSpeak||rights.canEditSheet)?200:403);
+   const row=h.sqlite.prepare('SELECT * FROM gdr_workspace_characters WHERE id=?').get('sally');
+   assert.equal(row.sheet,'Indicazioni del master');assert.equal(JSON.parse(row.profile_json).abilities,'Abilità del master');
+   assert.equal(row.is_pet,1);assert.equal(row.pet_owner_id,'daisy');
+  }
+  assert.deepEqual((await (await h.call(3)).json()).characters,[]);
+  assert.equal((await h.upload(3,'sally','photo',image)).status,403);
+  await denied(()=>mutate(h.db,other,{action:'saveCharacter',characterId:'sally',revision:revision(h.sqlite,'sally'),name:'No'}));
+  assert.equal(h.sqlite.prepare("SELECT COUNT(*) n FROM gdr_workspace_grants WHERE character_id='sally'").get().n,0);
+ }finally{h.sqlite.close();}
+});
+
+test('pet: revoca, riassegnazione e archiviazione bloccano anche gli editor già aperti',async()=>{
+ for(const change of ['revoke','reassign','unset','unlink','archive-owner','delete-owner','archive-pet']){
+  const h=apiHarness();try{
+   await character(h.db,'daisy');await character(h.db,'other-pg');await character(h.db,'sally','png');
+   await grant(h.db,h.sqlite,'daisy',{canEditSheet:true,canInventory:true});
+   await mutate(h.db,master,{action:'grant',characterId:'other-pg',revision:revision(h.sqlite,'other-pg'),userId:3,canSpeak:true,canEditSheet:true,canInventory:true});
+   await savePet(h,'sally',{isPet:true,petOwnerId:'daisy'});
+   const rev=revision(h.sqlite,'sally');
+   if(change==='revoke')await grant(h.db,h.sqlite,'daisy',{canSpeak:false,canEditSheet:false,canInventory:false});
+   if(change==='reassign')await savePet(h,'sally',{petOwnerId:'other-pg'});
+   if(change==='unset')await savePet(h,'sally',{isPet:false,petOwnerId:null});
+   if(change==='unlink')await savePet(h,'sally',{petOwnerId:null});
+   if(change==='archive-owner'||change==='archive-pet'){
+    const id=change==='archive-owner'?'daisy':'sally';
+    await mutate(h.db,master,{action:'archive',characterId:id,revision:revision(h.sqlite,id),archived:true});
+   }
+   if(change==='delete-owner')await mutate(h.db,master,{action:'deleteCharacter',characterId:'daisy',revision:revision(h.sqlite,'daisy')});
+   assert.equal((await (await h.call(2)).json()).characters.some(c=>c.id==='sally'),false,change);
+   for(const action of ['saveCharacter','inventory']){
+    assert.equal((await h.call(2,'POST',{action,characterId:'sally',revision:rev,name:'Intruso',sheet:'',portrait:'',items:[]})).status,403,change+' '+action);
+   }
+   assert.equal((await h.upload(2,'sally','photo',new TextEncoder().encode('RIFF0000WEBPVP8 00000000'))).status,403,change);
+   assert.equal((await (await h.call(3)).json()).characters.some(c=>c.id==='sally'),change==='reassign',change);
+   if(change==='archive-owner'){
+    await mutate(h.db,master,{action:'archive',characterId:'daisy',revision:revision(h.sqlite,'daisy'),archived:false});
+    assert.equal((await (await h.call(2)).json()).characters.find(c=>c.id==='sally').canEditSheet,true);
+   }
+  }finally{h.sqlite.close();}
+ }
+});
+
+test('pet: tutti i giocatori del PG ereditano i permessi e le deleghe dirette si sommano',async()=>{
+ const h=apiHarness();try{
+  await character(h.db,'daisy');await character(h.db,'sally','png');await savePet(h,'sally',{isPet:true,petOwnerId:'daisy'});
+  await grant(h.db,h.sqlite,'sally',{canSpeak:true});
+  await grant(h.db,h.sqlite,'daisy',{canSpeak:false,canEditSheet:true,canInventory:true});
+  await mutate(h.db,master,{action:'grant',characterId:'daisy',revision:revision(h.sqlite,'daisy'),userId:3,canSpeak:true,canEditSheet:false,canInventory:false});
+  const petFor=async user=>(await (await h.call(user)).json()).characters.find(c=>c.id==='sally');
+  let pet=await petFor(2);assert.equal(pet.canSpeak,true);assert.equal(pet.canEditSheet,true);assert.equal(pet.canInventory,true);
+  pet=await petFor(3);assert.equal(pet.canSpeak,true);assert.equal(pet.canEditSheet,false);assert.equal(pet.canInventory,false);
+  await grant(h.db,h.sqlite,'daisy',{canSpeak:false,canEditSheet:false,canInventory:false});
+  pet=await petFor(2);assert.equal(pet.canSpeak,true);assert.equal(pet.canEditSheet,false);assert.equal(pet.canInventory,false);
+  await denied(()=>mutate(h.db,member,{action:'saveCharacter',characterId:'sally',revision:pet.revision,name:'No',portrait:'',sheet:''}));
+  await denied(()=>mutate(h.db,member,{action:'saveCharacter',characterId:'sally',revision:pet.revision,name:'No',isPet:true,petOwnerId:'daisy'}));
+ }finally{h.sqlite.close();}
 });
 test('pet: solo PNG, assegnazione a PG della stessa avventura e conflitti senza sovrascrittura',async()=>{
  const h=apiHarness();await character(h.db,'daisy');await character(h.db,'sally','png');await character(h.db,'npc','png');

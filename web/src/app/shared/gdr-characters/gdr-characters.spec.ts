@@ -232,4 +232,30 @@ describe('pet assegnati ai PG', () => {
   button('Modifica personaggio').click();fixture.detectChanges();
   expect(fixture.nativeElement.querySelector('#character-is-pet')).toBeNull();expect(fixture.nativeElement.querySelector('#sheet-field-catName')).toBeNull();
  });
+ it('la giocatrice apre il pet assegnato, lo interpreta e ne modifica il profilo senza comandi di assegnazione',async()=>{
+  const {workspace,fixture,button}=setup();workspace.isMaster.set(false);fixture.componentRef.setInput('managementMode',false);
+  workspace.characters.update(chars=>[...chars,{...character('sally','Sally'),kind:'png',isPet:true,petOwnerId:'ada'}]);
+  workspace.pets.set([{id:'sally',ownerCharacterId:'ada',name:'Sally',portrait:'',photo:'',description:'Una gatta curiosa.'}]);fixture.detectChanges();
+  expect(workspace.voices().some(c=>c.id==='sally')).toBe(true);
+  button('Apri PNG').click();fixture.detectChanges();expect(workspace.active()?.id).toBe('sally');
+  button('Modifica personaggio').click();fixture.detectChanges();await fixture.whenStable();
+  expect(fixture.nativeElement.querySelector('#character-is-pet')).toBeNull();expect(fixture.nativeElement.querySelector('#pet-owner')).toBeNull();
+  const name=fixture.nativeElement.querySelector('#character-name') as HTMLInputElement;
+  name.value='Sally nuova';name.dispatchEvent(new Event('input'));fixture.detectChanges();await fixture.whenStable();
+  const save=vi.spyOn(workspace,'save').mockResolvedValue(true);
+  button('Salva modifiche').click();await fixture.whenStable();
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({action:'saveCharacter',characterId:'sally',name:'Sally nuova'}));
+  expect(save.mock.calls[0][0]).not.toHaveProperty('isPet');expect(save.mock.calls[0][0]).not.toHaveProperty('petOwnerId');
+ });
+ it('il master vede anche i permessi ereditati dal PG nella scheda del pet',()=>{
+  const {workspace,fixture,button}=setup();
+  workspace.characters.update(chars=>[...chars,{...character('sally','Sally'),kind:'png',isPet:true,petOwnerId:'ada'}]);
+  workspace.activeId.set('sally');fixture.detectChanges();
+  button('Assegnazioni · 1').click();fixture.detectChanges();
+  const permissions=fixture.nativeElement.querySelector('.permissions');
+  expect(permissions.textContent).toContain('Permessi ereditati dal PG');expect(permissions.textContent).toContain('Desy');
+  expect(permissions.textContent).toContain('Interpreta');expect(permissions.textContent).toContain('Gestisce zaino');
+  expect(permissions.textContent).not.toContain('disponibile solo al master');
+  expect(button('Revoca assegnazione')).toBeUndefined();
+ });
 });

@@ -1,5 +1,5 @@
 import { getAuthenticatedSession, json } from "../auth/_shared.js";
-import { isMaster, characterView, failure, validId } from "./_shared.js";
+import { isMaster, characterView, failure, validId, effectiveGrantsSql } from "./_shared.js";
 
 export async function onRequestGet(context) {
   try {
@@ -30,7 +30,7 @@ export async function onRequestGet(context) {
         .prepare(
           `SELECT c.*, g.can_speak,g.can_edit_sheet,g.can_inventory,
         EXISTS(SELECT 1 FROM gdr_workspace_story_links l WHERE l.adventure_id=c.adventure_id AND l.source_key='pg' AND l.character_id=c.id) AS legacy_protagonist
-        FROM gdr_workspace_characters c LEFT JOIN gdr_workspace_grants g ON g.character_id=c.id AND g.user_id=?
+        FROM gdr_workspace_characters c LEFT JOIN (${effectiveGrantsSql}) g ON g.character_id=c.id AND g.user_id=?
         WHERE c.adventure_id=? AND (?=1 OR (g.user_id IS NOT NULL AND c.archived=0 AND (g.can_speak=1 OR g.can_edit_sheet=1 OR g.can_inventory=1))) ORDER BY c.created_at,c.id`,
         )
         .bind(user.id, adventure, isMaster(user) ? 1 : 0)
@@ -56,13 +56,13 @@ export async function onRequestGet(context) {
       JOIN gdr_workspace_characters c ON c.id=cp.character_id
       JOIN gdr_power_availability pa ON pa.power_id=p.id AND pa.adventure_id=c.adventure_id
       WHERE c.adventure_id=? AND (?=1 OR (c.archived=0 AND EXISTS(
-        SELECT 1 FROM gdr_workspace_grants g WHERE g.character_id=c.id AND g.user_id=?
+        SELECT 1 FROM (${effectiveGrantsSql}) g WHERE g.character_id=c.id AND g.user_id=?
         AND (g.can_speak=1 OR g.can_edit_sheet=1 OR g.can_inventory=1))))
       ORDER BY p.kind,p.sort_order,p.name,p.id`).bind(adventure,isMaster(user)?1:0,user.id).all()).results : [];
     characters=characters.map(c=>({...c,powers:assignedPowers.filter(p=>p.character_id===c.id).map(p=>({
       id:p.id,kind:p.kind,name:p.name,description:p.description,components:p.components,effects:JSON.parse(p.effects_json),revision:p.revision
     }))}));
-    // Solo i pet dei PG visibili, senza concedere accesso alla scheda privata del PNG.
+    // Riepilogo dei pet sulla scheda dei PG visibili; il roster include i permessi ereditati.
     const pets = adventure ? (await db.prepare(`
       SELECT pet.id,pet.pet_owner_id,pet.name,pet.portrait,pet.photo,pet.profile_json
       FROM gdr_workspace_characters pet

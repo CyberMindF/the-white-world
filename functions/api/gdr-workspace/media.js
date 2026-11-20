@@ -1,5 +1,6 @@
 import { getAuthenticatedSession, json } from "../auth/_shared.js";
 import {
+  effectiveGrantsSql,
   WorkspaceError,
   isMaster,
   validId,
@@ -21,14 +22,14 @@ export async function uploadCharacterMedia(db, media, user, request) {
     throw new WorkspaceError("Personaggio o immagine non validi.", 400);
   const c = await db
     .prepare(
-      `SELECT c.*,g.can_edit_sheet FROM gdr_workspace_characters c LEFT JOIN gdr_workspace_grants g ON g.character_id=c.id AND g.user_id=? WHERE c.id=?`,
+      `SELECT c.*,g.can_edit_sheet FROM gdr_workspace_characters c LEFT JOIN (${effectiveGrantsSql}) g ON g.character_id=c.id AND g.user_id=? WHERE c.id=?`,
     )
     .bind(user.id, id)
     .first();
   if (!c) throw new WorkspaceError("Personaggio non trovato.", 404);
   if (
     !isMaster(user) &&
-    (c.kind !== "pg" || c.archived || c.can_edit_sheet !== 1)
+    ((c.kind !== "pg" && !c.is_pet) || c.archived || c.can_edit_sheet !== 1)
   )
     throw new WorkspaceError(
       "Non puoi modificare le immagini di questo personaggio.",

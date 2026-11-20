@@ -308,8 +308,16 @@ export class GdrCharacters {
   protected readonly hasChanges = computed(
     () => this.dirty() || this.grantDirty() || this.statsDirty() || this.powersPending(),
   );
-  protected readonly assignments = computed(() => {
-    const id = this.workspace.active()?.id;
+  protected readonly assignments = computed(() => this.characterAssignments(this.workspace.active()?.id));
+  protected readonly inheritedAssignments = computed(() => {
+    const c = this.workspace.active();
+    const owner = this.workspace.characters().find(pg => pg.id === c?.petOwnerId && !pg.archived);
+    return c?.isPet && !c.archived && owner ? this.characterAssignments(owner.id) : [];
+  });
+  protected readonly assignmentCount = computed(() => new Set(
+    [...this.assignments(), ...this.inheritedAssignments()].map(g => g.userId),
+  ).size);
+  private characterAssignments(id: string | undefined) {
     return this.workspace
       .grants()
       .filter((g) => g.characterId === id && (g.canSpeak || g.canEditSheet || g.canInventory))
@@ -322,7 +330,7 @@ export class GdrCharacters {
           g.canInventory ? 'Gestisce zaino' : '',
         ].filter(Boolean),
       }));
-  });
+  }
   protected readonly activeCount = computed(
     () => this.workspace.characters().filter((c) => !c.archived).length,
   );
@@ -364,13 +372,16 @@ export class GdrCharacters {
   protected readonly petOwnerId = signal('');
   protected readonly petOwners = computed(() => this.workspace.characters().filter(c => c.kind === 'pg'));
   protected readonly assignedPets = computed(() => this.workspace.pets().filter(p => p.ownerCharacterId === this.workspace.active()?.id));
+  protected canOpenPet(id: string): boolean {
+    return this.canManage() || this.workspace.characters().some(c => c.id === id);
+  }
   protected changePet(value: boolean): void {
     this.isPet.set(value);
     if (!value) this.petOwnerId.set('');
     this.dirty.set(true);
   }
   protected openPet(id: string): void {
-    if (!this.canManage() || this.hasChanges()) return;
+    if (!this.canOpenPet(id) || this.hasChanges()) return;
     this.choose(id);
     this.section.set('sheet');
   }

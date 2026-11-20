@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 const loadSource = file => readFileSync(new URL('../functions/api/gdr-workspace/'+file,import.meta.url),'utf8').replace(/^import[\s\S]*?;\s*/gm,'').replace(/export /g,'');
 const permissions=new Function(loadSource('../_shared/permissions.js')+';return {hasPermission};')();
-const helpers=new Function('json','hasPermission',loadSource('./_shared.js')+';return {WorkspaceError,requireMaster,isMaster,validId,text,portrait,inventory,profile,readLimited,failure,characterView};')((body,status=200)=>Response.json(body,{status}),permissions.hasPermission);
+const helpers=new Function('json','hasPermission',loadSource('./_shared.js')+';return {effectiveGrantsSql,WorkspaceError,requireMaster,isMaster,validId,text,portrait,inventory,profile,readLimited,failure,characterView};')((body,status=200)=>Response.json(body,{status}),permissions.hasPermission);
 export const {characterView}=helpers;
 const legacy=new Function('WorkspaceError',loadSource('./legacy.js')+';return {syncLegacy,characterFields,validateCharacterFields};')(helpers.WorkspaceError);
 const systemHelpers=new Function('WorkspaceError',loadSource('../gdr-systems/_shared.js')+';return {statFields};')(helpers.WorkspaceError);

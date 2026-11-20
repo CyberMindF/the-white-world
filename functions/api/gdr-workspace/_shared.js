@@ -4,6 +4,24 @@ export const isMaster = (user) =>
   hasPermission(user.role, "content.create") && !user.isTest;
 export const validId = (value) =>
   typeof value === "string" && /^[a-zA-Z0-9-]{1,100}$/.test(value);
+// Permessi effettivi: le deleghe esplicite si sommano a quelle del PG assegnatario.
+// Nessuna copia persistente: revoca, riassegnazione e archiviazione valgono subito,
+// anche nelle condizioni SQL delle scritture da editor già aperti.
+export const effectiveGrantsSql = `
+  SELECT character_id,user_id,MAX(can_speak) AS can_speak,
+    MAX(can_edit_sheet) AS can_edit_sheet,MAX(can_inventory) AS can_inventory
+  FROM (
+    SELECT g.character_id,g.user_id,g.can_speak,
+      CASE WHEN c.kind='pg' THEN g.can_edit_sheet ELSE 0 END AS can_edit_sheet,g.can_inventory
+    FROM gdr_workspace_grants g JOIN gdr_workspace_characters c ON c.id=g.character_id
+    UNION ALL
+    SELECT pet.id,g.user_id,g.can_speak,g.can_edit_sheet,g.can_inventory
+    FROM gdr_workspace_characters pet
+    JOIN gdr_workspace_characters pg ON pg.id=pet.pet_owner_id
+      AND pg.kind='pg' AND pg.adventure_id=pet.adventure_id AND pg.archived=0
+    JOIN gdr_workspace_grants g ON g.character_id=pg.id
+    WHERE pet.kind='png' AND pet.is_pet=1 AND pet.archived=0
+  ) GROUP BY character_id,user_id`;
 export function text(value, max, empty = false) {
   if (
     typeof value !== "string" ||
@@ -124,9 +142,9 @@ export function characterView(row, user) {
     archived: row.archived === 1,
     revision: row.revision,
     canSpeak: !row.archived && (master || row.can_speak === 1),
-    canEditSheet: master || (row.kind === "pg" && row.can_edit_sheet === 1),
+    canEditSheet: master || (!row.archived && (row.kind === "pg" || row.is_pet === 1) && row.can_edit_sheet === 1),
     canInventory: master || row.can_inventory === 1,
-    canAdjustResources: !row.archived && (master || (row.kind==='pg' && (row.can_speak===1 || row.can_edit_sheet===1))),
+    canAdjustResources: !row.archived && (master || ((row.kind==='pg' || row.is_pet===1) && (row.can_speak===1 || row.can_edit_sheet===1))),
     statsEditable: row.stats_editable === 1,
     statsBudget: row.stats_budget ?? 12,
     canEditStats: row.kind === 'pg' && row.adventure_id === 'il-prezzo-della-verita' && !row.archived && row.stats_editable === 1 && (master || row.can_edit_sheet === 1),

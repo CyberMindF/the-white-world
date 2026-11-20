@@ -4,6 +4,7 @@ import { syncLegacy, validateCharacterFields } from "./legacy.js";
 import { getAuthenticatedSession, json } from "../auth/_shared.js";
 import { notifyRealtime } from "../_shared/realtime.js";
 import {
+  effectiveGrantsSql,
   WorkspaceError,
   requireMaster,
   isMaster,
@@ -215,7 +216,7 @@ export async function mutate(db, user, payload) {
   const stats=statFields(schemaFields),statKeys=stats.map(f=>f.key);
   if (p.action === "adjustResource") {
     if (
-      (character.kind !== "pg" && !master) ||
+      (character.kind !== "pg" && !character.is_pet && !master) ||
       !schemaFields.some(f=>f.key===p.fieldKey && (f.role==='resource'||(f.role===undefined&&['stressCurrent','spellSlotsCurrent'].includes(f.key)))) ||
       ![-1, 1].includes(p.delta)
     )
@@ -224,7 +225,7 @@ export async function mutate(db, user, payload) {
       ? null
       : await db
           .prepare(
-            "SELECT can_speak,can_edit_sheet FROM gdr_workspace_grants WHERE character_id=? AND user_id=?",
+            `SELECT can_speak,can_edit_sheet FROM (${effectiveGrantsSql}) WHERE character_id=? AND user_id=?`,
           )
           .bind(character.id, user.id)
           .first();
@@ -254,7 +255,7 @@ export async function mutate(db, user, payload) {
     fields[p.fieldKey] = String(value);
     const result = await db
       .prepare(
-        `UPDATE gdr_workspace_characters SET fields_json=?,revision=revision+1 WHERE id=? AND revision=? AND (?=1 OR (archived=0 AND EXISTS(SELECT 1 FROM gdr_workspace_grants g WHERE g.character_id=gdr_workspace_characters.id AND g.user_id=? AND (g.can_speak=1 OR g.can_edit_sheet=1))))`,
+        `UPDATE gdr_workspace_characters SET fields_json=?,revision=revision+1 WHERE id=? AND revision=? AND (?=1 OR (archived=0 AND EXISTS(SELECT 1 FROM (${effectiveGrantsSql}) g WHERE g.character_id=gdr_workspace_characters.id AND g.user_id=? AND (g.can_speak=1 OR g.can_edit_sheet=1))))`,
       )
       .bind(JSON.stringify(fields), character.id, p.revision, +master, user.id)
       .run();
@@ -325,7 +326,7 @@ export async function mutate(db, user, payload) {
     };
     const result = await db
       .prepare(
-        `UPDATE gdr_workspace_characters SET fields_json=?,stats_editable=0,revision=revision+1 WHERE id=? AND revision=? AND (?=1 OR (stats_editable=1 AND archived=0 AND EXISTS(SELECT 1 FROM gdr_workspace_grants g WHERE g.character_id=gdr_workspace_characters.id AND g.user_id=? AND g.can_edit_sheet=1)))`,
+        `UPDATE gdr_workspace_characters SET fields_json=?,stats_editable=0,revision=revision+1 WHERE id=? AND revision=? AND (?=1 OR (stats_editable=1 AND archived=0 AND EXISTS(SELECT 1 FROM (${effectiveGrantsSql}) g WHERE g.character_id=gdr_workspace_characters.id AND g.user_id=? AND g.can_edit_sheet=1)))`,
       )
       .bind(JSON.stringify(fields), character.id, p.revision, +master, user.id)
       .run();
@@ -357,7 +358,7 @@ export async function mutate(db, user, payload) {
     const result = await db
       .prepare(
         `UPDATE gdr_workspace_characters SET name=?,portrait=?,sheet=?,profile_json=?,photo=?,fields_json=?,is_pet=?,pet_owner_id=?,revision=revision+1
-      WHERE id=? AND revision=? AND (?=1 OR (kind='pg' AND archived=0 AND EXISTS(SELECT 1 FROM gdr_workspace_grants g WHERE g.character_id=gdr_workspace_characters.id AND g.user_id=? AND g.can_edit_sheet=1)))`,
+      WHERE id=? AND revision=? AND (?=1 OR ((kind='pg' OR is_pet=1) AND archived=0 AND EXISTS(SELECT 1 FROM (${effectiveGrantsSql}) g WHERE g.character_id=gdr_workspace_characters.id AND g.user_id=? AND g.can_edit_sheet=1)))`,
       )
       .bind(
         text(p.name, 160),
@@ -408,7 +409,7 @@ export async function mutate(db, user, payload) {
     const result = await db
       .prepare(
         `UPDATE gdr_workspace_characters SET inventory_json=?,revision=revision+1
-      WHERE id=? AND revision=? AND (?=1 OR (archived=0 AND EXISTS(SELECT 1 FROM gdr_workspace_grants g WHERE g.character_id=gdr_workspace_characters.id AND g.user_id=? AND g.can_inventory=1)))`,
+      WHERE id=? AND revision=? AND (?=1 OR (archived=0 AND EXISTS(SELECT 1 FROM (${effectiveGrantsSql}) g WHERE g.character_id=gdr_workspace_characters.id AND g.user_id=? AND g.can_inventory=1)))`,
       )
       .bind(data, character.id, p.revision, master ? 1 : 0, user.id)
       .run();
@@ -454,7 +455,7 @@ async function permittedChange(db, user, character, p, result, permission) {
   if (result.meta.changes) return;
   const grant = await db
     .prepare(
-      "SELECT can_edit_sheet,can_inventory FROM gdr_workspace_grants WHERE character_id=? AND user_id=?",
+      `SELECT can_edit_sheet,can_inventory FROM (${effectiveGrantsSql}) WHERE character_id=? AND user_id=?`,
     )
     .bind(character.id, user.id)
     .first();
@@ -462,7 +463,7 @@ async function permittedChange(db, user, character, p, result, permission) {
     !isMaster(user) &&
     (character.archived ||
       !grant?.[permission] ||
-      (permission === "can_edit_sheet" && character.kind === "png"))
+      (permission === "can_edit_sheet" && character.kind === "png" && !character.is_pet))
   )
     throw new WorkspaceError(
       "Non hai il permesso di modificare questi dati.",

@@ -208,8 +208,15 @@ nel laboratorio. Le avventure storiche non sono riscrivibili da questi endpoint.
 Il master crea PG e PNG e assegna a uno o più utenti permessi distinti di interpretazione,
 modifica della scheda (solo PG) e modifica dello zaino. Non esiste un limite client deciso dal
 giocatore al numero di PG assegnati; un giocatore non può crearli o assegnarsi permessi.
-I PNG restano modificabili nella scheda solo dal master, anche se un giocatore può interpretarli
-o gestirne lo zaino. Ogni personaggio ha inventario separato (oggetto, quantità, note).
+I PNG ordinari restano modificabili nella scheda solo dal master, anche se un giocatore può interpretarli
+o gestirne lo zaino. I pet assegnati a un PG ereditano automaticamente i permessi dei suoi giocatori:
+interpretazione, modifica del personaggio (incluse foto e avatar) e gestione dello zaino. Appaiono
+nel selettore dei personaggi e si possono aprire dalla sezione «Pet assegnati» del PG. Le deleghe
+dirette al pet si sommano ai permessi ereditati; revoca, riassegnazione, rimozione del flag Pet,
+archiviazione o eliminazione del PG aggiornano subito l’eredità, anche per editor già aperti.
+Solo il master cambia il flag Pet e il PG assegnatario; restano riservate al master le indicazioni
+della scheda e le abilità, come per i PG. Il calcolo avviene sui permessi correnti, senza copie
+persistenti né nuove migrazioni. Ogni personaggio ha inventario separato (oggetto, quantità, note).
 La scheda storica si può copiare esplicitamente in un nuovo PG, senza modificare l’originale.
 «Gestione GDR» → avventura → «PG e PNG» apre la gestione, con elenco ricercabile e filtri, creazione
 visibile di PG e PNG, modifica della scheda, assegnazioni e zaino. I PNG già presenti nei blocchi

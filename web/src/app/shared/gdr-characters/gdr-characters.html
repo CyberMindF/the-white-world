@@ -204,7 +204,7 @@
                     [disabled]="hasChanges()"
                     (click)="setSection('assignments')"
                   >
-                    Assegnazioni · {{ assignments().length }}
+                    Assegnazioni · {{ assignmentCount() }}
                   </button>
                   <button
                     [class.is-active]="section() === 'inventory'"
@@ -561,6 +561,7 @@
                                     <option [value]="owner.id">{{ owner.name }} {{ owner.profile?.surname }}{{ owner.archived ? ' · archiviato' : '' }}</option>
                                   }
                                 </select>
+                                <p class="hint">Il pet eredita dai giocatori del PG i permessi di interpretazione, modifica del personaggio e gestione dello zaino.</p>
                               }
                             </section>
                           }
@@ -753,7 +754,7 @@
                               <div>
                                 <strong>{{ pet.name }}</strong>
                                 @if (pet.description) { <p>{{ pet.description }}</p> }
-                                @if (canManage()) {
+                                @if (canOpenPet(pet.id)) {
                                   <button class="btn" [disabled]="hasChanges()" (click)="openPet(pet.id)">Apri PNG</button>
                                 }
                               </div>
@@ -814,6 +815,18 @@
                       <p class="hint">
                         Il master mantiene sempre il controllo. Qui scegli a chi delegarlo.
                       </p>
+                      @if (inheritedAssignments().length) {
+                        <h4>Permessi ereditati dal PG</h4>
+                        <p class="hint">Si aggiornano automaticamente con le assegnazioni del PG. Per modificarli, apri il PG assegnatario.</p>
+                        @for (assignment of inheritedAssignments(); track assignment.userId) {
+                          <article class="assignment-card">
+                            <div>
+                              <strong>{{ assignment.nickname }}</strong>
+                              <p>{{ assignment.permissions.join(' · ') }}</p>
+                            </div>
+                          </article>
+                        }
+                      }
                       <div class="assignment-list">
                         @for (assignment of assignments(); track assignment.userId) {
                           <article class="assignment-card">
@@ -839,8 +852,8 @@
                           </article>
                         } @empty {
                           <div class="empty-state">
-                            <strong>Nessuna assegnazione</strong>
-                            <p>Questo personaggio è disponibile solo al master.</p>
+                            <strong>Nessuna assegnazione diretta</strong>
+                            @if (!inheritedAssignments().length) { <p>Questo personaggio è disponibile solo al master.</p> }
                           </div>
                         }
                       </div>
