@@ -160,6 +160,40 @@ try {
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`Overflow ${actor}/${width}`);
       await editor.screenshot({path:join(screenshots,`editor-${actor}-${width}.png`),animations:'disabled'});
     }
+    if (actor === 1) {
+      for (const [sample,text] of [['short','Ci penserò.'],['long','PROVA '.repeat(90).trim()]]) {
+        await editor.getByRole('button',{name:'Torna al testo',exact:true}).click();
+        await area.fill(`::: pensiero Daisy | | daisy\n${text}\n:::`);
+        for (const [width,mode] of [[1280,'Solo anteprima'],[1280,'Testo e anteprima'],[390,'Testo e anteprima'],[320,'Solo anteprima']]) {
+          await page.setViewportSize({width,height:1000});
+          await editor.getByRole('button',{name:mode,exact:true}).click();
+          const thought = editor.locator('.thought'), bubble = thought.locator('.thought-bubble');
+          await page.waitForFunction(()=>{
+            const svg=document.querySelector('app-gdr-source-editor .thought-bubble svg');
+            return svg && Math.abs(svg.viewBox.baseVal.width-svg.getBoundingClientRect().width)<1 && Math.abs(svg.viewBox.baseVal.height-svg.getBoundingClientRect().height)<1;
+          });
+          const spacing = await bubble.evaluate(el=>{
+            const rect=el.getBoundingClientRect(), avatar=el.closest('.thought').querySelector('.portrait-trigger').getBoundingClientRect();
+            const dots=['::before','::after'].map(pseudo=>{
+              const css=getComputedStyle(el,pseudo), left=rect.left+parseFloat(css.left), top=rect.top+parseFloat(css.top);
+              return {left,top,right:left+parseFloat(css.width),bottom:top+parseFloat(css.height)};
+            });
+            return {bubbleLeft:rect.left,avatarRight:avatar.right,dots};
+          });
+          const [large,small]=spacing.dots;
+          assert.ok(small.left-spacing.avatarRight>=4, 'Pallini separati dall’avatar');
+          assert.ok(large.left-small.right>=4, 'Pallini separati tra loro');
+          assert.ok(spacing.bubbleLeft-large.right>=4, 'Pallini fuori dal contorno');
+          assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+          await thought.screenshot({path:join(screenshots,`thought-${sample}-${width}-${mode==='Solo anteprima'?'preview':'split'}.png`),animations:'disabled'});
+          if (width === 1280 && mode === 'Solo anteprima') {
+            await page.evaluate(()=>document.body.dataset.theme='the-white-world');
+            await thought.screenshot({path:join(screenshots,`thought-${sample}-dark.png`),animations:'disabled'});
+            await page.evaluate(()=>document.body.dataset.theme='white-world');
+          }
+        }
+      }
+    }
     await editor.getByRole('button',{name:'Torna al testo',exact:true}).click();
     await area.fill('');
     await page.evaluate(()=>sessionStorage.setItem('gdr-test-user','2'));

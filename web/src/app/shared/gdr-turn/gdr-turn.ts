@@ -2,6 +2,7 @@ import { Component, ElementRef, ViewChild, computed, effect, inject, input, outp
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { renderGdrInline } from '../gdr-inline-text';
 import { NgTemplateOutlet } from '@angular/common';
+import { GdrThoughtCloud } from './gdr-thought-cloud';
 import { FormsModule } from '@angular/forms';
 import { updateGdrTextarea } from '../gdr-textarea';
 import { PROFILE_FIELDS } from '../gdr-characters/character-profile';
@@ -24,7 +25,7 @@ interface RenderedSection extends NarrativeSection {
 @Component({
   selector: 'app-gdr-turn',
   standalone: true,
-  imports: [GdrBlocks, FormsModule, NgTemplateOutlet],
+  imports: [GdrBlocks, FormsModule, NgTemplateOutlet, GdrThoughtCloud],
   template: `
     @if (viewedCharacter(); as character) {
       <div class="character-backdrop" (click)="viewedCharacter.set(null)">
@@ -238,7 +239,7 @@ interface RenderedSection extends NarrativeSection {
             </div>
             <p class="voice-bubble" [class.speech-bubble]="section.kind === 'dialogo'" [class.thought-bubble]="section.kind === 'pensiero'">
               @if (section.kind === 'pensiero') {
-                <span class="cloud-outline" aria-hidden="true"><span class="cloud-middle"></span><svg class="cloud-side cloud-left" focusable="false"><defs><pattern [attr.id]="fieldId + '-' + section.id + '-cloud'" width="12" height="26" patternUnits="userSpaceOnUse"><path d="M11 0 C-2 2 -2 24 11 26" /></pattern></defs><rect width="100%" height="100%" stroke="none" [attr.fill]="'url(#' + fieldId + '-' + section.id + '-cloud)'" /></svg><svg class="cloud-side cloud-right" focusable="false"><rect width="100%" height="100%" stroke="none" [attr.fill]="'url(#' + fieldId + '-' + section.id + '-cloud)'" /></svg><svg class="cloud-cap cloud-top" viewBox="0 0 400 32" preserveAspectRatio="none" focusable="false"><path vector-effect="non-scaling-stroke" d="M1 32 C1 20 8 14 24 16 C18 6 40 1 56 10 C70 1 89 2 102 11 C118 1 138 2 151 11 C166 1 186 2 199 11 C216 1 237 3 250 12 C268 2 288 4 301 13 C320 3 341 8 350 19 C375 11 399 18 399 32" /></svg><svg class="cloud-cap cloud-bottom" viewBox="0 0 400 32" preserveAspectRatio="none" focusable="false"><path vector-effect="non-scaling-stroke" d="M1 32 C1 20 8 14 24 16 C18 6 40 1 56 10 C70 1 89 2 102 11 C118 1 138 2 151 11 C166 1 186 2 199 11 C216 1 237 3 250 12 C268 2 288 4 301 13 C320 3 341 8 350 19 C375 11 399 18 399 32" /></svg></span>
+                <span gdrThoughtCloud class="cloud-outline" aria-hidden="true"></span>
                 <em [innerHTML]="renderInline(section.text)"></em>
               } @else {<span [innerHTML]="renderInline(section.text)"></span>}
             </p>
@@ -387,20 +388,18 @@ interface RenderedSection extends NarrativeSection {
     .speech-bubble::before, .speech-bubble::after { content: ''; position: absolute; pointer-events: none; clip-path: polygon(100% 0, 0 50%, 100% 100%); }
     .speech-bubble::before { top: calc(1.65rem - 7px); right: 100%; width: 10px; height: 14px; background: linear-gradient(var(--border-color), var(--border-color)), var(--speech-background); }
     .speech-bubble::after { top: calc(1.65rem - 6px); right: calc(100% - 1px); width: 9px; height: 12px; background: var(--speech-background); }
-    .thought-bubble { display: grid; align-content: center; padding: 1.7rem 1.9rem; min-height: 6rem; }
+    .thought { --thought-fill: rgb(255 255 255 / .12); column-gap: 2rem; }
+    :host-context(body[data-theme="white-world"]) .thought,
+    :host-context(body[data-theme="sea"]) .thought,
+    :host-context(body[data-theme="love"]) .thought,
+    :host-context(body[data-theme="beige-flat"]) .thought,
+    :host-context(body.safe-mode) .thought { --thought-fill: rgb(255 255 255 / .45); }
+    .thought-bubble { display: grid; align-content: center; padding: 1.7rem 1.9rem; min-width: min(100%, 8rem); min-height: 6rem; }
     .thought-bubble em { position: relative; }
-    .cloud-outline { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
-    .cloud-middle { position: absolute; inset: 13px 10px; background: var(--panel-color); }
-    .cloud-side { position: absolute; top: 13px; width: 12px; height: calc(100% - 26px); fill: var(--panel-color); stroke: var(--border-color); stroke-width: 1.4; }
-    .cloud-left { left: 0; }
-    .cloud-right { right: 0; transform: scaleX(-1); }
-    .cloud-cap { position: absolute; left: 0; width: 100%; height: 26px; overflow: visible; fill: var(--panel-color); stroke: var(--border-color); stroke-width: 1.4; }
-    .cloud-top { top: 0; }
-    .cloud-bottom { bottom: 0; transform: scaleY(-1); }
-    .thought-bubble::before, .thought-bubble::after { content: ''; position: absolute; border: 1px solid var(--border-color); border-radius: 50%; background: var(--panel-color); }
-    .thought-bubble::before { width: .65rem; height: .5rem; left: -.3rem; top: 1.9rem; }
-    .thought-bubble::after { width: .35rem; height: .28rem; left: -.9rem; top: 1.45rem; }
-    @media (max-width: 400px) { .voice-block { grid-template-columns: 32px minmax(0, 1fr); column-gap: .6rem; } .speaker > .portrait-trigger, .speaker img, .speaker .initial { width: 32px; height: 32px; } .dialogue .speaker > .portrait-trigger, .dialogue .speaker > .avatar-placeholder { margin-top: .65rem; } .thought-bubble { padding: 1.4rem 1.3rem; } }
+    .thought-bubble::before, .thought-bubble::after { content: ''; position: absolute; box-sizing: border-box; border: 1px solid var(--border-color); border-radius: 50%; background: var(--thought-fill); pointer-events: none; }
+    .thought-bubble::before { width: 8px; height: 8px; left: -15px; top: 19px; }
+    .thought-bubble::after { width: 5px; height: 5px; left: -26px; top: 10px; }
+    @media (max-width: 400px) { .voice-block { grid-template-columns: 32px minmax(0, 1fr); column-gap: .6rem; } .speaker > .portrait-trigger, .speaker img, .speaker .initial { width: 32px; height: 32px; } .dialogue .speaker > .portrait-trigger, .dialogue .speaker > .avatar-placeholder { margin-top: .65rem; } .thought { column-gap: 2rem; } .thought-bubble { padding: 1.4rem 1.3rem; } }
     .letter { margin: 1rem auto 1.5rem; max-width: 42rem; padding: clamp(1.2rem, 4vw, 2.6rem); color: #382c24; border: 1px solid #d9c8a8; border-radius: 3px 8px 5px 3px; background: linear-gradient(125deg, #fffaf0, #f3e7cd); box-shadow: 0 4px 14px #20180d14; font-family: 'Caveat', cursive; font-size: 1.6rem; }
     .letter p { line-height: 1.45; }
     .letter .letter-date { margin: 0 0 1.3rem; text-align: right; font-size: 1.3rem; }
