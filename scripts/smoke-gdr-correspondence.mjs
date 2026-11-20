@@ -78,6 +78,20 @@ try {
     const person = editor.getByRole('combobox',{name:'Personaggio',exact:true});
     const choosePerson = async label => { await person.click(); await editor.getByRole('option',{name:label,exact:true}).click(); };
     const code = async (label,value) => area.fill((await area.inputValue()).replace(new RegExp('^'+label+':.*$','m'),label+': '+value));
+    const repairSeparator = async () => {
+      const original=await area.inputValue(), separator=original.indexOf('\n---\n')+1;
+      assert.ok(separator>0);
+      for (const mode of ['Solo testo','Testo e anteprima']) {
+        await editor.getByRole('button',{name:mode,exact:true}).click();
+        await area.focus();await area.evaluate((el,position)=>el.setSelectionRange(position,position),separator+3);
+        await area.press('Backspace');
+        assert.equal(await area.inputValue(),original.slice(0,separator+2)+original.slice(separator+3));
+        await area.pressSequentially('-');
+        assert.equal(await area.inputValue(),original, 'Ripristinare --- conserva dati e corpo');
+        assert.equal(await area.evaluate(el=>el.selectionStart),separator+3);
+      }
+      await editor.getByRole('button',{name:'Solo testo',exact:true}).click();
+    };
     assert.equal(await editor.locator('select').count(),0);
     const addButton=editor.getByRole('button',{name:'Aggiungi',exact:true});
     assert.ok(await addButton.evaluate(el=>getComputedStyle(el).backdropFilter.includes('blur')));
@@ -102,6 +116,7 @@ try {
     assert.equal(await area.isVisible(),true);assert.equal(await editor.locator('.inline-editor, .insertion-details').count(),0);
     await page.waitForFunction(()=>document.querySelector('#lab-turn')?.value.includes('DATA: (Elimina se non ti serve)'));
     await code('DATA','Terza luna');await code('FIRMA','Daisy');
+    await repairSeparator();
     assert.equal((await area.inputValue()).includes('"signature"'),false);
     for(const width of [1280,390,320]) {
       await page.setViewportSize({width,height:1000});
@@ -113,6 +128,7 @@ try {
     await area.fill('Arrivo.');await area.evaluate(el=>el.select());await editor.getByRole('button',{name:'Aggiungi',exact:true}).click();
     await page.waitForFunction(()=>document.querySelector('#lab-turn')?.value.includes('ORA: (Elimina se non ti serve)'));
     await code('DATA','Ieri');await code('ORA','Dopo cena');
+    await repairSeparator();
     assert.equal(await area.isVisible(),true);assert.equal(await editor.locator('.inline-editor').count(),0);
     assert.equal((await area.inputValue()).includes('characterId'),false);
     await editor.getByRole('button',{name:'Solo anteprima',exact:true}).click();

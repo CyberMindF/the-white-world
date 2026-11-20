@@ -35,7 +35,9 @@ export function visibleNarrativeSource(source: string, roster: NarrativeCharacte
     if (correspondence && (section.kind === 'lettera' || section.kind === 'messaggio')) {
       if (sourceEnd > lineEnd) visible += normalized.slice(lineEnd,sourceEnd);
       else {
-        correspondence = {...correspondence,name:section.kind === 'messaggio' ? character?.name ?? correspondence.name : correspondence.name};
+        // Aggiorna un contatto già presente nel vecchio JSON, senza generarne
+        // uno nuovo quando i codici sono temporaneamente parte del corpo.
+        correspondence = {...correspondence,name:section.kind === 'messaggio' && correspondence.name ? character?.name ?? correspondence.name : correspondence.name};
         visible = correspondencePrefix(section.kind,correspondence,false,true);
       }
     }
@@ -114,7 +116,9 @@ export function updateVisibleNarrativeSource(view: VisibleNarrativeSource, value
     const lineEnd = next.indexOf('\n', section.start);
     const end = section.correspondence && section.contentStart !== undefined ? section.contentStart - 1 : lineEnd < 0 ? next.length : lineEnd;
     const stored = preserved.get(section.start);
-    if (stored) replacements.push({start: section.start, end, header: stored.stored});
+    // Sostituisce solo il testo rimasto intatto: un separatore appena completato
+    // può far riconoscere nuovi campi oltre l’intestazione conservata.
+    if (stored) replacements.push({start: section.start, end: section.start + stored.visible.length, header: stored.stored});
     else if (section.correspondence && (section.kind === 'lettera' || section.kind === 'messaggio')) {
       const data = {...section.correspondence};
       const previous = references.get(section.start)?.correspondence;
@@ -124,7 +128,9 @@ export function updateVisibleNarrativeSource(view: VisibleNarrativeSource, value
         if (section.kind === 'lettera') {data.name=previous.name;data.time=previous.time;}
         else {
           data.signature=previous.signature;
-          if (data.name !== previous.name) {data.characterId='';data.portrait='';}
+          // Senza separatore i codici non sono ancora riconosciuti: il nome
+          // temporaneamente vuoto non equivale a cambiare contatto.
+          if (end > lineEnd && data.name !== previous.name) {data.characterId='';data.portrait='';}
         }
       }
       replacements.push({start:section.start,end:lineEnd < 0 ? next.length : lineEnd,header:correspondenceReferenceHeader(section.kind,data)});

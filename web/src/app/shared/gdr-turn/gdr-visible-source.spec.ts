@@ -97,4 +97,35 @@ describe('riferimenti dei personaggi nascosti nella textbox', () => {
     const free=updateVisibleNarrativeSource(contact,contact.text.replace('CONTATTO: Ada','CONTATTO: +39 123'),roster);
     expect(parseNarrative(free).sections[0]).toMatchObject({characterId:'',speaker:'+39 123',portrait:''});
   });
+
+  it.each([
+    ['lettera', '::: lettera\nDATA: Terza luna\nFIRMA: Ada\n---\nCiao.\n:::'],
+    ['messaggio', '::: messaggio {"characterId":"ada-2"}\nCONTATTO: Ada\nDATA: Ieri\nORA: 18:42\n---\nCiao.\n:::'],
+    ['lettera', '::: lettera {"signature":"Ada","date":"Terza luna"}\nCiao.\n:::'],
+    ['messaggio', '::: messaggio {"name":"Ada","characterId":"ada-2","date":"Ieri","time":"18:42"}\nCiao.\n:::'],
+  ])('conserva tutti i codici di %s cancellando e riscrivendo il separatore', (kind, block) => {
+    let view = visibleNarrativeSource('Prima.\n\n' + block + '\n\nDopo.', roster);
+    const original = view.text;
+    const expected = parseNarrative(view.source).sections.find(section => section.kind === kind)!;
+    for (const separator of ['--', '---', '--', '-', '', '-', '--', '---']) {
+      const edited = original.replace('\n---\n', '\n' + separator + '\n');
+      const source = updateVisibleNarrativeSource(view, edited, roster);
+      view = visibleNarrativeSource(source, roster);
+      expect(view.text).toBe(edited);
+      expect(parseNarrative(source).sections.find(section => section.kind === kind)?.characterId).toBe(expected.characterId);
+    }
+    expect(parseNarrative(view.source).sections.find(section => section.kind === kind)).toMatchObject({
+      text: expected.text, characterId: expected.characterId, correspondence: expected.correspondence,
+    });
+  });
+
+  it('conserva i codici aggiunti prima del corpo completando il separatore un carattere alla volta', () => {
+    let view = visibleNarrativeSource('::: lettera\nCiao.\n:::');
+    for (const separator of ['-', '--', '---']) {
+      const edited = `::: lettera\nDATA: Domani\nFIRMA: Ada\n${separator}\nCiao.\n:::`;
+      view = visibleNarrativeSource(updateVisibleNarrativeSource(view, edited));
+      expect(view.text).toBe(edited);
+    }
+    expect(parseNarrative(view.source).sections[0]).toMatchObject({text:'Ciao.',correspondence:{date:'Domani',signature:'Ada'}});
+  });
 });
