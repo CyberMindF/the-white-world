@@ -72,9 +72,29 @@ try {
     await page.goto(`${base}/tavolo-da-gioco/gdr/gioca/${adventureId}`);
     const area = page.locator('#lab-turn'), editor = page.locator('app-gdr-source-editor').filter({has: area});
     await area.waitFor();
-    const choose = async label => editor.getByLabel('Tipo di blocco',{exact:true}).selectOption({label});
-    const person = editor.getByLabel('Personaggio',{exact:true});
+    const closePlaces=page.getByRole('button',{name:'Chiudi i luoghi',exact:true});
+    if(await closePlaces.isVisible()) await closePlaces.click();
+    const choose = async label => { await editor.getByRole('combobox',{name:'Tipo di blocco',exact:true}).click(); await editor.getByRole('option',{name:label,exact:true}).click(); };
+    const person = editor.getByRole('combobox',{name:'Personaggio',exact:true});
+    const choosePerson = async label => { await person.click(); await editor.getByRole('option',{name:label,exact:true}).click(); };
     const code = async (label,value) => area.fill((await area.inputValue()).replace(new RegExp('^'+label+':.*$','m'),label+': '+value));
+    assert.equal(await editor.locator('select').count(),0);
+    const addButton=editor.getByRole('button',{name:'Aggiungi',exact:true});
+    assert.ok(await addButton.evaluate(el=>getComputedStyle(el).backdropFilter.includes('blur')));
+    for (const width of [1280,390,320]) {
+      await page.setViewportSize({width,height:1000});
+      const combo=editor.getByRole('combobox',{name:'Tipo di blocco',exact:true});
+      await combo.click();
+      const menu=editor.getByRole('listbox',{name:'Tipo di blocco',exact:true});
+      await menu.waitFor();
+      await combo.locator('svg').evaluate(el=>Promise.all(el.getAnimations().map(animation=>animation.finished)));
+      const trigger=await combo.boundingBox(), arrow=await combo.locator('svg').boundingBox();
+      assert.ok(trigger.x+trigger.width-arrow.x-arrow.width>=12, 'Freccia distanziata dal bordo');
+      assert.ok(await menu.evaluate(el=>{const r=el.getBoundingClientRect();return el.contains(document.elementFromPoint(r.left+r.width/2,r.top+Math.min(30,r.height/2)));}), 'Menu non coperto dall’editor');
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+      await editor.screenshot({path:join(screenshots,`toolbar-${actor}-${width}.png`),animations:'disabled'});
+      await page.keyboard.press('Escape');
+    }
     // Un solo editor: dati facoltativi e corpo si scrivono nella stessa textbox.
     await choose('Lettera');
     await area.fill('Cara Ada,\n\nci vediamo domani.');await area.evaluate(el=>el.select());
@@ -89,8 +109,7 @@ try {
       await editor.screenshot({path:join(screenshots,`insertion-${actor}-${width}.png`),animations:'disabled'});
     }
     await choose('Messaggio');
-    const option=person.locator('option').filter({hasText:'Shivay'});assert.equal(await option.count(),1);
-    await person.selectOption(await option.getAttribute('value'));
+    await choosePerson('Shivay · PNG');
     await area.fill('Arrivo.');await area.evaluate(el=>el.select());await editor.getByRole('button',{name:'Aggiungi',exact:true}).click();
     await page.waitForFunction(()=>document.querySelector('#lab-turn')?.value.includes('ORA: (Elimina se non ti serve)'));
     await code('DATA','Ieri');await code('ORA','Dopo cena');
@@ -117,7 +136,7 @@ try {
     }
     assert.equal(await editor.locator('.edit-start, .edit-speaker, .gdr-edit-start, .inline-editor').count(),0);
     await editor.getByRole('button',{name:'Torna al testo',exact:true}).click();
-    await choose('Messaggio');await person.selectOption({label:'Nome o numero libero'});
+    await choose('Messaggio');await choosePerson('Nome o numero libero');
     await area.fill('<img src=x onerror=alert(1)>\nArrivo.');await area.evaluate(el=>el.select());
     await editor.getByRole('button',{name:'Aggiungi',exact:true}).click();
     await page.waitForFunction(()=>document.querySelector('#lab-turn')?.value.includes('CONTATTO: (Elimina se non ti serve)'));await code('CONTATTO','+39 123 456');
@@ -130,7 +149,7 @@ try {
       for (const mode of ['Solo testo','Testo e anteprima']) {
         await area.fill('Non posso fidarmi.');await area.evaluate(el=>el.select());
         await editor.getByRole('button',{name:mode,exact:true}).click();
-        await choose(label);await person.selectOption({label:'Daisy · PG'});await editor.getByRole('button',{name:'Aggiungi',exact:true}).click();
+        await choose(label);await choosePerson('Daisy · PG');await editor.getByRole('button',{name:'Aggiungi',exact:true}).click();
         await page.waitForFunction(()=>{
           const field=document.querySelector('#lab-turn');
           return document.activeElement===field && field.value.slice(field.selectionStart,field.selectionEnd)==='Non posso fidarmi.';
@@ -156,8 +175,9 @@ try {
       assert.ok((await editor.locator('.letter-body u').evaluate(el=>getComputedStyle(el).textDecorationLine)).includes('underline'));
       await editor.getByRole('button',{name:'Torna al testo',exact:true}).click();
     } else {
-      const options=editor.getByLabel('Tipo di blocco',{exact:true}).locator('option');
-      assert.equal(await options.filter({hasText:/^(Grassetto|Sottolineato|Corsivo)$/}).count(),0);
+      await editor.getByRole('combobox',{name:'Tipo di blocco',exact:true}).click();
+      assert.equal(await editor.getByRole('option',{name:/^(Grassetto|Sottolineato|Corsivo)$/}).count(),0);
+      await page.keyboard.press('Escape');
     }
     await area.fill(initial);await editor.getByRole('button',{name:'Solo anteprima',exact:true}).click();
     for (const width of [1280,390,320]) {

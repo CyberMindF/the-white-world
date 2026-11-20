@@ -3,6 +3,7 @@ import { By } from '@angular/platform-browser';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GdrSourceEditor } from './gdr-source-editor';
 import { GdrTurn } from '../gdr-turn/gdr-turn';
+import { AppSelect } from '../app-select/app-select';
 import { parseNarrative } from '../gdr-turn/gdr-turn.parser';
 
 describe('anteprima prima della pubblicazione', () => {
@@ -12,12 +13,18 @@ describe('anteprima prima della pubblicazione', () => {
     const fixture=TestBed.createComponent(GdrSourceEditor);
     fixture.componentRef.setInput('source',source);
     fixture.detectChanges();
-    const button=(label:string) => Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>).find(b=>b.textContent?.trim()===label)!;
-    const typeSelect=()=>fixture.nativeElement.querySelector('select[id$="-block-type"]') as HTMLSelectElement;
-    const option=(label:string)=>Array.from(typeSelect().options).find(option=>option.textContent?.trim()===label);
-    const choose=(label:string)=>{const select=typeSelect();select.value=option(label)!.value;select.dispatchEvent(new Event('change'));fixture.detectChanges();};
+    const button=(label:string) => Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>).find(b=>!b.matches('[role=combobox], [role=option]') && b.textContent?.trim()===label)!;
+    const select=(name:string)=>fixture.debugElement.queryAll(By.directive(AppSelect)).find(element=>element.componentInstance.ariaLabel===name)!;
+    const option=(label:string)=>(select('Tipo di blocco').componentInstance as AppSelect).options.find(option=>option.label===label);
+    const chooseSelect=(name:string,label:string)=>{
+      const element=select(name).nativeElement as HTMLElement;
+      (element.querySelector('[role=combobox]') as HTMLButtonElement).click();fixture.detectChanges();
+      (Array.from(element.querySelectorAll<HTMLButtonElement>('[role=option]')).find(option=>option.textContent?.trim()===label)!).click();fixture.detectChanges();
+    };
+    const choose=(label:string)=>chooseSelect('Tipo di blocco',label);
+    const choosePerson=(label:string)=>chooseSelect('Personaggio',label);
     const add=(label:string)=>{choose(label);button('Aggiungi').click();fixture.detectChanges();};
-    return {fixture,button,option,choose,add};
+    return {fixture,button,option,choose,choosePerson,select,add};
   }
   it('richiede del testo e mostra l’anteprima senza emettere un invio', () => {
     const {fixture,button,option,choose,add}=setup('   ');
@@ -66,13 +73,13 @@ describe('anteprima prima della pubblicazione', () => {
     ['Lettera', 'lettera', false], ['Messaggio', 'messaggio', false],
     ['Lettera', 'lettera', true], ['Messaggio', 'messaggio', true],
   ] as const)('inserisce %s (%s, master: %s) con codici modificabili nella textbox', async (label,kind,masterTools) => {
-    const {fixture,button,choose}=setup('Un saluto.');
+    const {fixture,button,choose,choosePerson}=setup('Un saluto.');
     fixture.componentRef.setInput('masterTools',masterTools);
     fixture.componentRef.setInput('characters',[{id:'pg',name:'Daisy',portrait:''}]);
     fixture.componentRef.setInput('characterRoster',[{id:'npc',name:'Ada',portrait:'/assets/a.webp',kind:'png'}]);
     let saved='';fixture.componentInstance.sourceChange.subscribe(source=>{saved=source;fixture.componentRef.setInput('source',source);});
     fixture.detectChanges();await fixture.whenStable();choose(label);await fixture.whenStable();
-    if(kind==='messaggio'){const person=fixture.nativeElement.querySelector('select[id$="-voice"]') as HTMLSelectElement;person.selectedIndex=1;person.dispatchEvent(new Event('change'));fixture.detectChanges();await fixture.whenStable();}
+    if(kind==='messaggio'){choosePerson('Ada · PNG');await fixture.whenStable();}
     expect(saved).toBe('');expect(fixture.nativeElement.querySelector('.insertion-details')).toBeNull();
     const area=fixture.nativeElement.querySelector('.source-pane textarea') as HTMLTextAreaElement;
     area.setSelectionRange(0,10);button('Aggiungi').click();fixture.detectChanges();
@@ -122,14 +129,13 @@ describe('anteprima prima della pubblicazione', () => {
     expect(parseNarrative(saved).sections[1]).toMatchObject({kind,characterId:'ada-1',speaker:'Ada',text:'Ciao'});
   });
   it('mantiene il personaggio scelto cambiando tipo e permette un contatto libero nel messaggio', async () => {
-    const {fixture,button,choose}=setup('Ciao.');
+    const {fixture,button,choose,choosePerson}=setup('Ciao.');
     fixture.componentRef.setInput('characters',[{id:'pg',name:'Daisy',portrait:''}]);
     fixture.componentRef.setInput('characterRoster',[{id:'npc',name:'Ada',portrait:''},{id:'pg',name:'Daisy',portrait:''}]);
     let saved='';fixture.componentInstance.sourceChange.subscribe(value=>{saved=value;fixture.componentRef.setInput('source',value);});
     fixture.detectChanges();await fixture.whenStable();choose('Messaggio');await fixture.whenStable();
-    const person=fixture.nativeElement.querySelector('select[id$="-voice"]') as HTMLSelectElement;
-    expect(person.selectedOptions[0].textContent).toContain('Daisy');
-    person.selectedIndex=0;person.dispatchEvent(new Event('change'));fixture.detectChanges();await fixture.whenStable();
+    expect(fixture.nativeElement.querySelector('[role=combobox][aria-label="Personaggio"]').textContent).toContain('Daisy');
+    choosePerson('Nome o numero libero');await fixture.whenStable();
     const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;area.setSelectionRange(0,5);
     button('Aggiungi').click();fixture.detectChanges();await fixture.whenStable();
     area.value=area.value.replace('CONTATTO: (Elimina se non ti serve)','CONTATTO: +39 123');area.dispatchEvent(new Event('input'));fixture.detectChanges();
@@ -212,8 +218,8 @@ describe('anteprima prima della pubblicazione', () => {
     expect(parseNarrative(saved).sections.map(s=>s.characterId)).toEqual(['ada-2','ada-1','']);
   });
   it('offre gli stessi strumenti per il testo iniziale e per il seguito del master',()=>{
-    const {fixture}=setup('');fixture.componentRef.setInput('allowImages',true);fixture.componentRef.setInput('document',true);fixture.detectChanges();
-    const labels=()=>Array.from(fixture.nativeElement.querySelector('select[id$="-block-type"]').options as HTMLOptionsCollection).map(option=>option.textContent?.trim());
+    const {fixture,select}=setup('');fixture.componentRef.setInput('allowImages',true);fixture.componentRef.setInput('document',true);fixture.detectChanges();
+    const labels=()=>(select('Tipo di blocco').componentInstance as AppSelect).options.map(option=>option.label);
     const documentTools=labels();fixture.componentRef.setInput('document',false);fixture.componentRef.setInput('masterTools',true);fixture.detectChanges();
     expect(labels()).toEqual(documentTools);expect(labels()).toContain('Scheda PNG');
   });

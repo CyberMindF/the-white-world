@@ -3,6 +3,7 @@ import { Component, ElementRef, EventEmitter, HostListener, Input, Output, signa
 export interface AppSelectOption {
   value: string;
   label: string;
+  group?: string;
 }
 
 let nextSelectId = 0;
@@ -24,6 +25,7 @@ export class AppSelect {
   @Input() placeholder = 'Scegli…';
   @Input() name = '';
   @Input() ariaLabel = 'Scegli un’opzione';
+  @Input() inputId = '';
   @Input() disabled = false;
   @Input() required = false;
 

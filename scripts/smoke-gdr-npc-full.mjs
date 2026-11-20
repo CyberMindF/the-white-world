@@ -71,8 +71,8 @@ try {
   const full=page.locator('app-gdr-turn .npc-grid.npc-full').first();await full.waitFor();
   assert.equal(blocks[0].type,'npc_grid');assert.equal(blocks[0].data.layout,'full');assert.equal(blocks[0].data.entries[0].name,'Shivay Lorenne');
   const area=page.locator('#lab-turn'),editor=page.locator('app-gdr-source-editor').filter({has:area});
-  await editor.locator('select').first().selectOption({index:1});
-  await editor.getByLabel('Tipo di blocco',{exact:true}).selectOption({label:'PNG a tutta pagina'});await editor.getByRole('button',{name:'Aggiungi',exact:true}).click();
+  await editor.getByRole('combobox',{name:'Personaggio',exact:true}).click();await editor.getByRole('option',{name:'Shivay Lorenne · PNG',exact:true}).click();
+  await editor.getByRole('combobox',{name:'Tipo di blocco',exact:true}).click();await editor.getByRole('option',{name:'PNG a tutta pagina',exact:true}).click();await editor.getByRole('button',{name:'Aggiungi',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('#lab-turn')?.value.startsWith('::: npc full'));
   const draft=await area.inputValue();assert.ok(draft.startsWith('::: npc full'));assert.ok(draft.includes('characterId: shivay'));assert.equal(draft.includes(photo),false);assert.equal(draft.includes(avatar),false);
   assert.equal(await editor.locator('.inline-editor').count(),0);

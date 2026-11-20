@@ -73,7 +73,7 @@ const assertPosition=async(area,before,label)=>{
 try {
   await page.goto(`${base}/tavolo-da-gioco/gdr/gioca/${adventureId}`);
   const area=page.locator('#lab-turn'), editor=page.locator('app-gdr-source-editor').filter({has:area});
-  const add=async label=>{await editor.getByLabel('Tipo di blocco',{exact:true}).selectOption({label});await editor.getByRole('button',{name:'Aggiungi',exact:true}).click();};
+  const add=async label=>{await editor.getByRole('combobox',{name:'Tipo di blocco',exact:true}).click();await editor.getByRole('option',{name:label,exact:true}).click();await editor.getByRole('button',{name:'Aggiungi',exact:true}).click();};
   for(const width of [1280,390]) {
     await page.setViewportSize({width,height:900});
     for(const mode of ['Solo testo','Testo e anteprima']) {

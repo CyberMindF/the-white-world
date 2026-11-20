@@ -6,7 +6,7 @@
   border: 1px solid var(--border-color);
   border-radius: 12px;
   background: var(--panel-color);
-  overflow: hidden;
+  overflow: visible;
 }
 .toolbar {
   display: flex;
@@ -25,40 +25,25 @@
 .toolbar-field { display: grid; gap: .35rem; min-width: 0; flex: 1 1 12rem; }
 .toolbar-field > label { padding: 0; }
 .character-choice { display: flex; align-items: center; gap: .45rem; min-width: 0; }
-.character-choice select, .toolbar-field > select { width: 100%; min-width: 0; }
-.character-choice select { flex: 1; }
+.character-choice app-select, .toolbar-field > app-select { width: 100%; min-width: 0; font-size: .82rem; }
+.character-choice app-select { flex: 1; }
+.editor-controls { position: relative; z-index: 2; }
+.insert-toolbar { border-radius: 11px 11px 0 0; }
 .insert-toolbar .add-block { flex: 0 0 auto; }
 .tools-label { color: var(--muted-color); font-size: .8rem; margin-right: .3rem; }
 .master-toolbar { background: var(--panel-color); }
 .image-picker { padding: 0 .9rem .8rem; border-bottom: 1px solid var(--border-color); }
-.toolbar select {
-  width: auto;
-  max-width: 100%;
-  padding: 0.4rem 0.5rem;
-  font-size: 0.82rem;
-  min-height: 36px;
-}
 .editor .btn {
-  min-height: 38px;
+  min-height: 2.8rem;
   white-space: normal;
   margin: 0;
-  padding: 0.35rem 0.6rem;
-  border: 1px solid var(--border-color);
-  border-radius: 7px;
-  background: var(--button-bg);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+  padding: .55rem .9rem;
   justify-content: center;
-  font-weight: 600;
-  font-size: 0.8rem;
+  font-size: .82rem;
   line-height: 1.4;
-  color: var(--text-color);
-}
-.editor .btn:hover:not(:disabled) {
-  background: var(--button-hover-bg);
-  border-color: var(--border-color);
 }
 .editor .btn:disabled {
-  opacity: 0.45;
+  opacity: .45;
   cursor: default;
 }
 .view-tools {
@@ -72,8 +57,8 @@
 }
 .editor .btn[aria-pressed='true'] {
   color: var(--accent-color);
-  background: color-mix(in srgb, var(--accent-color) 9%, transparent);
-  border-color: var(--border-color);
+  --glass-background: color-mix(in srgb, var(--accent-color) 12%, var(--panel-color));
+  border-color: var(--focus-color);
 }
 .hint,
 details {
@@ -128,14 +113,6 @@ label,
   margin: 0;
   padding: 0.65rem 0.9rem;
 }
-select {
-  box-sizing: border-box;
-  border: 1px solid var(--border-color);
-  color: var(--text-color);
-  background: var(--input-bg);
-  border-radius: 5px;
-  font: inherit;
-}
 textarea {
   box-sizing: border-box;
   width: 100%;
@@ -183,7 +160,6 @@ summary {
 }
 button:focus-visible,
 textarea:focus-visible,
-select:focus-visible,
 summary:focus-visible {
   outline: 2px solid var(--focus-color);
   outline-offset: -2px;
@@ -200,9 +176,6 @@ summary:focus-visible {
   }
   textarea {
     min-height: 320px;
-  }
-  .toolbar select {
-    flex: 1;
   }
   .toolbar {
     gap: 0.25rem;

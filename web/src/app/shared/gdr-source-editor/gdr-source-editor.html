@@ -5,44 +5,21 @@
         <label [for]="editorId() + '-voice'">Personaggio</label>
         <div class="character-choice">
           @if (selectedCharacter()?.portrait) { <img class="voice-avatar" [src]="selectedCharacter()!.portrait" alt="Ritratto del personaggio selezionato" /> }
-          <select [id]="editorId() + '-voice'"
-            [ngModel]="blockType() === 'messaggio' ? contactIndex() : characterIndex()" (ngModelChange)="selectCharacter(+$event)">
-            @if (blockType() === 'messaggio') { <option [ngValue]="-1">Nome o numero libero</option> }
-            @for (character of selectionCharacters(); track $index) {
-              <option [ngValue]="$index">{{ character.name }}{{ character.kind === 'pg' ? ' · PG' : character.kind === 'png' ? ' · PNG' : '' }}</option>
-            }
-            @if (!selectionCharacters().length && blockType() !== 'messaggio') {
-              <option [ngValue]="0">{{ allowGeneric() ? 'Il mio personaggio' : 'Nessun personaggio disponibile' }}</option>
-            }
-          </select>
+          <app-select [inputId]="editorId() + '-voice'" ariaLabel="Personaggio"
+            [options]="characterOptions()" [value]="'' + (blockType() === 'messaggio' ? contactIndex() : characterIndex())"
+            (valueChange)="selectCharacter(+$event)" />
         </div>
       </div>
       <div class="toolbar-field block-type-field">
         <label [for]="editorId() + '-block-type'">Tipo di blocco</label>
-        <select [id]="editorId() + '-block-type'" [ngModel]="blockType()" (ngModelChange)="selectBlockType($event)">
-          <optgroup label="Scrittura">
-            @for (option of writingTypes; track option.type) { <option [value]="option.type">{{ option.label }}</option> }
-            @if (allowImages() && !masterTools() && !document()) { <option value="image">Immagine</option> }
-          </optgroup>
-          @if (masterTools() || document()) {
-            <optgroup label="Storia">
-              @for (type of blockTypes; track type) {
-                @if (type !== 'image' || allowImages()) { <option [value]="type">{{ type === 'callout' ? 'Riquadro' : type === 'npc_grid' ? 'Scheda PNG' : snippetLabels[type] }}</option> }
-              }
-              <option value="npc_full">PNG a tutta pagina</option>
-              <option value="subtitle">Sottotitolo</option>
-              <option value="emphasis">Corsivo</option>
-              <option value="strong">Grassetto</option>
-              <option value="underline">Sottolineato</option>
-            </optgroup>
-          }
-        </select>
+        <app-select [inputId]="editorId() + '-block-type'" ariaLabel="Tipo di blocco"
+          [options]="blockTypeOptions()" [value]="blockType()" (valueChange)="selectBlockType($event)" />
       </div>
-      <button class="btn add-block" type="button" [disabled]="addDisabled()" (click)="addBlock(sourceArea)">Aggiungi</button>
+      <button class="btn glass-surface add-block" type="button" [disabled]="addDisabled()" (click)="addBlock(sourceArea)">Aggiungi</button>
     </div>
     <div class="view-tools" role="group" aria-label="Visualizzazione editor">
       <button
-        class="btn"
+        class="btn glass-surface"
         type="button"
         [attr.aria-pressed]="mode() === 'source'"
         (click)="setMode('source')"
@@ -50,7 +27,7 @@
         Solo testo
       </button>
       <button
-        class="btn"
+        class="btn glass-surface"
         type="button"
         [attr.aria-pressed]="mode() === 'split'"
         (click)="setMode('split')"
@@ -58,7 +35,7 @@
         Testo e anteprima
       </button>
       <button
-        class="btn"
+        class="btn glass-surface"
         type="button"
         [attr.aria-pressed]="mode() === 'preview'"
         [disabled]="!source().trim()"
@@ -71,7 +48,7 @@
   @if (allowImages() && imagePickerOpen()) {
     <div class="image-picker">
       <app-gdr-image-library [images]="images()" [story]="true" (selected)="insertImage($event.src, sourceArea)" />
-      <button type="button" class="btn" (click)="imagePickerOpen.set(false)">Chiudi immagini</button>
+      <button type="button" class="btn glass-surface" (click)="imagePickerOpen.set(false)">Chiudi immagini</button>
     </div>
   }
   @if (voiceMessage()) {
@@ -102,7 +79,7 @@
         <div class="preview-heading">
           <p class="preview-label">Anteprima</p>
           @if (mode() === 'preview') {
-            <button class="btn" type="button" (click)="setMode('source')">Torna al testo</button>
+            <button class="btn glass-surface" type="button" (click)="setMode('source')">Torna al testo</button>
           }
         </div>
         @if (source().trim()) {

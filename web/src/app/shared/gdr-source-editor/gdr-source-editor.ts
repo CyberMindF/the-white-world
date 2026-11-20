@@ -1,6 +1,7 @@
 import { diagnosticAction } from '../../core/diagnostics';
 import { Component, ElementRef, computed, effect, input, output, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { AppSelect, AppSelectOption } from '../app-select/app-select';
 import { updateGdrTextarea } from '../gdr-textarea';
 import { GdrTurn } from '../gdr-turn/gdr-turn';
 import { parseNarrative, safeNarrativeImage } from '../gdr-turn/gdr-turn.parser';
@@ -14,7 +15,7 @@ export type { NarrativeCharacter } from '../gdr-turn/gdr-writing';
 @Component({
   selector: 'app-gdr-source-editor',
   standalone: true,
-  imports: [FormsModule, GdrTurn, GdrImageLibrary],
+  imports: [FormsModule, AppSelect, GdrTurn, GdrImageLibrary],
   templateUrl: './gdr-source-editor.html',
   styleUrl: './gdr-source-editor.css',
 })
@@ -42,6 +43,27 @@ export class GdrSourceEditor {
   ];
   protected readonly contactCharacters = computed(() => this.characterRoster().length ? this.characterRoster() : this.characters());
   protected readonly selectionCharacters = computed(() => this.blockType() === 'messaggio' ? this.contactCharacters() : this.characters());
+  protected readonly characterOptions = computed<AppSelectOption[]>(() => {
+    const options = this.selectionCharacters().map((character, index) => ({
+      value: String(index),
+      label: character.name + (character.kind === 'pg' ? ' · PG' : character.kind === 'png' ? ' · PNG' : ''),
+    }));
+    if (this.blockType() === 'messaggio') options.unshift({value: '-1', label: 'Nome o numero libero'});
+    else if (!options.length) options.push({value: '0', label: this.allowGeneric() ? 'Il mio personaggio' : 'Nessun personaggio disponibile'});
+    return options;
+  });
+  protected readonly blockTypeOptions = computed<AppSelectOption[]>(() => {
+    const options: AppSelectOption[] = this.writingTypes.map(option => ({value: option.type, label: option.label, group: 'Scrittura'}));
+    if (this.masterTools() || this.document()) {
+      options.push(...this.blockTypes.filter(type => type !== 'image' || this.allowImages()).map(type => ({
+        value: type, label: type === 'callout' ? 'Riquadro' : type === 'npc_grid' ? 'Scheda PNG' : this.snippetLabels[type], group: 'Storia',
+      })), ...[
+        {value: 'npc_full', label: 'PNG a tutta pagina'}, {value: 'subtitle', label: 'Sottotitolo'},
+        {value: 'emphasis', label: 'Corsivo'}, {value: 'strong', label: 'Grassetto'}, {value: 'underline', label: 'Sottolineato'},
+      ].map(option => ({...option, group: 'Storia'})));
+    } else if (this.allowImages()) options.push({value: 'image', label: 'Immagine', group: 'Scrittura'});
+    return options;
+  });
   protected readonly selectedCharacter = computed(() => this.selectionCharacters()[this.blockType() === 'messaggio' ? this.contactIndex() : this.characterIndex()]);
   protected readonly addDisabled = computed(() => (['dialogo','pensiero'].includes(this.blockType()) && !this.characters().length && !this.allowGeneric()));
   protected readonly voiceMessage = signal('');
