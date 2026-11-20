@@ -11,7 +11,10 @@
 .update-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 1rem; padding: 1.2rem; border: 1px solid var(--panel-border-color); border-radius: 1.25rem; }
 .update-emoji { font-size: 2rem; }
 .update-copy time { color: var(--muted-color); font-size: .75rem; }
-.update-copy h2 { margin: .25rem 0 .35rem; font-size: 1.15rem; }
+.update-copy h2, .update-copy h3 { margin: .25rem 0 .35rem; font-size: 1.15rem; }
+.update-copy small { color: var(--muted-color); }
+.draft-list { display: grid; gap: .8rem; margin-top: 1rem; }
+.update-copy { min-width: 0; overflow-wrap: anywhere; }
 .update-copy p { margin: 0 0 .8rem; color: var(--muted-color); line-height: 1.55; }
 .editor-actions { display: flex; align-items: flex-start; flex-wrap: wrap; gap: .4rem; }
 .danger { color: var(--danger-text-color, #e393a0); }

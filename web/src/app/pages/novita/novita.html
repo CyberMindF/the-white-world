@@ -34,6 +34,27 @@
     </section>
 
     @if (canEdit()) {
+      <section class="admin-studio card glass-surface" aria-labelledby="update-drafts-title">
+        <header><div><p class="eyebrow">Modalità admin</p><h2 id="update-drafts-title">Bozze · {{ drafts().length }}</h2></div></header>
+        <p class="admin-intro">Le bozze sono visibili solo in modalità admin e non inviano notifiche. Apri «Modifica» per aggiornarle o spunta «Pubblicata» nell’editor per pubblicarle.</p>
+        <div class="draft-list">
+          @for (draft of drafts(); track draft.id) {
+            <article class="update-card">
+              <span class="update-emoji" aria-hidden="true">{{ draft.emoji }}</span>
+              <div class="update-copy">
+                <small>Bozza · {{ draft.kind === 'contenuto' ? 'Da scoprire' : 'Novità del Mondo' }} · {{ draft.safe ? 'Safe' : 'Non safe' }}</small>
+                <h3>{{ draft.title }}</h3>
+                @if (draft.body) { <p>{{ draft.body }}</p> }
+              </div>
+              <div class="editor-actions">
+                <button class="btn" type="button" [disabled]="saving()" (click)="editUpdate(draft)">Modifica</button>
+                <button class="btn danger" type="button" [disabled]="saving()" (click)="deleteUpdate(draft)">Elimina</button>
+              </div>
+            </article>
+          } @empty { <p class="empty">Nessuna bozza salvata.</p> }
+        </div>
+      </section>
+
       <section class="admin-studio card glass-surface" aria-labelledby="update-editor-title">
         <header><div><p class="eyebrow">Modalità admin</p><h2 id="update-editor-title">Gestione delle novità</h2></div><button type="button" class="btn" (click)="editUpdate(null)">+ Nuova voce</button></header>
         <form id="update-editor" class="editor-form" (ngSubmit)="saveUpdate()">
@@ -47,8 +68,8 @@
           <label class="check"><input type="checkbox" name="updateActive" [(ngModel)]="updateActive" /> Pubblicata</label>
           <label class="check wide"><input type="checkbox" name="updateSafe" [(ngModel)]="updateSafe" /> Safe: visibile anche in safe mode</label>
           <label class="check wide"><input type="checkbox" name="updateAnnounce" [(ngModel)]="updateAnnounce" /> Mostra anche nel popup “Cosa ti sei persa?”</label>
-          <p class="wide hint">Una nuova voce attiva, con annuncio abilitato, invia anche un’email secondo le preferenze di notifica. Le modifiche successive non ripetono l’invio.</p>
-          <div class="wide form-actions"><button class="btn btn-submit" type="submit" [disabled]="saving()">{{ editingUpdateId() ? 'Salva modifiche' : 'Pubblica novità' }}</button></div>
+          <p class="wide hint">Senza la spunta «Pubblicata», la voce resta tra le bozze e non invia notifiche. Quando la pubblichi, controlla anche data e ora: con annuncio abilitato può inviare un’email secondo le impostazioni di notifica. Le modifiche successive non ripetono l’invio.</p>
+          <div class="wide form-actions"><button class="btn btn-submit" type="submit" [disabled]="saving()">{{ !updateActive ? 'Salva bozza' : editingUpdateId() ? 'Salva modifiche' : 'Pubblica novità' }}</button></div>
         </form>
       </section>
 

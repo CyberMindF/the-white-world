@@ -135,6 +135,12 @@ export class GdrPowersPage implements OnInit {
     this.draft.components=SPELL_COMPONENTS.filter(c=>c.code===code?checked:selected.includes(c.code)).map(c=>c.code).join('');
     this.change();
   }
+  protected toggleSystem(id: string, checked: boolean): void {
+    this.draft.systemIds = checked
+      ? [...new Set([...this.draft.systemIds, id])]
+      : this.draft.systemIds.filter((value) => value !== id);
+    this.change();
+  }
   protected async cancel(): Promise<void> {
     this.dirty.set(false);
     this.notice.set('');
@@ -172,7 +178,7 @@ export class GdrPowersPage implements OnInit {
       this.saving.set(false);
       if(creating)this.systemFilter.set('');
       await this.load();
-      this.notice.set(creating?'Voce salvata. Puoi includerla nei sistemi dalla sezione «Sistemi».':'Voce salvata.');
+      this.notice.set('Voce salvata.');
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Non è stato possibile salvare.');
     } finally {

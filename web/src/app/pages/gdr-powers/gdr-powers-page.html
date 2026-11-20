@@ -110,13 +110,18 @@
               />
             </details>
           }
-          <section class="availability" aria-label="Sistemi che usano questa voce">
-            <h3>Usata nei sistemi</h3>
-            @for(id of draft.systemIds;track id){
-              @for(system of systems();track system.id){@if(system.id===id){<p>{{system.name}}</p>}}
-            }@empty{<p>Non ancora inclusa in un sistema.</p>}
-            <p class="hint">La disponibilità si sceglie nella sezione «Sistemi». Assegna le voci ai PG e PNG dai dettagli del personaggio.</p>
-          </section>
+          <fieldset class="system-availability" aria-describedby="system-availability-hint">
+            <legend>Sistemi collegati</legend>
+            @for (system of systems(); track system.id) {
+              <label class="check">
+                <input type="checkbox" [checked]="draft.systemIds.includes(system.id)" (change)="toggleSystem(system.id, $any($event.target).checked)" />
+                <span>{{ system.name }}</span>
+              </label>
+            } @empty {
+              <p>Nessun sistema disponibile. Crea un sistema nella sezione «Sistemi».</p>
+            }
+            <p id="system-availability-hint" class="hint">Seleziona i sistemi in cui rendere disponibile questa voce e premi «Salva voce». Per scollegare un sistema, rimuovi prima la voce dai suoi personaggi. Assegna le voci ai PG e PNG dai dettagli del personaggio.</p>
+          </fieldset>
 
         </fieldset>
         @if (dirty()) {

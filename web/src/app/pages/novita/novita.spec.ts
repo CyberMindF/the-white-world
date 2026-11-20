@@ -16,6 +16,15 @@ class Discovery extends WorldDiscovery {
   seed(){this.updates.set([{id:'1',kind:'contenuto',emoji:'✨',title:'Nuovo capitolo',body:'',route:null,ctaLabel:null,publishedAt:'2026-11-01',safe:true,seen:false}]);this.updateModalOpen.set(true);}
   close(){this.closeUpdates();}
   isOpen(){return this.updateModalOpen();}
+  seedHidden(){
+    const base={kind:'mondo' as const,emoji:'✨',title:'Riservata',body:'',route:null,ctaLabel:null,safe:true,seen:false};
+    this.updates.set([
+      {...base,id:'draft',active:false,publishedAt:'2026-01-01'},
+      {...base,id:'future',active:true,publishedAt:'2099-01-01'},
+    ]);
+    this.updateModalOpen.set(true);
+  }
+  unseenCount(){return this.unseen().length;}
 }
 function setup(impersonating:boolean){
   TestBed.configureTestingModule({providers:[
@@ -39,5 +48,11 @@ describe('lettura delle novità durante impersonazione',()=>{
     await page.read();expect(page.seen()).toBe(true);
     const discovery=TestBed.runInInjectionContext(()=>new Discovery());discovery.seed();discovery.close();
     expect(fetchMock.mock.calls.map(c=>c[0])).toEqual(['/api/world-updates','/api/world-updates/seen','/api/world-updates/seen']);
+  });
+  it('il popup esclude bozze e novità future ricevute dall’API admin, senza segnarle lette',()=>{
+    const fetchMock=setup(false),discovery=TestBed.runInInjectionContext(()=>new Discovery());
+    discovery.seedHidden();expect(discovery.unseenCount()).toBe(0);
+    discovery.close();expect(discovery.isOpen()).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

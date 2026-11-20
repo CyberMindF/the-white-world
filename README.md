@@ -580,6 +580,8 @@ Prima di distribuire il frontend applicare la migrazione `0139_add_safe_mode.sql
 
 ### Email delle Novità
 
+In modalità admin, la pagina Novità mostra un elenco «Bozze» separato dalle voci pubblicate. Togliere la spunta «Pubblicata» e usare «Salva bozza» per conservare una voce senza mostrarla agli altri utenti o inviare notifiche. Dall’elenco si può riaprire «Modifica», controllare data e ora, spuntare «Pubblicata» e salvare. Per gli annunci di funzionalità, attivare la voce soltanto dopo aver verificato il relativo rilascio online.
+
 Tutte le email inviate da `sendEmail`, comprese quelle di recupero password, includono Rory (account `users.id=1`, admin reale attivo) in CCN all’indirizzo salvato nel suo account. Se è già il destinatario principale non viene aggiunta una seconda copia. La CCN fa parte dello stesso invio Resend; per le Novità viene congelata nel payload insieme al destinatario principale, così i retry mantengono la stessa richiesta. I tentativi iniziati prima dell’attivazione conservano i destinatari originali.
 
 Pubblicare un nuovo seguito come master in un’avventura GDR pubblicata crea automaticamente una Novità con titolo e collegamento alla partita, senza riportare il racconto nell’avviso. L’email usa la coda e le impostazioni esistenti. Risposte della giocatrice, bozze, account test, impersonazione e modifiche o eliminazioni di turni già pubblicati non generano nuove Novità.

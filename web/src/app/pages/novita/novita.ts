@@ -37,6 +37,7 @@ export class Novita {
   protected readonly tab = signal<UpdateKind>('contenuto');
   protected readonly visibleUpdates = computed(() => this.updates().filter(update => update.active && (!this.safe.enabled() || update.safe)));
   protected readonly filteredUpdates = computed(() => this.visibleUpdates().filter(update => update.kind === this.tab()));
+  protected readonly drafts = computed(() => this.canEdit() ? this.updates().filter(update => !update.active) : []);
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
   protected readonly error = signal('');
@@ -69,7 +70,7 @@ export class Novita {
   constructor() {
     this.editUpdate(null);
     this.editPromo(null);
-    effect(() => { this.safe.enabled(); void this.load(); });
+    effect(() => { this.safe.enabled(); this.canEdit(); void this.load(); });
   }
 
   protected readonly isAllowed = isSafeRoute;

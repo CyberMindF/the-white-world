@@ -19,6 +19,7 @@ interface WorldUpdate {
   publishedAt: string;
   seen: boolean;
   safe: boolean;
+  active?: boolean;
 }
 
 interface WorldPromo {
@@ -48,7 +49,9 @@ export class WorldDiscovery {
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly updates = signal<WorldUpdate[]>([]);
-  protected readonly unseen = computed(() => this.updates().filter((update) => !update.seen && (!this.safe.enabled() || update.safe)));
+  protected readonly unseen = computed(() => this.updates().filter((update) =>
+    update.active !== false && Date.parse(update.publishedAt) <= Date.now() &&
+    !update.seen && (!this.safe.enabled() || update.safe)));
   protected readonly updateTab = signal<UpdateKind>('contenuto');
   protected readonly visibleUpdates = computed(() => this.unseen().filter((update) => update.kind === this.updateTab()));
   protected readonly updateModalOpen = signal(false);

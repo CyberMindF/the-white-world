@@ -7,11 +7,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GdrManagementShell } from '../../shared/gdr-management/gdr-management-shell';
 import { GdrPowersPage } from './gdr-powers-page';
 
-async function setup() {
+async function setup(kind: 'ability' | 'spell' = 'spell') {
   let power = {
     id: 'spell',
     name: 'Scudo',
-    kind: 'spell',
+    kind,
     description: 'Descrizione originale',
     components: 'VS',
     effects: [],
@@ -127,6 +127,7 @@ describe('catalogo condiviso di abilità e magie', () => {
     const h = await setup();
     h.reject();
     h.check('Materiale');
+    h.check('Sistema B');
     const description = h.fixture.nativeElement.querySelector('[name="description"]');
     description.value = 'Da conservare';
     description.dispatchEvent(new Event('input'));
@@ -142,7 +143,50 @@ describe('catalogo condiviso di abilità e magie', () => {
     expect(h.fixture.nativeElement.textContent).toContain('La voce è cambiata.');
     expect(h.button('+ Nuova voce').disabled).toBe(true);
     expect(h.fetchMock.mock.calls).toHaveLength(2);
-    expect(h.fixture.nativeElement.querySelectorAll('input[type="checkbox"]:checked').length).toBe(3);
+    expect(h.fixture.nativeElement.querySelectorAll('[aria-describedby="spell-components-hint"] input:checked').length).toBe(3);
+    expect(h.fixture.nativeElement.querySelectorAll('.system-availability input:checked').length).toBe(2);
+  });
+  it.each(['spell', 'ability'] as const)('collega e scollega sistemi dalla singola voce di tipo %s', async (kind) => {
+    const h = await setup(kind);
+    const systems = () => [...h.fixture.nativeElement.querySelectorAll('.system-availability input')] as HTMLInputElement[];
+    expect(systems().map(input => input.checked)).toEqual([true, false]);
+    h.check('Sistema A');
+    h.check('Sistema B');
+    expect(h.button('+ Nuova voce').disabled).toBe(true);
+    h.button('Salva voce').click();
+    await vi.waitFor(() => {
+      h.fixture.detectChanges();
+      expect(h.fixture.nativeElement.textContent).toContain('Voce salvata.');
+    });
+    const [, init] = h.fetchMock.mock.calls.find(([, options]) => options?.method === 'POST')!;
+    expect(JSON.parse(init.body)).toMatchObject({ kind, systemIds: ['b'] });
+    expect(JSON.parse(init.body)).not.toHaveProperty('characterIds');
+    expect(systems().map(input => input.checked)).toEqual([false, true]);
+    h.check('Sistema B');
+    h.button('Salva voce').click();
+    await vi.waitFor(() => {
+      h.fixture.detectChanges();
+      expect(h.fixture.nativeElement.textContent).toContain('Voce salvata.');
+    });
+    const posts = h.fetchMock.mock.calls.filter(([, options]) => options?.method === 'POST');
+    expect(JSON.parse(posts[1][1].body).systemIds).toEqual([]);
+  });
+  it('annulla le modifiche ai sistemi e disabilita la selezione fuori dalla modalità admin', async () => {
+    const h = await setup();
+    h.check('Sistema B');
+    h.button('Annulla modifiche').click();
+    await vi.waitFor(() => {
+      h.fixture.detectChanges();
+      expect(h.fetchMock).toHaveBeenCalledTimes(2);
+      expect(h.button('+ Nuova voce').disabled).toBe(false);
+      expect([...h.fixture.nativeElement.querySelectorAll('.system-availability input')].map((input: any) => input.checked)).toEqual([true, false]);
+    });
+    const systems = [...h.fixture.nativeElement.querySelectorAll('.system-availability input')] as HTMLInputElement[];
+    expect(systems.map(input => input.checked)).toEqual([true, false]);
+    (TestBed.inject(AuthService).adminModeEnabled as ReturnType<typeof signal<boolean>>).set(false);
+    h.fixture.detectChanges();
+    expect(systems.every(input => input.matches(':disabled'))).toBe(true);
+    expect(h.button('Salva voce').disabled).toBe(true);
   });
   it('non mostra assegnazioni ai personaggi nel catalogo', async () => {
     const h = await setup();
@@ -153,9 +197,27 @@ describe('catalogo condiviso di abilità e magie', () => {
     const h=await setup();h.button('+ Nuova voce').click();h.fixture.detectChanges();await h.fixture.whenStable();
     const name=h.fixture.nativeElement.querySelector('[name="name"]');name.value='Nuova magia';name.dispatchEvent(new Event('input'));h.fixture.detectChanges();
     h.button('Salva voce').click();
-    await vi.waitFor(()=>{h.fixture.detectChanges();expect(h.fixture.nativeElement.textContent).toContain('Puoi includerla nei sistemi');});
+    await vi.waitFor(()=>{h.fixture.detectChanges();expect(h.fixture.nativeElement.textContent).toContain('Voce salvata.');});
     const [,init]=h.fetchMock.mock.calls.find(([,options])=>options?.method==='POST')!;
     expect(JSON.parse(init.body).systemIds).toEqual([]);
+  });
+  it('permette di scegliere più sistemi già durante la creazione', async () => {
+    const h = await setup();
+    h.button('+ Nuova voce').click();
+    h.fixture.detectChanges();
+    await h.fixture.whenStable();
+    const name = h.fixture.nativeElement.querySelector('[name="name"]');
+    name.value = 'Nuova abilità';
+    name.dispatchEvent(new Event('input'));
+    h.check('Sistema A');
+    h.check('Sistema B');
+    h.button('Salva voce').click();
+    await vi.waitFor(() => {
+      h.fixture.detectChanges();
+      expect(h.fixture.nativeElement.textContent).toContain('Voce salvata.');
+    });
+    const [, init] = h.fetchMock.mock.calls.find(([, options]) => options?.method === 'POST')!;
+    expect(JSON.parse(init.body)).toMatchObject({ revision: null, systemIds: ['a', 'b'] });
   });
   it('salva le componenti selezionate nell’ordine VSM e permette di svuotarle',async()=>{
     const h=await setup();
@@ -173,9 +235,9 @@ describe('catalogo condiviso di abilità e magie', () => {
     const h=await setup();h.button('+ Nuova voce').click();h.fixture.detectChanges();await h.fixture.whenStable();
     const kind=h.fixture.nativeElement.querySelector('select[name="kind"]');
     const select=async(value:string)=>{kind.value=value;kind.dispatchEvent(new Event('change'));h.fixture.detectChanges();await h.fixture.whenStable();h.fixture.detectChanges();};
-    await select('spell');expect(h.fixture.nativeElement.querySelectorAll('input[type="checkbox"]').length).toBe(3);
+    await select('spell');expect(h.fixture.nativeElement.querySelectorAll('[aria-describedby="spell-components-hint"] input').length).toBe(3);
     expect(h.fixture.nativeElement.querySelectorAll('input[type="checkbox"]:checked').length).toBe(0);
-    h.check('Verbale');await select('ability');expect(h.fixture.nativeElement.querySelectorAll('input[type="checkbox"]').length).toBe(0);
+    h.check('Verbale');await select('ability');expect(h.fixture.nativeElement.querySelectorAll('[aria-describedby="spell-components-hint"] input').length).toBe(0);
     await select('spell');expect(h.fixture.nativeElement.querySelectorAll('input[type="checkbox"]:checked').length).toBe(0);
   });
 

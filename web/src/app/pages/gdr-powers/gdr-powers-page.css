@@ -110,4 +110,4 @@ details {
 
 }
 
-.availability{margin-top:1rem;border-top:1px solid var(--panel-border-color);padding-top:.8rem}.availability h3{font-size:.95rem}.availability p{font-size:.9rem}
+.system-availability p { font-size: .9rem; }
