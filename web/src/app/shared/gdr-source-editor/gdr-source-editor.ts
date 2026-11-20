@@ -1,5 +1,5 @@
 import { diagnosticAction } from '../../core/diagnostics';
-import { Component, ElementRef, computed, effect, input, output, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, computed, effect, forwardRef, input, output, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AppSelect, AppSelectOption } from '../app-select/app-select';
 import { updateGdrTextarea } from '../gdr-textarea';
@@ -8,14 +8,16 @@ import { isCharacterNarrativeKind, parseNarrative, safeNarrativeImage } from '..
 import { BLOCK_TYPES, SNIPPET_LABELS } from '../gdr-blocks/gdr-snippets';
 import { GdrImageLibrary, GdrLibraryImage } from '../gdr-characters/gdr-image-library';
 
-import { NarrativeCharacter, NARRATIVE_TEXT_FORMATS, narrativeSnippet, replaceNarrativeSelection } from '../gdr-turn/gdr-writing';
+import { NarrativeCharacter, NARRATIVE_TEXT_FORMATS, findNarrativeCharacter, narrativeSnippet, replaceNarrativeSelection } from '../gdr-turn/gdr-writing';
 import { storedSourceOffset, updateVisibleNarrativeSource, visibleNarrativeSource, visibleSourceOffset } from '../gdr-turn/gdr-visible-source';
 import { writeCorrespondence } from '../gdr-turn/gdr-correspondence';
+import { readCharacterDraft, writeCharacterDraft } from '../gdr-turn/gdr-character-draft';
 export type { NarrativeCharacter } from '../gdr-turn/gdr-writing';
 @Component({
   selector: 'app-gdr-source-editor',
   standalone: true,
-  imports: [FormsModule, AppSelect, GdrTurn, GdrImageLibrary],
+  // Il renderer ospita lo stesso editor; la sua anteprima resta in sola lettura.
+  imports: [FormsModule, AppSelect, forwardRef(() => GdrTurn), GdrImageLibrary],
   templateUrl: './gdr-source-editor.html',
   styleUrl: './gdr-source-editor.css',
 })
@@ -33,6 +35,10 @@ export class GdrSourceEditor {
   readonly characters = input<NarrativeCharacter[]>([]);
   readonly characterRoster = input<NarrativeCharacter[]>([]);
   readonly editorId = input('gdr-source');
+  readonly focusedBlock = input(false);
+  protected readonly focusedCharacter = computed(() => this.focusedBlock() ? readCharacterDraft(this.source()) : null);
+  protected readonly editorValue = computed(() => this.focusedCharacter()?.body ?? this.visibleSource().text);
+  private focusInitialized = false;
   protected readonly mode = signal<'split' | 'source' | 'preview'>('source');
   protected readonly characterIndex = signal(0);
   protected readonly blockType = signal('dialogo');
@@ -42,14 +48,16 @@ export class GdrSourceEditor {
     {type:'azione',label:'Azione'}, {type:'nota',label:'Nota'}, {type:'lettera',label:'Lettera'}, {type:'messaggio',label:'Messaggio'},
   ];
   protected readonly contactCharacters = computed(() => this.characterRoster().length ? this.characterRoster() : this.characters());
-  protected readonly selectionCharacters = computed(() => this.blockType() === 'messaggio' ? this.contactCharacters() : this.characters());
+  protected readonly selectionCharacters = computed(() => this.focusedCharacter()?.kind === 'npc' ? this.characters().filter(character => character.kind === 'png') : this.blockType() === 'messaggio' ? this.contactCharacters() : this.characters());
   protected readonly characterOptions = computed<AppSelectOption[]>(() => {
-    const options = this.selectionCharacters().map((character, index) => ({
+    const options: AppSelectOption[] = this.selectionCharacters().map((character, index) => ({
       value: String(index),
       label: character.name + (character.kind === 'pg' ? ' · PG' : character.kind === 'png' ? ' · PNG' : ''),
     }));
     if (this.blockType() === 'messaggio') options.unshift({value: '-1', label: 'Nome o numero libero'});
     else if (!options.length) options.push({value: '0', label: this.allowGeneric() ? 'Il mio personaggio' : 'Nessun personaggio disponibile'});
+    const draft = this.focusedCharacter();
+    if (draft && this.focusedCharacterIndex() < 0) options.unshift({value:'-1',label:draft.name});
     return options;
   });
   protected readonly blockTypeOptions = computed<AppSelectOption[]>(() => {
@@ -64,7 +72,13 @@ export class GdrSourceEditor {
     } else if (this.allowImages()) options.push({value: 'image', label: 'Immagine', group: 'Scrittura'});
     return options;
   });
-  protected readonly selectedCharacter = computed(() => this.selectionCharacters()[this.blockType() === 'messaggio' ? this.contactIndex() : this.characterIndex()]);
+  protected readonly focusedCharacterIndex = computed(() => {
+    const draft = this.focusedCharacter();
+    if (!draft) return this.characterIndex();
+    const character = findNarrativeCharacter(this.selectionCharacters(), draft.characterId, draft.name);
+    return character ? this.selectionCharacters().indexOf(character) : -1;
+  });
+  protected readonly selectedCharacter = computed(() => this.selectionCharacters()[this.focusedCharacter() ? this.focusedCharacterIndex() : this.blockType() === 'messaggio' ? this.contactIndex() : this.characterIndex()]);
   protected readonly addDisabled = computed(() => (isCharacterNarrativeKind(this.blockType()) && !this.characters().length && !this.allowGeneric()));
   protected readonly voiceMessage = signal('');
   protected readonly imagePickerOpen = signal(false);
@@ -81,9 +95,20 @@ export class GdrSourceEditor {
   protected readonly snippetLabels = SNIPPET_LABELS;
   protected readonly visibleSource = computed(() => visibleNarrativeSource(this.source(), this.characterRoster().length ? this.characterRoster() : this.characters()));
   protected updateSource(value: string): void {
+    const draft = this.focusedCharacter();
+    if (draft) {
+      this.sourceChange.emit(writeCharacterDraft({...draft,body:value},this.characterRoster().length ? this.characterRoster() : this.characters()));
+      return;
+    }
     this.sourceChange.emit(updateVisibleNarrativeSource(this.visibleSource(), value, this.characterRoster().length ? this.characterRoster() : this.characters()));
   }
   protected selectCharacter(index: number): void {
+    const draft = this.focusedCharacter(), character = this.selectionCharacters()[index];
+    if (draft) {
+      if (character && (draft.kind !== 'npc' || character.kind === 'png'))
+        this.sourceChange.emit(writeCharacterDraft({...draft,name:character.name,characterId:character.id,portrait:character.portrait},[character]));
+      return;
+    }
     if (this.blockType() === 'messaggio') this.contactIndex.set(index);
     else this.characterIndex.set(index);
   }
@@ -112,6 +137,20 @@ export class GdrSourceEditor {
   }
 
   constructor() {
+    effect(() => {
+      if (!this.focusedBlock() || this.focusInitialized) return;
+      this.focusInitialized = true;
+      const section = parseNarrative(this.source()).sections[0];
+      const draft = this.focusedCharacter();
+      if (section && section.kind !== 'document') this.blockType.set(section.kind);
+      else if (section?.blocks.length === 1 && !draft) this.blockType.set(section.blocks[0].type);
+      const character = findNarrativeCharacter(this.characters(), draft?.characterId ?? section?.characterId, draft?.name ?? (section?.speaker || section?.correspondence?.signature || ''));
+      if (character) this.characterIndex.set(this.characters().indexOf(character));
+      if (section?.kind === 'messaggio') {
+        const contact = findNarrativeCharacter(this.contactCharacters(), section.characterId, section.speaker);
+        this.contactIndex.set(contact ? this.contactCharacters().indexOf(contact) : -1);
+      }
+    });
     effect(() => {
       if (this.mode() === 'preview' && !this.source().trim()) this.mode.set('source');
       this.modeChange.emit(this.mode());
@@ -160,6 +199,13 @@ export class GdrSourceEditor {
   }
   public openPreview(): void {
     if (this.source().trim()) this.setMode('preview');
+  }
+  public focus(): void {
+    this.sourceArea()?.nativeElement.focus({preventScroll:true});
+  }
+  protected setFocusedNpcLayout(layout: string): void {
+    if (this.focusedCharacter()?.kind !== 'npc' || !this.masterTools() || !['card','full'].includes(layout)) return;
+    this.sourceChange.emit(this.source().replace(/^::: npc(?: full)?(?=\r?$)/m, layout === 'full' ? '::: npc full' : '::: npc'));
   }
   protected insertImage(src: string, area: HTMLTextAreaElement): void {
     if (!this.allowImages() || !safeNarrativeImage(src)) return;

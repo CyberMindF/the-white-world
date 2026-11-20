@@ -1,4 +1,7 @@
-import {TestBed} from '@angular/core/testing';
+import {ComponentFixture,TestBed} from '@angular/core/testing';
+import {By} from '@angular/platform-browser';
+import {AppSelect} from '../app-select/app-select';
+import {GdrSourceEditor} from '../gdr-source-editor/gdr-source-editor';
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {GdrTurn} from './gdr-turn';
 import {serializeGdrBlocks} from '../gdr-blocks/gdr-markdown.serializer';
@@ -11,6 +14,40 @@ function setup(source:string) {
  const buttons=(text:string)=>Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>).filter(b=>b.textContent?.trim()===text);
  return {fixture,buttons};
 }
+function chooseOption(fixture:ComponentFixture<GdrTurn>, name:string, option:string|number):void {
+ const control=fixture.debugElement.queryAll(By.directive(AppSelect)).find(element=>element.componentInstance.ariaLabel===name)!;
+ (control.nativeElement.querySelector('[role=combobox]') as HTMLButtonElement).click();fixture.detectChanges();
+ const choices=Array.from(control.nativeElement.querySelectorAll('[role=option]') as NodeListOf<HTMLButtonElement>);
+ const target=typeof option==='number'?choices[option]:choices.find(button=>button.textContent?.trim()===option)!;
+ target.click();fixture.detectChanges();
+}
+describe('editor condiviso per aggiunta e modifica sul posto',()=>{
+ afterEach(()=>TestBed.resetTestingModule());
+ it('apre la lettera nello stesso editor con tipo già selezionato e anteprima affiancata',async()=>{
+  const letter='::: lettera\nDATA: Dopo cena\nFIRMA: Maerath Solven\n---\nSei convocata nel mio studio.\n:::';
+  const source='Prima.\n\n'+letter+'\n\nDopo.';
+  const {fixture,buttons}=setup(source);
+  fixture.componentRef.setInput('characters',[{id:'maerath',name:'Maerath Solven',kind:'png',portrait:''}]);fixture.detectChanges();
+  buttons('✎ Modifica lettera')[0].click();fixture.detectChanges();await fixture.whenStable();
+  const editor=fixture.debugElement.query(By.directive(GdrSourceEditor));
+  expect(editor.componentInstance.focusedBlock()).toBe(true);
+  expect(fixture.nativeElement.querySelector('select')).toBeNull();
+  const type=fixture.debugElement.queryAll(By.directive(AppSelect)).find(element=>element.componentInstance.ariaLabel==='Tipo di blocco')!;
+  expect(type.componentInstance.value).toBe('lettera');
+  expect(buttons('Aggiungi')).toHaveLength(1);
+  const saved=vi.fn();fixture.componentInstance.sourceChange.subscribe(saved);
+  buttons('Testo e anteprima')[0].click();fixture.detectChanges();
+  expect(fixture.nativeElement.querySelector('.panes.split')).not.toBeNull();
+  expect(fixture.nativeElement.querySelector('.preview-pane .letter-body').textContent).toBe('Sei convocata nel mio studio.');
+  expect(fixture.nativeElement.querySelector('.preview-pane .inline-editor')).toBeNull();
+  expect(saved).not.toHaveBeenCalled();
+  const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
+  area.value=area.value.replace('Sei convocata nel mio studio.','Ti aspetto in biblioteca.');area.dispatchEvent(new Event('input'));fixture.detectChanges();
+  expect(fixture.nativeElement.querySelector('.preview-pane .letter-body').textContent).toBe('Ti aspetto in biblioteca.');
+  buttons('Applica al testo')[0].click();
+  expect(saved).toHaveBeenCalledWith(source.replace('Sei convocata nel mio studio.','Ti aspetto in biblioteca.'));
+ });
+});
 describe('azioni come frasi del personaggio',()=>{
  afterEach(()=>TestBed.resetTestingModule());
  it('mostra nome e gesto sulla stessa riga, senza avatar, nuvoletta o unione dei blocchi',()=>{
@@ -35,8 +72,7 @@ describe('azioni come frasi del personaggio',()=>{
   buttons('✎ Modifica azione')[0].click();fixture.detectChanges();await fixture.whenStable();
   const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
   expect(area.value).toBe('ti guarda.');expect(area.value).not.toContain('ada-1');
-  const selector=fixture.nativeElement.querySelector('select[id$="-voice"]') as HTMLSelectElement;
-  selector.selectedIndex=1;selector.dispatchEvent(new Event('change'));fixture.detectChanges();
+  chooseOption(fixture,'Personaggio',1);
   area.value='si allontana.';area.dispatchEvent(new Event('input'));fixture.detectChanges();
   const saved=vi.fn();fixture.componentInstance.sourceChange.subscribe(saved);buttons('Applica al testo')[0].click();
   expect(saved).toHaveBeenCalledWith('Prima.\n\n::: azione Ada |  | ada-2\nsi allontana.\n:::\n\nDopo.');
@@ -101,8 +137,7 @@ describe('eliminazione dei blocchi della storia',()=>{
   const blocks:GdrBlockRow[]=[{id:'22',documentKey:'avventura',position:0,type:'npc_grid',data:{entries:[{name:'Sally',alt:'Sally',image:'/assets/intera.webp',description:'La gatta di Daisy.'}]}}];
   const {fixture,buttons}=setup(serializeGdrBlocks(blocks));fixture.componentRef.setInput('persistedBlocks',blocks);fixture.detectChanges();
   fixture.nativeElement.querySelector('button.gdr-edit-start').click();fixture.detectChanges();await fixture.whenStable();
-  const select=fixture.nativeElement.querySelector('select[id$="-layout"]') as HTMLSelectElement;
-  expect(select.value).toBe('card');select.value='full';select.dispatchEvent(new Event('change'));fixture.detectChanges();
+  chooseOption(fixture,'Formato PNG','A tutta pagina');
   const save=vi.fn();fixture.componentInstance.blockChange.subscribe(save);buttons('Applica al testo')[0].click();
   expect(save).toHaveBeenCalledWith({id:'22',source:'::: npc full\n- image: /assets/intera.webp\n  alt: Sally\n  name: Sally\n  description: La gatta di Daisy.\n:::'});
  });
@@ -110,8 +145,7 @@ describe('eliminazione dei blocchi della storia',()=>{
   const {fixture,buttons}=setup('');fixture.componentRef.setInput('insertable',true);
   fixture.componentRef.setInput('characters',[{id:'sally',name:'Sally',kind:'png',portrait:'/assets/avatar.webp',photo:'/assets/foto-intera.webp',description:'La gatta di Daisy.'}]);fixture.detectChanges();
   fixture.nativeElement.querySelector('button[aria-label="Inizia a scrivere"]').click();fixture.detectChanges();await fixture.whenStable();
-  const select=fixture.nativeElement.querySelector('select[aria-label="Inserisci contenuto nel blocco"]') as HTMLSelectElement;
-  select.value='npc_full';select.dispatchEvent(new Event('change'));fixture.detectChanges();
+  chooseOption(fixture,'Tipo di blocco','PNG a tutta pagina');buttons('Aggiungi')[0].click();fixture.detectChanges();
   let source='';fixture.componentInstance.sourceChange.subscribe(value=>source=value);
   buttons('Aggiungi al racconto')[0].click();fixture.componentRef.setInput('source',source);fixture.detectChanges();
   const full=fixture.nativeElement.querySelector('.npc-grid.npc-full');
@@ -225,8 +259,7 @@ describe('nomi correnti nei blocchi esistenti', () => {
   fixture.nativeElement.querySelector('button.edit-speaker').click();fixture.detectChanges();await fixture.whenStable();
   const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
   expect(area.value).toBe('Ciao.');
-  const selector=fixture.nativeElement.querySelector('select[id$="-voice"]') as HTMLSelectElement;
-  selector.selectedIndex=1;selector.dispatchEvent(new Event('change'));fixture.detectChanges();
+  chooseOption(fixture,'Personaggio',1);
   area.value='Una nuova battuta.';area.dispatchEvent(new Event('input'));fixture.detectChanges();
   const saved=vi.fn();fixture.componentInstance.sourceChange.subscribe(saved);buttons('Applica al testo')[0].click();
   expect(saved).toHaveBeenCalledWith('Prima.\n\n::: dialogo Ada |  | ada-2\nUna nuova battuta.\n:::\n\nDopo.');

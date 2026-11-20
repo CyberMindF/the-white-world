@@ -6,16 +6,25 @@
         <div class="character-choice">
           @if (selectedCharacter()?.portrait) { <img class="voice-avatar" [src]="selectedCharacter()!.portrait" alt="Ritratto del personaggio selezionato" /> }
           <app-select [inputId]="editorId() + '-voice'" ariaLabel="Personaggio"
-            [options]="characterOptions()" [value]="'' + (blockType() === 'messaggio' ? contactIndex() : characterIndex())"
+            [options]="characterOptions()" [value]="'' + (focusedCharacter() ? focusedCharacterIndex() : blockType() === 'messaggio' ? contactIndex() : characterIndex())"
             (valueChange)="selectCharacter(+$event)" />
         </div>
       </div>
-      <div class="toolbar-field block-type-field">
-        <label [for]="editorId() + '-block-type'">Tipo di blocco</label>
-        <app-select [inputId]="editorId() + '-block-type'" ariaLabel="Tipo di blocco"
-          [options]="blockTypeOptions()" [value]="blockType()" (valueChange)="selectBlockType($event)" />
-      </div>
-      <button class="btn glass-surface add-block" type="button" [disabled]="addDisabled()" (click)="addBlock(sourceArea)">Aggiungi</button>
+      @if (!focusedCharacter()) {
+        <div class="toolbar-field block-type-field">
+          <label [for]="editorId() + '-block-type'">Tipo di blocco</label>
+          <app-select [inputId]="editorId() + '-block-type'" ariaLabel="Tipo di blocco"
+            [options]="blockTypeOptions()" [value]="blockType()" (valueChange)="selectBlockType($event)" />
+        </div>
+        <button class="btn glass-surface add-block" type="button" [disabled]="addDisabled()" (click)="addBlock(sourceArea)">Aggiungi</button>
+      } @else if (focusedCharacter()?.kind === 'npc' && masterTools()) {
+        <div class="toolbar-field">
+          <label [for]="editorId() + '-layout'">Formato PNG</label>
+          <app-select [inputId]="editorId() + '-layout'" ariaLabel="Formato PNG"
+            [options]="[{value:'card',label:'Scheda'},{value:'full',label:'A tutta pagina'}]"
+            [value]="focusedCharacter()?.layout === 'full' ? 'full' : 'card'" (valueChange)="setFocusedNpcLayout($event)" />
+        </div>
+      }
     </div>
     <div class="view-tools" role="group" aria-label="Visualizzazione editor">
       <button
@@ -64,7 +73,7 @@
         (focus)="setScrollDriver('source')" (pointerdown)="setScrollDriver('source')"
         (wheel)="setScrollDriver('source')" (keydown)="setScrollDriver('source')"
         (scroll)="syncScroll('source')"
-        [ngModel]="visibleSource().text"
+        [ngModel]="editorValue()"
         (ngModelChange)="updateSource($event)"
         spellcheck="true"
         placeholder="Scrivi qui…"

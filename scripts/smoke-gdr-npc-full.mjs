@@ -66,7 +66,8 @@ await page.addInitScript(()=>{
 try {
   await page.goto(`${base}/tavolo-da-gioco/gdr/gioca/${adventureId}`);
   await page.locator('app-gdr-turn button.gdr-edit-start').first().click();
-  await page.getByLabel('Formato PNG',{exact:true}).selectOption('full');
+  await page.getByRole('combobox',{name:'Formato PNG',exact:true}).click();
+  await page.getByRole('option',{name:'A tutta pagina',exact:true}).click();
   await page.getByRole('button',{name:'Applica al testo',exact:true}).click();
   const full=page.locator('app-gdr-turn .npc-grid.npc-full').first();await full.waitFor();
   assert.equal(blocks[0].type,'npc_grid');assert.equal(blocks[0].data.layout,'full');assert.equal(blocks[0].data.entries[0].name,'Shivay Lorenne');

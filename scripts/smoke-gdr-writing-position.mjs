@@ -117,7 +117,10 @@ try {
   await page.locator('app-gdr-turn button.gdr-edit-start').first().click();
   const inline=page.locator('.inline-editor textarea');
   before=await placeSelection(inline);
-  await page.getByLabel('Inserisci contenuto nel blocco',{exact:true}).selectOption('heading');
+  const inlineEditor=page.locator('.inline-editor');
+  await inlineEditor.getByRole('combobox',{name:'Tipo di blocco',exact:true}).click();
+  await inlineEditor.getByRole('option',{name:'Titolo',exact:true}).click();
+  await inlineEditor.getByRole('button',{name:'Aggiungi',exact:true}).click();
   await assertPosition(inline,before,'modifica rapida');
   await inline.screenshot({path:join(screenshots,'cursore-nella-parte-alta.png')});
   assert.deepEqual(errors,[]);

@@ -1,16 +1,14 @@
-import { Component, ElementRef, ViewChild, computed, effect, inject, input, output, signal } from '@angular/core';
+import { Component, ViewChild, computed, effect, forwardRef, inject, input, output, signal } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { renderGdrInline } from '../gdr-inline-text';
 import { NgTemplateOutlet } from '@angular/common';
 import { GdrThoughtCloud } from './gdr-thought-cloud';
-import { FormsModule } from '@angular/forms';
-import { updateGdrTextarea } from '../gdr-textarea';
 import { PROFILE_FIELDS } from '../gdr-characters/character-profile';
 import { GdrBlocks } from '../gdr-blocks/gdr-blocks';
-import { BLOCK_TYPES, SNIPPET_LABELS } from '../gdr-blocks/gdr-snippets';
-import { NarrativeCharacter, NARRATIVE_TEXT_FORMATS, findNarrativeCharacter, narrativeNameMatches, insertNarrativeBlock, narrativeSnippet, replaceNarrativeSelection } from './gdr-writing';
-import {CharacterDraft,readCharacterDraft,writeCharacterDraft} from './gdr-character-draft';
-import { storedSourceOffset, updateVisibleNarrativeSource, visibleNarrativeSource, visibleSourceOffset } from './gdr-visible-source';
+import { NarrativeCharacter, findNarrativeCharacter, narrativeNameMatches, insertNarrativeBlock } from './gdr-writing';
+import {readCharacterDraft} from './gdr-character-draft';
+import {GdrSourceEditor} from '../gdr-source-editor/gdr-source-editor';
+import {GdrLibraryImage} from '../gdr-characters/gdr-image-library';
 import { NarrativeSection, isCharacterNarrativeKind, parseNarrative, safeNarrativeImage } from './gdr-turn.parser';
 import { GdrBlockRow, GdrParagraphData } from '../gdr-blocks/gdr-block.types';
 import { serializeGdrBlocks } from '../gdr-blocks/gdr-markdown.serializer';
@@ -25,7 +23,7 @@ interface RenderedSection extends NarrativeSection {
 @Component({
   selector: 'app-gdr-turn',
   standalone: true,
-  imports: [GdrBlocks, FormsModule, NgTemplateOutlet, GdrThoughtCloud],
+  imports: [GdrBlocks, NgTemplateOutlet, GdrThoughtCloud, forwardRef(() => GdrSourceEditor)],
   template: `
     @if (viewedCharacter(); as character) {
       <div class="character-backdrop" (click)="viewedCharacter.set(null)">
@@ -94,98 +92,33 @@ interface RenderedSection extends NarrativeSection {
         class="inline-editor"
         [attr.aria-label]="inserting() ? 'Aggiungi in questo punto' : 'Modifica in questo punto'"
       >
-        <div class="inline-header">
-          <strong>{{ inserting() ? 'Aggiungi in questo punto' : 'Modifica questo punto' }}</strong
-          ><span>Solo questa parte del racconto.</span>
-        </div>
-        <div class="inline-tools">
-          @if(!characterDraft()){
-          <label [for]="fieldId + '-type'">Inserisci</label>
-          <select
-            #snippetType
-            [id]="fieldId + '-type'"
-            aria-label="Inserisci contenuto nel blocco"
-            (change)="insertSnippet(snippetType.value); snippetType.value = ''"
-          >
-            <option value="">Scegli un contenuto…</option>
-            @for (type of blockTypes; track type) {
-              <option [value]="type">{{ snippetLabels[type] }}</option>
-            }
-            @if (deletable() || insertable()) {
-              <option value="npc_full">PNG a tutta pagina</option>
-              <option value="emphasis">Corsivo</option>
-              <option value="strong">Grassetto</option>
-              <option value="underline">Sottolineato</option>
-            }
-            <option value="dialogo" [disabled]="!characters().length && !allowGeneric()">
-              Dialogo
-            </option>
-            <option value="pensiero" [disabled]="!characters().length && !allowGeneric()">Pensiero</option>
-            <option value="lettera">Lettera</option>
-            <option value="messaggio">Messaggio</option>
-            <option value="azione" [disabled]="!characters().length && !allowGeneric()">Azione</option>
-            <option value="nota">Fuori personaggio</option>
-          </select>
-          }
-          @if (characters().length) {
-            <label [for]="fieldId + '-voice'">Personaggio</label>
-            <select
-              [id]="fieldId + '-voice'"
-              [ngModel]="selectedVoice()"
-              (ngModelChange)="setVoice(+$event)"
-            >
-              @if(characterDraft() && selectedVoice()===-1){<option [ngValue]="-1">{{characterDraft()!.name}}</option>}
-              @for (c of characters(); track $index) {
-                <option [ngValue]="$index" [disabled]="characterDraft()?.kind==='npc' && c.kind!=='png'">{{ c.name }}</option>
-              }
-            </select>
-          }
-          @if ((deletable() || insertable()) && npcLayout()) {
-            <label [for]="fieldId + '-layout'">Formato PNG</label>
-            <select [id]="fieldId + '-layout'" [ngModel]="npcLayout()" (ngModelChange)="setNpcLayout($event)">
-              <option value="card">Scheda</option>
-              <option value="full">A tutta pagina</option>
-            </select>
-          }
-        </div>
-        @if(characterDraft()?.kind==='npc'){<p class="character-hint">Foto e dati provengono dal personaggio. Puoi aggiungere una descrizione per questa scena.</p>}
-        <label class="sr-only" [for]="fieldId">{{ inserting() ? 'Testo del nuovo blocco' : 'Testo del blocco selezionato' }}</label>
-        <textarea
-          #inlineArea
-          [id]="fieldId"
-          rows="7"
-          [ngModel]="editorValue()"
-          (ngModelChange)="setEditorValue($event)"
-          spellcheck="true"
-        ></textarea>
-        @if (draftParsed().errors.length) {
-          <ul class="inline-message" role="status">
-            @for (error of draftParsed().errors; track $index) {
-              <li>{{ error.message }}</li>
-            }
-          </ul>
-        }
+        <div class="inline-header"><strong>{{ inserting() ? 'Aggiungi in questo punto' : 'Modifica questo punto' }}</strong></div>
+        <app-gdr-source-editor #inlineSourceEditor
+          [source]="draft()" (sourceChange)="setDraft($event)"
+          [editorId]="fieldId" [label]="inserting() ? 'Testo del nuovo blocco' : 'Testo del blocco selezionato'"
+          [characters]="characters()" [characterRoster]="characterRoster()" [allowGeneric]="allowGeneric()"
+          [masterTools]="deletable() || insertable()" [allowImages]="deletable() || insertable()" [images]="images()"
+          [focusedBlock]="true" />
         @if (message()) {
           <p class="inline-message" role="status">{{ message() }}</p>
         }
         <div class="inline-actions">
           <button
+            class="btn glass-surface"
             type="button"
             [disabled]="!!deleting() || (inserting() && !draft().trim()) || emptyDialogue() || draftParsed().errors.length > 0"
             (click)="apply()"
           >
             {{ inserting() ? 'Aggiungi al racconto' : 'Applica al testo' }}</button
-          ><button type="button" (click)="cancel()">
+          ><button class="btn glass-surface" type="button" (click)="cancel()">
             {{ inserting() ? 'Annulla aggiunta' : 'Annulla modifica rapida' }}</button
-          ><button type="button" [attr.aria-pressed]="preview()" (click)="preview.set(!preview())">
-            Anteprima di questa parte
-          </button>
+          >
           @if (insertable() && !inserting() && !deleting()) {
-            <button type="button" [disabled]="!canAddBeside()" (click)="addBeside('above')">Aggiungi sopra</button>
-            <button type="button" [disabled]="!canAddBeside()" (click)="addBeside('below')">Aggiungi sotto</button>
+            <button class="btn glass-surface" type="button" [disabled]="!canAddBeside()" (click)="addBeside('above')">Aggiungi sopra</button>
+            <button class="btn glass-surface" type="button" [disabled]="!canAddBeside()" (click)="addBeside('below')">Aggiungi sotto</button>
           }
           @if (canDelete() && !deleting()) {
-            <button type="button" class="delete-block" (click)="requestDelete()">
+            <button class="btn glass-surface delete-block" type="button" (click)="requestDelete()">
               {{ editing()?.ownerId || deletionScope() === 'partita' ? 'Elimina blocco' : 'Elimina dalla bozza' }}
             </button>
           }
@@ -196,17 +129,8 @@ interface RenderedSection extends NarrativeSection {
         @if (deleting()) {
           <div class="delete-confirm" role="alert">
             <p>Eliminare questo blocco {{ editing()?.ownerId || deletionScope() === 'partita' ? 'dalla partita' : 'dalla bozza' }}?</p>
-            <button type="button" (click)="confirmDelete()">Elimina</button>
-            <button type="button" (click)="cancelDelete()">Annulla</button>
-          </div>
-        }
-        @if (preview()) {
-          <div class="inline-preview">
-            @for (section of resolvedDraft(); track section.id) {
-              <ng-container
-                *ngTemplateOutlet="content; context: { $implicit: section, canEdit: false }"
-              />
-            }
+            <button class="btn glass-surface" type="button" (click)="confirmDelete()">Elimina</button>
+            <button class="btn glass-surface" type="button" (click)="cancelDelete()">Annulla</button>
           </div>
         }
       </section>
@@ -459,104 +383,18 @@ interface RenderedSection extends NarrativeSection {
       font: inherit;
       cursor: pointer;
     }
-    .inline-tools {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.6rem 0.8rem;
-      font-size: 0.8rem;
-      border-bottom: 1px solid var(--border-color);
-    }
-    .inline-tools select {
-      min-width: 0;
-      max-width: 100%;
-      border: 1px solid var(--border-color);
-      border-radius: 5px;
-      color: var(--text-color);
-      background: var(--input-bg);
-      font: inherit;
-      padding: 0.4rem;
-    }
-    .inline-editor {
-      border: 1px solid var(--accent-color);
-      border-radius: 8px;
-      background: var(--input-bg);
-      margin: 1rem 0;
-      overflow: hidden;
-    }
-    .inline-header {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.4rem 1rem;
-      padding: 0.7rem 0.8rem;
-      border-bottom: 1px solid var(--border-color);
-      font-size: 0.85rem;
-    }
-    .inline-header span {
-      font-size: 0.8rem;
-      color: var(--muted-color);
-    }
-    .character-hint{padding:0 .8rem;font-size:.85rem;color:var(--muted-color)}
-    textarea {
-      display: block;
-      width: 100%;
-      box-sizing: border-box;
-      min-height: 160px;
-      resize: vertical;
-      border: 0;
-      background: var(--input-bg);
-      padding: 0.8rem;
-      color: var(--text-color);
-      font: inherit;
-      font-family: ui-monospace, monospace;
-      font-size: 0.86rem;
-      line-height: 1.7;
-    }
-    .inline-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      padding: 0.6rem 0.7rem;
-      border-top: 1px solid var(--border-color);
-    }
-    .inline-actions button {
-      border: 1px solid var(--border-color);
-      background: var(--button-bg);
-      border-radius: 5px;
-      color: var(--text-color);
-      font: inherit;
-      font-size: 0.8rem;
-      min-height: 36px;
-      padding: 0.35rem 0.6rem;
-      cursor: pointer;
-    }
-    .inline-actions button:first-child {
-      color: var(--accent-color);
-    }
-    .inline-actions .delete-block {
-      margin-inline-start: auto;
-      color: var(--danger-text-color);
-    }
-    .inline-preview {
-      padding: 0.9rem;
-      border-top: 1px solid var(--border-color);
-      background: var(--panel-color);
-    }
+    .inline-editor { margin: 1rem 0; min-width: 0; }
+    .inline-header { padding: 0 0 .5rem; font-size: .85rem; }
+    .inline-actions { display: flex; flex-wrap: wrap; gap: .5rem; padding: .65rem 0; }
+    .inline-actions .btn { margin: 0; font-size: .82rem; min-height: 2.8rem; padding: .55rem .9rem; line-height: 1.4; }
+    .inline-actions .btn:first-child { color: var(--accent-color); }
+    .inline-actions .delete-block { margin-inline-start: auto; color: var(--danger-text-color); }
     .inline-message {
       font-size: 0.8rem;
       color: var(--danger-text-color);
       padding: 0 0.8rem;
     }
-    .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-    }
-    button:focus-visible,
-    textarea:focus-visible {
+    button:focus-visible {
       outline: 2px solid var(--focus-color);
       outline-offset: -2px;
     }
@@ -606,12 +444,10 @@ export class GdrTurn {
   readonly characterRoster = input<NarrativeCharacter[]>([]);
   readonly characters = input<NarrativeCharacter[]>([]);
   readonly allowGeneric = input(true);
-  protected readonly blockTypes = BLOCK_TYPES;
-  protected readonly snippetLabels = SNIPPET_LABELS;
-  protected readonly voice = signal(0);
+  readonly images = input<GdrLibraryImage[]>([]);
   readonly sourceChange = output<string>();
   readonly editingChange = output<boolean>();
-  @ViewChild('inlineArea') private area?: ElementRef<HTMLTextAreaElement>;
+  @ViewChild('inlineSourceEditor') private sourceEditor?: GdrSourceEditor;
   protected readonly fieldId = 'inline-' + crypto.randomUUID();
   protected readonly parsed = computed(() => parseNarrative(this.source()));
   protected readonly rawRendered = computed<RenderedSection[]>(() => {
@@ -702,52 +538,14 @@ export class GdrTurn {
   }
   protected readonly inserting = computed(() => this.editing()?.inserting === true);
   protected readonly draft = signal('');
-  protected readonly characterDraft=signal<CharacterDraft|null>(null);
-  private readonly visibleDraft = computed(() => visibleNarrativeSource(this.draft(), this.characterRoster().length ? this.characterRoster() : this.characters()));
-  protected readonly editorValue=computed(()=>this.characterDraft()?.body??this.visibleDraft().text);
   protected readonly emptyDialogue = computed(() => {
-    if (isCharacterNarrativeKind(this.characterDraft()?.kind ?? '')) return !this.editorValue().trim();
+    const draft = readCharacterDraft(this.draft());
+    if (draft && isCharacterNarrativeKind(draft.kind)) return !draft.body.trim();
     const sections = this.draftParsed().sections;
     return sections.length === 1 && !!sections[0].correspondence && !sections[0].text.trim();
   });
-  protected readonly selectedVoice=computed(()=>{
-    const draft=this.characterDraft();if(!draft)return this.voice();
-    const character=this.findCharacter(this.characters(),draft.characterId,draft.name);
-    return character?this.characters().indexOf(character):-1;
-  });
-  private setDraft(value:string):void{
-    this.draft.set(value);
-    this.characterDraft.set(readCharacterDraft(value));
-  }
-  protected setEditorValue(value:string):void{
-    const current=this.characterDraft();
-    if(current){const next={...current,body:value};this.characterDraft.set(next);this.draft.set(writeCharacterDraft(next,this.characterRoster().length?this.characterRoster():this.characters()));}
-    else this.setDraft(updateVisibleNarrativeSource(this.visibleDraft(), value, this.characterRoster().length ? this.characterRoster() : this.characters()));
-  }
-  protected setVoice(index:number):void{
-    this.voice.set(index);
-    const current=this.characterDraft(),character=this.characters()[index];
-    if(!current||!character||(current.kind==='npc'&&character.kind!=='png'))return;
-    const next={...current,characterId:character.id,name:character.name,portrait:character.portrait};
-    this.characterDraft.set(next);this.draft.set(writeCharacterDraft(next,[character]));
-  }
+  protected setDraft(value: string): void { this.draft.set(value); }
   protected readonly draftParsed = computed(() => parseNarrative(this.draft()));
-  protected readonly resolvedDraft=computed(()=>this.resolveSections(this.draftParsed().sections));
-  protected readonly npcLayout = computed(() => {
-    const parsed = this.draftParsed();
-    if (parsed.errors.length || parsed.sections.length !== 1) return null;
-    const section = parsed.sections[0];
-    if (section.kind !== 'document' || section.blocks.length !== 1 || section.blocks[0].type !== 'npc_grid') return null;
-    return (section.blocks[0].data as {layout?:'full'}).layout === 'full' ? 'full' : 'card';
-  });
-  protected setNpcLayout(layout: string): void {
-    if (!this.editable() || (!this.deletable() && !this.insertable()) || !this.npcLayout() || !['card','full'].includes(layout)) return;
-    const area = this.area?.nativeElement;
-    if (!area) return;
-    const current = this.draft(), next = current.replace(/^::: npc(?: full)?(?=\r?$)/m, layout === 'full' ? '::: npc full' : '::: npc');
-    updateGdrTextarea(area, () => this.setDraft(next), area.selectionStart, area.selectionEnd);
-  }
-  protected readonly preview = signal(false);
   protected readonly message = signal('');
   protected readonly editing = signal<{
     start: number;
@@ -787,39 +585,10 @@ export class GdrTurn {
     const owner=this.rendered().find(section=>section.ownerId && offset>section.ownerStart! && offset<section.ownerEnd!);
     this.editing.set({ start: offset, end: offset, snapshot: this.source(), inserting: true,anchor,...(owner?{ownerId:owner.ownerId,ownerStart:owner.ownerStart,ownerEnd:owner.ownerEnd}:{}) });
     this.setDraft('');
-    this.preview.set(false);
     this.message.set('');
     this.editingChange.emit(true);
-    requestAnimationFrame(() => this.area?.nativeElement.focus({ preventScroll: true }));
+    requestAnimationFrame(() => this.sourceEditor?.focus());
   }
-  protected insertSnippet(type: string): void {
-    const area = this.area?.nativeElement;
-    if (type === 'npc_full' && !this.deletable() && !this.insertable()) return;
-    if (NARRATIVE_TEXT_FORMATS[type] && !this.deletable() && !this.insertable()) return;
-    if (!area || !type || (isCharacterNarrativeKind(type) && !this.characters().length && !this.allowGeneric()))
-      return;
-    const start = storedSourceOffset(this.visibleDraft(), area.selectionStart),
-      end = storedSourceOffset(this.visibleDraft(), area.selectionEnd);
-    const snippet = narrativeSnippet(
-      type,
-      area.value.slice(area.selectionStart, area.selectionEnd),
-      this.characters()[this.voice()] ?? this.characters()[0],
-    );
-    if (!snippet) {
-      if (type === 'npc_grid' || type === 'npc_full') this.message.set('Scegli un PNG nel menu Personaggio.');
-      return;
-    }
-    this.message.set('');
-    const formatMarker = NARRATIVE_TEXT_FORMATS[type] ?? '';
-    const replacement = replaceNarrativeSelection(this.draft(), start, end, snippet, !!formatMarker);
-    const characterDraft = readCharacterDraft(replacement.source);
-    const nextView = visibleNarrativeSource(replacement.source, this.characterRoster().length ? this.characterRoster() : this.characters());
-    const correspondenceBody = ['lettera','messaggio'].includes(type) ? parseNarrative(snippet).sections[0]?.contentStart : undefined;
-    const selectionStart = correspondenceBody === undefined ? replacement.start + formatMarker.length : replacement.start + correspondenceBody;
-    const selectionEnd = correspondenceBody === undefined ? replacement.end - formatMarker.length : replacement.start + snippet.lastIndexOf('\n');
-    updateGdrTextarea(area, () => this.setDraft(replacement.source), characterDraft ? 0 : visibleSourceOffset(nextView, selectionStart), characterDraft?.body.length ?? visibleSourceOffset(nextView, selectionEnd));
-  }
-
   public startEditing(range: { start: number; end: number; ownerId?:string; ownerStart?:number; ownerEnd?:number }): void {
     if (!this.editable() || !this.editBlocks() || !range || this.deleting()) return;
     if (this.editing()) {
@@ -829,10 +598,9 @@ export class GdrTurn {
     const section = this.rendered().find(section => section.start === range.start && section.end === range.end);
     this.editing.set({ ...section, ...range, snapshot: this.source() });
     this.setDraft(this.source().slice(range.start, range.end));
-    this.preview.set(false);
     this.message.set('');
     this.editingChange.emit(true);
-    requestAnimationFrame(() => this.area?.nativeElement.focus({ preventScroll: true }));
+    requestAnimationFrame(() => this.sourceEditor?.focus());
   }
   protected apply(): void {
     const current = this.editing();
