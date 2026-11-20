@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
 
+# Quando arriva un nuovo rilascio, termina solo la notifica ormai superata.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   notify:
     runs-on: ubuntu-latest
