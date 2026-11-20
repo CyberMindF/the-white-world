@@ -83,6 +83,8 @@ legend {
   width: auto;
   margin-top: 0.2rem;
 }
+.spell-component-options { display:flex; flex-wrap:wrap; gap:.25rem 1.5rem; }
+.spell-component-options .check { align-items:center; margin:.5rem 0; }
 .actions {
   display: flex;
   flex-wrap: wrap;

@@ -75,9 +75,11 @@
           @if(draft.kind==='spell'){
             <fieldset aria-describedby="spell-components-hint">
               <legend>Componenti della magia</legend>
+              <div class="spell-component-options">
               @for(component of spellComponents;track component.code){
                 <label class="check"><input type="checkbox" [checked]="(draft.components??'').includes(component.code)" (change)="toggleComponent(component.code,$any($event.target).checked)" /><span>{{component.code}} · {{component.label}}</span></label>
               }
+              </div>
               <p id="spell-components-hint" class="hint">Facoltative. Se non ne selezioni nessuna, non compaiono nella scheda.</p>
             </fieldset>
           }
