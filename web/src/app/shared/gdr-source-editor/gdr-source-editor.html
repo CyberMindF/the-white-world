@@ -35,7 +35,9 @@
       >
         Dialogo
       </button>
+      <button class="btn" type="button" [disabled]="!characters().length && !allowGeneric()" (click)="insert('pensiero', sourceArea)">Pensiero</button>
       <button class="btn" type="button" (click)="insert('azione', sourceArea)">Azione</button>
+      <button class="btn" type="button" (click)="insert('lettera', sourceArea)">Lettera / Messaggio</button>
       <button class="btn" type="button" (click)="insert('nota', sourceArea)">
         Nota
       </button>
@@ -130,6 +132,7 @@
             [editable]="mode() === 'preview'"
             [deletable]="masterTools() || document()"
             [characters]="characters()"
+            [characterRoster]="characterRoster()"
             [allowGeneric]="allowGeneric()"
             (sourceChange)="sourceChange.emit($event)"
             (editingChange)="inlineEditing.set($event); editingChange.emit($event)"
@@ -154,6 +157,8 @@
     <details>
       <summary>Come funziona la scrittura</summary>
       <ul>
+        <li>Pensiero riporta in corsivo ciò che pensa il personaggio selezionato.</li>
+        <li>Lettera / Messaggio apre i campi dedicati: scegli il formato e compila il testo. Firma, data e orario sono facoltativi.</li>
         <li><strong>Dialogo</strong>: scegli il personaggio e inserisci le sue parole.</li>
         <li><strong>Azione</strong>: racconta cosa fa.</li>
         <li><strong>Nota</strong>: scrivi al master fuori dalla storia.</li>

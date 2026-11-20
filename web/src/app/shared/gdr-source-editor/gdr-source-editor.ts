@@ -28,6 +28,7 @@ export class GdrSourceEditor {
   readonly allowGeneric = input(true);
   readonly allowImages = input(false);
   readonly characters = input<NarrativeCharacter[]>([]);
+  readonly characterRoster = input<NarrativeCharacter[]>([]);
   readonly editorId = input('gdr-source');
   protected readonly inlineEditing = signal(false);
   protected readonly mode = signal<'split' | 'source' | 'preview'>('source');
@@ -120,7 +121,7 @@ export class GdrSourceEditor {
     const end = area.selectionEnd ?? start;
     const selected = text.slice(start, end);
     const character = this.characters()[this.characterIndex()] ?? this.characters()[0];
-    if (type === 'dialogo' && !character && !this.allowGeneric()) return;
+    if (['dialogo', 'pensiero'].includes(type) && !character && !this.allowGeneric()) return;
     const snippet = customSnippet ?? narrativeSnippet(type, selected, character);
     if (!snippet) {
       if (type === 'npc_grid' || type === 'npc_full') this.voiceMessage.set('Scegli un PNG nel menu Personaggio.');
@@ -128,14 +129,14 @@ export class GdrSourceEditor {
     }
     this.voiceMessage.set('');
     const replacement = replaceNarrativeSelection(text, start, end, snippet);
-    const fenced = ['dialogo', 'azione', 'nota', 'callout'].includes(type);
+    const fenced = ['dialogo', 'pensiero', 'lettera', 'messaggio', 'azione', 'nota', 'callout'].includes(type);
     const heading = type === 'heading' || type === 'subtitle';
     const contentOffset = fenced ? snippet.indexOf('\n') + 1 : heading ? snippet.indexOf(' ') + 1 : type === 'emphasis' ? 1 : 0;
     const contentLength = fenced ? snippet.lastIndexOf('\n') - contentOffset : type === 'emphasis' ? snippet.length - 2 : snippet.length - contentOffset;
     updateGdrTextarea(area, () => {
       this.sourceChange.emit(replacement.source);
-      this.setMode(['dialogo','npc_grid','npc_full'].includes(type)?'preview':this.mode() === 'preview' ? 'split' : this.mode());
+      this.setMode(['dialogo','pensiero','lettera','messaggio','npc_grid','npc_full'].includes(type)?'preview':this.mode() === 'preview' ? 'split' : this.mode());
     }, replacement.start + contentOffset, replacement.start + contentOffset + contentLength);
-    if(['dialogo','npc_grid','npc_full'].includes(type))requestAnimationFrame(()=>this.narrativeEditor()?.startEditing({start:replacement.start,end:replacement.end}));
+    if(['dialogo','pensiero','lettera','messaggio','npc_grid','npc_full'].includes(type))requestAnimationFrame(()=>this.narrativeEditor()?.startEditing({start:replacement.start,end:replacement.end}));
   }
 }

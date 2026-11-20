@@ -1,4 +1,5 @@
 import { GdrBlockRow } from '../gdr-blocks/gdr-block.types';
+import { CorrespondenceData, parseCorrespondenceHeader } from './gdr-correspondence';
 import {
   GdrParseError,
   GdrSourceRange,
@@ -8,11 +9,12 @@ import {
 
 export interface NarrativeSection {
   id: string;
-  kind: 'document' | 'dialogo' | 'azione' | 'nota';
+  kind: 'document' | 'dialogo' | 'pensiero' | 'lettera' | 'messaggio' | 'azione' | 'nota';
   text: string;
   speaker: string;
   characterId?: string;
   portrait: string;
+  correspondence?: CorrespondenceData;
   blocks: GdrBlockRow[];
   ranges: GdrSourceRange[];
   start: number;
@@ -67,7 +69,7 @@ export function parseNarrative(source: string): NarrativeResult {
     buffer = [];
   };
   for (let i = 0; i < lines.length; i++) {
-    const match = /^::: (dialogo|azione|nota)(?:\s+(.*))?$/.exec(lines[i].trim());
+    const match = /^::: (dialogo|pensiero|lettera|messaggio|azione|nota)(?:\s+(.*))?$/.exec(lines[i].trim());
     if (match) {
       flush();
       const start = i;
@@ -82,13 +84,27 @@ export function parseNarrative(source: string): NarrativeResult {
         buffer = lines.slice(start);
         break;
       }
-      const [speaker = '', portrait = '', characterId = ''] = (match[2] ?? '')
+      let [speaker = '', portrait = '', characterId = ''] = (match[2] ?? '')
         .split('|')
         .map((value) => value.trim());
-      if (match[1] === 'dialogo' && !speaker)
+      let correspondence: CorrespondenceData | undefined;
+      if (match[1] === 'lettera' || match[1] === 'messaggio') {
+        speaker = portrait = characterId = '';
+        try {
+          correspondence = parseCorrespondenceHeader(match[2] ?? '');
+          if (match[1] === 'messaggio') {
+            speaker = correspondence.name;
+            portrait = correspondence.portrait;
+            characterId = correspondence.characterId;
+          }
+        } catch {
+          errors.push({ line: start + 1, message: `Riga ${start + 1}: i campi di ${match[1]} devono essere un oggetto JSON con valori di testo.` });
+        }
+      }
+      if ((match[1] === 'dialogo' || match[1] === 'pensiero') && !speaker)
         errors.push({
           line: start + 1,
-          message: `Riga ${start + 1}: indica chi parla dopo "::: dialogo".`,
+          message: `Riga ${start + 1}: indica il personaggio dopo "::: ${match[1]}".`,
         });
       if (portrait && !safeNarrativeImage(portrait))
         errors.push({
@@ -102,6 +118,7 @@ export function parseNarrative(source: string): NarrativeResult {
         speaker,
         characterId,
         portrait: safeNarrativeImage(portrait),
+        ...(correspondence ? { correspondence: { ...correspondence, portrait: safeNarrativeImage(correspondence.portrait) } } : {}),
         ranges: [],
         start: offsets[start],
         end: offsets[end] + lines[end].length,

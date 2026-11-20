@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { parseNarrative, safeNarrativeImage } from './gdr-turn.parser';
 import { parseGdrMarkdown } from '../gdr-blocks/gdr-markdown.parser';
+import { narrativeSnippet } from './gdr-writing';
+import { writeCorrespondence } from './gdr-correspondence';
 
 describe('testo narrativo GDR', () => {
   it('mantiene il parser e i tipi dei documenti già presenti', () => {
@@ -88,5 +90,35 @@ describe('posizioni per la modifica rapida', () => {
     const result = parseNarrative(source);
     expect(result.sections[0].ranges).toHaveLength(2);
     expect(result.sections[0].blocks.map((b) => b.type)).toEqual(['npc_grid', 'table']);
+  });
+});
+
+describe('lettere, messaggi e pensieri', () => {
+  it('conserva testo e campi liberi, anche con virgolette, barre e righe vuote', () => {
+    const source = writeCorrespondence({ kind: 'messaggio', name: '+39 123 | "Ada"', characterId: '', portrait: '', signature: 'A.\nB.', date: 'Terza luna | ieri', time: 'Al tramonto', body: 'Prima riga.\n\n🪄 Seconda riga.' });
+    const parsed = parseNarrative('Prima.\r\n\r\n' + source.replace(/\n/g, '\r\n') + '\r\n\r\nDopo.');
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.sections.map(s => s.kind)).toEqual(['document', 'messaggio', 'document']);
+    expect(parsed.sections[1]).toMatchObject({ speaker: '+39 123 | "Ada"', text: 'Prima riga.\n\n🪄 Seconda riga.', correspondence: { date: 'Terza luna | ieri', time: 'Al tramonto', signature: 'A.\nB.' } });
+  });
+  it('accetta lettera e messaggio senza metadati e segnala intestazioni o immagini non valide', () => {
+    for (const kind of ['lettera', 'messaggio']) {
+      expect(parseNarrative(`::: ${kind}\nTesto.\n:::`).errors).toEqual([]);
+      for (const header of ['null', '[]', '{"date":12}', 'testo non JSON'])
+        expect(parseNarrative(`::: ${kind} ${header}\nTesto.\n:::`).errors).toHaveLength(1);
+    }
+    const result = parseNarrative('::: messaggio {"portrait":"javascript:alert(1)"}\nTesto.\n:::');
+    expect(result.errors).toHaveLength(1);
+    expect(result.sections[0].portrait).toBe('');
+    expect(result.sections[0].correspondence?.portrait).toBe('');
+    const missing = parseNarrative('::: lettera\nLettera incompleta.');
+    expect(missing.errors).toHaveLength(1);
+    expect(JSON.stringify(missing.sections)).toContain('Lettera incompleta.');
+  });
+  it('associa il pensiero al personaggio e non interpreta i comandi nel corpo della lettera', () => {
+    const thought = parseNarrative(narrativeSnippet('pensiero', 'Non devo dirlo.', { id: 'ada', name: 'Ada', portrait: '/assets/a.webp' }));
+    expect(thought.errors).toEqual([]);
+    expect(thought.sections[0]).toMatchObject({ kind: 'pensiero', speaker: 'Ada', characterId: 'ada', portrait: '', text: 'Non devo dirlo.' });
+    expect(parseNarrative('::: lettera\n::: pensiero Ada\nNon devo dirlo.\n:::').sections).toHaveLength(1);
   });
 });

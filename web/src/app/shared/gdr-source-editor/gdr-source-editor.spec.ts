@@ -58,6 +58,22 @@ describe('anteprima prima della pubblicazione', () => {
     button('Dialogo').click(); fixture.detectChanges();
     expect(updated).toContain('::: dialogo Ada\nCiao\n:::');
   });
+  it.each([false, true])('apre i campi Lettera / Messaggio anche per masterTools=%s', async (masterTools) => {
+    const {fixture,button}=setup('Un saluto.');
+    fixture.componentRef.setInput('masterTools',masterTools);
+    fixture.componentRef.setInput('characterRoster',[{id:'npc',name:'Ada',portrait:'/assets/a.webp',kind:'png'}]);
+    fixture.componentInstance.sourceChange.subscribe(source=>fixture.componentRef.setInput('source',source));
+    fixture.detectChanges();await fixture.whenStable();
+    const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
+    area.setSelectionRange(0,10);button('Lettera / Messaggio').click();fixture.detectChanges();
+    await vi.waitFor(()=>{
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('[id$="-format"]')).not.toBeNull();
+    });
+    expect((fixture.nativeElement.querySelector('.inline-editor textarea') as HTMLTextAreaElement).value).toBe('Un saluto.');
+    expect(fixture.nativeElement.querySelector('.inline-editor')?.textContent).toContain('Firma (facoltativa)');
+    expect(fixture.debugElement.query(By.directive(GdrTurn)).componentInstance.characterRoster()[0].id).toBe('npc');
+  });
   it('dal comando Dialogo apre solo le parole e mantiene nascosto il riferimento scelto',async()=>{
     const {fixture,button}=setup('Ciao');
     fixture.componentRef.setInput('characters',[{id:'ada-1',name:'Ada',portrait:'/assets/ada.webp'},{id:'ada-2',name:'Ada',portrait:'/assets/other.webp'}]);

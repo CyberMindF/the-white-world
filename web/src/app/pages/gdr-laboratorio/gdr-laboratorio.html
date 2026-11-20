@@ -123,7 +123,7 @@
                     maxlength="160"
                   />
                 }
-                <app-gdr-source-editor
+                <app-gdr-source-editor [characterRoster]="characterRoster()"
                   #documentComposer
                   editorId="lab-document"
                   (editingChange)="documentEdit.set($event)"
@@ -198,7 +198,7 @@
                 </div>
                 @if (playerTurnEdit()?.id === turn.id && playerTurnEdit()) {
                   <fieldset class="published-turn-editor" [disabled]="contentSaving()">
-                    <app-gdr-source-editor #publishedPlayerComposer
+                    <app-gdr-source-editor [characterRoster]="characterRoster()" #publishedPlayerComposer
                       [editorId]="'edit-turn-' + turn.id" label="Modifica il tuo turno"
                       [source]="playerTurnDraft()" (sourceChange)="playerTurnDraft.set($event)"
                       [characters]="characters()" [allowGeneric]="!workspace.available()"
@@ -245,7 +245,7 @@
             }
           </div>
           <section class="lab-composer" [attr.aria-label]="canPrepare() ? 'Continua la storia' : 'Scrivi un messaggio'">
-            <app-gdr-source-editor
+            <app-gdr-source-editor [characterRoster]="characterRoster()"
               [masterTools]="canPrepare()"
               [images]="siteImages()"
               [allowImages]="canPrepare()"
