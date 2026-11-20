@@ -147,7 +147,7 @@ export class GdrSourceEditor {
       const character = findNarrativeCharacter(this.characters(), draft?.characterId ?? section?.characterId, draft?.name ?? (section?.speaker || section?.correspondence?.signature || ''));
       if (character) this.characterIndex.set(this.characters().indexOf(character));
       if (section?.kind === 'messaggio') {
-        const contact = findNarrativeCharacter(this.contactCharacters(), section.characterId, section.speaker);
+        const contact = section.characterId ? findNarrativeCharacter(this.contactCharacters(), section.characterId, section.speaker) : undefined;
         this.contactIndex.set(contact ? this.contactCharacters().indexOf(contact) : -1);
       }
     });

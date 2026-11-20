@@ -23,6 +23,17 @@ function chooseOption(fixture:ComponentFixture<GdrTurn>, name:string, option:str
 }
 describe('editor condiviso per aggiunta e modifica sul posto',()=>{
  afterEach(()=>TestBed.resetTestingModule());
+ it('mantiene libero il contatto di un messaggio anche se il nome coincide con un PNG',async()=>{
+  const source='::: messaggio\nCONTATTO: Maerath Solven\n---\nCi vediamo dopo.\n:::';
+  const {fixture,buttons}=setup(source);
+  fixture.componentRef.setInput('characters',[{id:'daisy',name:'Daisy',portrait:''}]);
+  fixture.componentRef.setInput('characterRoster',[{id:'maerath',name:'Maerath Solven',kind:'png',portrait:''}]);fixture.detectChanges();
+  buttons('✎ Modifica messaggio')[0].click();fixture.detectChanges();await fixture.whenStable();
+  const contact=fixture.debugElement.queryAll(By.directive(AppSelect)).find(element=>element.componentInstance.ariaLabel==='Personaggio')!;
+  expect(contact.componentInstance.value).toBe('-1');
+  const saved=vi.fn();fixture.componentInstance.sourceChange.subscribe(saved);buttons('Applica al testo')[0].click();
+  expect(saved).toHaveBeenCalledWith(source);
+ });
  it('apre la lettera nello stesso editor con tipo già selezionato e anteprima affiancata',async()=>{
   const letter='::: lettera\nDATA: Dopo cena\nFIRMA: Maerath Solven\n---\nSei convocata nel mio studio.\n:::';
   const source='Prima.\n\n'+letter+'\n\nDopo.';
