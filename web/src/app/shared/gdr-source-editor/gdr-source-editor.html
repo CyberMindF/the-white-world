@@ -54,9 +54,6 @@
   @if (voiceMessage()) {
     <p class="hint editor-status" role="status">{{ voiceMessage() }}</p>
   }
-  @if (blockType() === 'azione') {
-    <p class="hint editor-status">Scrivi cosa fa in terza persona, senza ripetere il nome.</p>
-  }
   <div class="panes" [class.split]="mode() === 'split'">
     <div [hidden]="mode() === 'preview'" class="source-pane">
       <label [for]="editorId()">{{ label() }}</label>

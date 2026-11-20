@@ -149,7 +149,6 @@ interface RenderedSection extends NarrativeSection {
           }
         </div>
         @if(characterDraft()?.kind==='npc'){<p class="character-hint">Foto e dati provengono dal personaggio. Puoi aggiungere una descrizione per questa scena.</p>}
-        @if(characterDraft()?.kind==='azione'){<p class="character-hint">Scrivi cosa fa in terza persona, senza ripetere il nome.</p>}
         <label class="sr-only" [for]="fieldId">{{ inserting() ? 'Testo del nuovo blocco' : 'Testo del blocco selezionato' }}</label>
         <textarea
           #inlineArea
