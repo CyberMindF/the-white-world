@@ -102,13 +102,21 @@ try {
     assert.equal(await message.locator('img').count(),0);
     assert.ok((await message.innerText()).includes('<img src=x onerror=alert(1)>'));
     await editor.getByRole('button',{name:'Torna al testo',exact:true}).click();
-    await area.fill('Non posso fidarmi.');await area.evaluate(el=>el.select());
-    await editor.getByRole('button',{name:'Pensiero',exact:true}).click();
-    const thoughtBody = editor.locator('.inline-editor textarea');await thoughtBody.waitFor();
-    assert.equal(await thoughtBody.inputValue(),'Non posso fidarmi.');
-    await editor.getByRole('button',{name:'Applica al testo',exact:true}).click();
-    assert.equal(await editor.locator('.thought em').innerText(),'Non posso fidarmi.');
-    await editor.getByRole('button',{name:'Torna al testo',exact:true}).click();
+    for (const [label,kind,rendered] of [['Pensiero','pensiero','.thought em'],['Dialogo','dialogo','.dialogue p']]) {
+      for (const mode of ['Solo testo','Testo e anteprima']) {
+        await area.fill('Non posso fidarmi.');await area.evaluate(el=>el.select());
+        await editor.getByRole('button',{name:mode,exact:true}).click();
+        await editor.getByRole('button',{name:label,exact:true}).click();
+        await page.waitForFunction(()=>{
+          const field=document.querySelector('#lab-turn');
+          return document.activeElement===field && field.value.slice(field.selectionStart,field.selectionEnd)==='Non posso fidarmi.';
+        });
+        assert.ok((await area.inputValue()).startsWith(`::: ${kind} `));
+        assert.equal(await area.isVisible(),true);
+        assert.equal(await editor.locator('.inline-editor').count(),0);
+        if(mode==='Testo e anteprima') assert.equal(await editor.locator(rendered).innerText(),'Non posso fidarmi.');
+      }
+    }
     await area.fill(initial);await editor.getByRole('button',{name:'Solo anteprima',exact:true}).click();
     for (const width of [1280,390,320]) {
       await page.setViewportSize({width,height:1000});

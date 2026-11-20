@@ -74,22 +74,31 @@ describe('anteprima prima della pubblicazione', () => {
     expect(fixture.nativeElement.querySelector('.inline-editor')?.textContent).toContain('Firma (facoltativa)');
     expect(fixture.debugElement.query(By.directive(GdrTurn)).componentInstance.characterRoster()[0].id).toBe('npc');
   });
-  it('dal comando Dialogo apre solo le parole e mantiene nascosto il riferimento scelto',async()=>{
-    const {fixture,button}=setup('Ciao');
-    fixture.componentRef.setInput('characters',[{id:'ada-1',name:'Ada',portrait:'/assets/ada.webp'},{id:'ada-2',name:'Ada',portrait:'/assets/other.webp'}]);
+  it.each([
+    ['Dialogo', 'dialogo', false], ['Pensiero', 'pensiero', false],
+    ['Dialogo', 'dialogo', true], ['Pensiero', 'pensiero', true],
+  ] as const)('inserisce %s (%s) nella textbox senza modifica rapida (anteprima affiancata: %s)', async (label, kind, split) => {
+    const original = 'Prima.\n\nCiao\n\nDopo.';
+    const {fixture,button}=setup(original);
+    fixture.componentRef.setInput('characters',[{id:'ada-1',name:'Ada',portrait:'/assets/ada.webp'}]);
     let saved='';fixture.componentInstance.sourceChange.subscribe(value=>{saved=value;fixture.componentRef.setInput('source',value);});
+    const editing=vi.fn();fixture.componentInstance.editingChange.subscribe(editing);
     fixture.detectChanges();await fixture.whenStable();
-    const source=fixture.nativeElement.querySelector('.source-pane textarea') as HTMLTextAreaElement;source.setSelectionRange(0,4);
-    button('Dialogo').click();fixture.detectChanges();
-    await vi.waitFor(()=>{fixture.detectChanges();expect(fixture.nativeElement.querySelector('.inline-editor textarea')).not.toBeNull();});
-    await fixture.whenStable();fixture.detectChanges();
-    const area=fixture.nativeElement.querySelector('.inline-editor textarea') as HTMLTextAreaElement;
-    expect(area.value).toBe('Ciao');expect(saved).not.toContain('/assets/');expect(saved).toContain('ada-1');
-    expect(fixture.nativeElement.querySelector('.source-pane').hidden).toBe(true);
-    const select=fixture.nativeElement.querySelector('.inline-editor select[id$="-voice"]') as HTMLSelectElement;
-    select.selectedIndex=1;select.dispatchEvent(new Event('change'));fixture.detectChanges();
-    area.value='Nuova battuta';area.dispatchEvent(new Event('input'));fixture.detectChanges();button('Applica al testo').click();fixture.detectChanges();
-    expect(parseNarrative(saved).sections[0]).toMatchObject({characterId:'ada-2',speaker:'Ada',portrait:'',text:'Nuova battuta'});
+    if(split) { button('Testo e anteprima').click();fixture.detectChanges(); }
+    const area=fixture.nativeElement.querySelector('.source-pane textarea') as HTMLTextAreaElement;
+    const start=original.indexOf('Ciao');area.setSelectionRange(start,start+4);
+    button(label).click();fixture.detectChanges();
+    await vi.waitFor(()=>{
+      fixture.detectChanges();
+      expect(document.activeElement).toBe(area);
+      expect(area.value.slice(area.selectionStart,area.selectionEnd)).toBe('Ciao');
+    });
+    expect(saved).toBe(`Prima.\n\n::: ${kind} Ada |  | ada-1\nCiao\n:::\n\nDopo.`);
+    expect(fixture.nativeElement.querySelector('.source-pane').hidden).toBe(false);
+    expect(fixture.nativeElement.querySelector('.inline-editor')).toBeNull();
+    expect(editing).not.toHaveBeenCalledWith(true);
+    expect(fixture.debugElement.query(By.directive(GdrTurn))?.componentInstance.editable() ?? false).toBe(false);
+    expect(parseNarrative(saved).sections[1]).toMatchObject({kind,characterId:'ada-1',speaker:'Ada',text:'Ciao'});
   });
   it('offre l’impaginazione solo al master e converte la selezione in titoli o riquadri validi', async () => {
     const {fixture,button}=setup('Un incontro');

@@ -133,10 +133,11 @@ export class GdrSourceEditor {
     const heading = type === 'heading' || type === 'subtitle';
     const contentOffset = fenced ? snippet.indexOf('\n') + 1 : heading ? snippet.indexOf(' ') + 1 : type === 'emphasis' ? 1 : 0;
     const contentLength = fenced ? snippet.lastIndexOf('\n') - contentOffset : type === 'emphasis' ? snippet.length - 2 : snippet.length - contentOffset;
+    const opensInlineEditor = ['lettera', 'messaggio', 'npc_grid', 'npc_full'].includes(type);
     updateGdrTextarea(area, () => {
       this.sourceChange.emit(replacement.source);
-      this.setMode(['dialogo','pensiero','lettera','messaggio','npc_grid','npc_full'].includes(type)?'preview':this.mode() === 'preview' ? 'split' : this.mode());
+      this.setMode(opensInlineEditor ? 'preview' : this.mode() === 'preview' ? 'split' : this.mode());
     }, replacement.start + contentOffset, replacement.start + contentOffset + contentLength);
-    if(['dialogo','pensiero','lettera','messaggio','npc_grid','npc_full'].includes(type))requestAnimationFrame(()=>this.narrativeEditor()?.startEditing({start:replacement.start,end:replacement.end}));
+    if(opensInlineEditor)requestAnimationFrame(()=>this.narrativeEditor()?.startEditing({start:replacement.start,end:replacement.end}));
   }
 }
