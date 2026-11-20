@@ -1,5 +1,5 @@
 import { SNIPPETS } from '../gdr-blocks/gdr-snippets';
-import { safeNarrativeImage } from './gdr-turn.parser';
+import { isCharacterNarrativeKind, safeNarrativeImage } from './gdr-turn.parser';
 import { writeCorrespondence } from './gdr-correspondence';
 
 export interface NarrativeCharacter {
@@ -33,13 +33,16 @@ export function narrativeSnippet(
   character?: NarrativeCharacter,
 ): string {
   const name = (character?.name || 'Il mio personaggio').replace(/[|\r\n]/g, ' ').trim();
-  const portrait = character?.id ? '' : safeNarrativeImage(character?.portrait ?? '');
-  if (type === 'dialogo' || type === 'pensiero')
-    return `::: ${type} ${name}${portrait || character?.id ? ' | ' + portrait : ''}${character?.id ? ' | ' + character.id : ''}\n${selected || (type === 'pensiero' ? 'Scrivi qui i suoi pensieri.' : 'Scrivi qui le sue parole.')}\n:::`;
+  const portrait = type === 'azione' || character?.id ? '' : safeNarrativeImage(character?.portrait ?? '');
+  if (isCharacterNarrativeKind(type)) {
+    const actor = type === 'azione' && !character ? '' : name;
+    const placeholder = type === 'azione' ? (character ? 'si avvicina.' : 'Descrivi cosa fa il personaggio.') : type === 'pensiero' ? 'Scrivi qui i suoi pensieri.' : 'Scrivi qui le sue parole.';
+    return `::: ${type}${actor ? ' ' + actor : ''}${portrait || character?.id ? ' | ' + portrait : ''}${character?.id ? ' | ' + character.id : ''}\n${selected || placeholder}\n:::`;
+  }
   if (type === 'lettera' || type === 'messaggio')
     return writeCorrespondence({ kind: type, body: selected || (type === 'lettera' ? 'Scrivi qui la lettera.' : 'Scrivi qui il messaggio.'), name: type === 'messaggio' ? character?.name ?? '' : '', characterId: type === 'messaggio' ? character?.id ?? '' : '', portrait: type === 'messaggio' && !character?.id ? portrait : '', signature: type === 'lettera' ? character?.name ?? '' : '', date: '', time: '' }, true);
-  if (type === 'azione' || type === 'nota')
-    return `::: ${type}\n${selected || (type === 'azione' ? 'Descrivi cosa fa il personaggio.' : 'Scrivi la nota fuori personaggio.')}\n:::`;
+  if (type === 'nota')
+    return `::: nota\n${selected || 'Scrivi la nota fuori personaggio.'}\n:::`;
   if (type === 'heading') return `## ${selected || 'Titolo'}`;
   if (type === 'subtitle') return `### ${selected || 'Sottotitolo'}`;
   if (type === 'emphasis') return `*${selected || 'Testo in corsivo.'}*`;

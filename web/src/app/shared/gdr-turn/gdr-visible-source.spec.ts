@@ -5,6 +5,16 @@ import { storedSourceOffset, updateVisibleNarrativeSource, visibleNarrativeSourc
 const roster = [{id: 'ada-1', name: 'Ada', portrait: '/assets/a.webp'}, {id: 'ada-2', name: 'Ada', portrait: '/assets/b.webp'}];
 
 describe('riferimenti dei personaggi nascosti nella textbox', () => {
+  it('conserva l’ID dell’azione durante la scrittura e nel passaggio da dialogo ad azione', () => {
+    const source = '::: azione Ada | | ada-2\nsi avvicina.\n:::';
+    const view = visibleNarrativeSource(source, roster);
+    expect(view.text).toBe('::: azione Ada\nsi avvicina.\n:::');
+    const edited = updateVisibleNarrativeSource(view, view.text.replace('si avvicina.', 'ti guarda.'), roster);
+    expect(parseNarrative(edited).sections[0]).toMatchObject({kind:'azione',characterId:'ada-2',text:'ti guarda.'});
+    const dialogue = visibleNarrativeSource('::: dialogo Ada | | ada-2\nCiao.\n:::', roster);
+    expect(parseNarrative(updateVisibleNarrativeSource(dialogue, dialogue.text.replace('dialogo','azione'), roster)).sections[0]).toMatchObject({kind:'azione',characterId:'ada-2'});
+    expect(parseNarrative(updateVisibleNarrativeSource(visibleNarrativeSource(''), view.text, [roster[0]])).sections[0].characterId).toBe('ada-1');
+  });
   it('mostra solo il nome, conserva il riferimento anche con omonimi e rilegge una rinomina', () => {
     const source = '::: pensiero Prima | /assets/old.webp | ada-2\nNon devo dirlo.\n:::';
     const view = visibleNarrativeSource(source, roster);

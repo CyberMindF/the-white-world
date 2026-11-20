@@ -91,7 +91,21 @@ try {
       assert.ok((await area.inputValue()).includes('::: dialogo Daisy'));
       assert.equal((await area.inputValue()).includes('|'),false);
       await page.keyboard.type('Battuta riscritta.');
-
+      await area.fill(longText);before=await placeSelection(area);
+      await add('Azione');
+      after=await assertPosition(area,before,`${width}px ${mode} azione`);
+      assert.equal(after.selected,'Riga 010');
+      assert.ok((await area.inputValue()).includes('::: azione Daisy'));
+      assert.equal((await area.inputValue()).includes('|'),false);
+      await page.keyboard.type('ti guarda con disprezzo.');
+      await editor.getByRole('button',{name:'Solo anteprima',exact:true}).click();
+      const action=editor.locator('.action');
+      assert.equal(await action.innerText(),'Daisy ti guarda con disprezzo.');
+      assert.equal(await action.locator('img,.voice-bubble').count(),0);
+      assert.equal(await action.evaluate(el=>getComputedStyle(el).fontStyle),'normal');
+      await action.evaluate(el=>el.scrollIntoView({block:'center'}));await settled();
+      await action.screenshot({path:join(screenshots,`azione-${width}-${mode.replaceAll(' ','-')}.png`)});
+      await editor.getByRole('button',{name:mode,exact:true}).click();
     }
   }
   await editor.getByRole('button',{name:'Solo testo',exact:true}).click();
@@ -107,6 +121,6 @@ try {
   await assertPosition(inline,before,'modifica rapida');
   await inline.screenshot({path:join(screenshots,'cursore-nella-parte-alta.png')});
   assert.deepEqual(errors,[]);
-  console.log(`PASS: cursore, selezione e scorrimento conservati su desktop/mobile, testo e split, titoli, dialoghi, immagini e modifica rapida. Screenshot: ${screenshots}`);
+  console.log(`PASS: cursore, selezione e scorrimento conservati su desktop/mobile, testo e split, titoli, dialoghi, azioni, immagini e modifica rapida. Azioni in testo tondo con nome e gesto, senza avatar. Screenshot: ${screenshots}`);
 }catch(error){await page.screenshot({path:join(screenshots,'errore.png')});console.error('Screenshot:',screenshots);console.error('Browser errors:',errors);throw error;}
 finally{await browser.close();await new Promise(resolve=>server.close(resolve));harness.sqlite.close();}

@@ -7,9 +7,14 @@ import {
   parseGdrMarkdown,
 } from '../gdr-blocks/gdr-markdown.parser';
 
+export type CharacterNarrativeKind = 'dialogo' | 'pensiero' | 'azione';
+export function isCharacterNarrativeKind(kind: string): kind is CharacterNarrativeKind {
+  return kind === 'dialogo' || kind === 'pensiero' || kind === 'azione';
+}
+
 export interface NarrativeSection {
   id: string;
-  kind: 'document' | 'dialogo' | 'pensiero' | 'lettera' | 'messaggio' | 'azione' | 'nota';
+  kind: 'document' | CharacterNarrativeKind | 'lettera' | 'messaggio' | 'nota';
   text: string;
   speaker: string;
   characterId?: string;

@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { AppSelect, AppSelectOption } from '../app-select/app-select';
 import { updateGdrTextarea } from '../gdr-textarea';
 import { GdrTurn } from '../gdr-turn/gdr-turn';
-import { parseNarrative, safeNarrativeImage } from '../gdr-turn/gdr-turn.parser';
+import { isCharacterNarrativeKind, parseNarrative, safeNarrativeImage } from '../gdr-turn/gdr-turn.parser';
 import { BLOCK_TYPES, SNIPPET_LABELS } from '../gdr-blocks/gdr-snippets';
 import { GdrImageLibrary, GdrLibraryImage } from '../gdr-characters/gdr-image-library';
 
@@ -65,7 +65,7 @@ export class GdrSourceEditor {
     return options;
   });
   protected readonly selectedCharacter = computed(() => this.selectionCharacters()[this.blockType() === 'messaggio' ? this.contactIndex() : this.characterIndex()]);
-  protected readonly addDisabled = computed(() => (['dialogo','pensiero'].includes(this.blockType()) && !this.characters().length && !this.allowGeneric()));
+  protected readonly addDisabled = computed(() => (isCharacterNarrativeKind(this.blockType()) && !this.characters().length && !this.allowGeneric()));
   protected readonly voiceMessage = signal('');
   protected readonly imagePickerOpen = signal(false);
   private readonly sourceArea = viewChild<ElementRef<HTMLTextAreaElement>>('sourceArea');
@@ -183,7 +183,7 @@ export class GdrSourceEditor {
     const end = storedSourceOffset(view, area.selectionEnd ?? area.selectionStart ?? view.text.length);
     const selected = area.value.slice(area.selectionStart, area.selectionEnd);
     const character = this.characters()[this.characterIndex()] ?? this.characters()[0];
-    if (['dialogo', 'pensiero'].includes(type) && !character && !this.allowGeneric()) return;
+    if (isCharacterNarrativeKind(type) && !character && !this.allowGeneric()) return;
     const snippet = customSnippet ?? narrativeSnippet(type, selected, character);
     if (!snippet) {
       if (type === 'npc_grid' || type === 'npc_full') this.voiceMessage.set('Scegli un PNG nel menu Personaggio.');

@@ -11,7 +11,7 @@ import { BLOCK_TYPES, SNIPPET_LABELS } from '../gdr-blocks/gdr-snippets';
 import { NarrativeCharacter, NARRATIVE_TEXT_FORMATS, findNarrativeCharacter, narrativeNameMatches, insertNarrativeBlock, narrativeSnippet, replaceNarrativeSelection } from './gdr-writing';
 import {CharacterDraft,readCharacterDraft,writeCharacterDraft} from './gdr-character-draft';
 import { storedSourceOffset, updateVisibleNarrativeSource, visibleNarrativeSource, visibleSourceOffset } from './gdr-visible-source';
-import { NarrativeSection, parseNarrative, safeNarrativeImage } from './gdr-turn.parser';
+import { NarrativeSection, isCharacterNarrativeKind, parseNarrative, safeNarrativeImage } from './gdr-turn.parser';
 import { GdrBlockRow, GdrParagraphData } from '../gdr-blocks/gdr-block.types';
 import { serializeGdrBlocks } from '../gdr-blocks/gdr-markdown.serializer';
 
@@ -123,7 +123,7 @@ interface RenderedSection extends NarrativeSection {
             <option value="pensiero" [disabled]="!characters().length && !allowGeneric()">Pensiero</option>
             <option value="lettera">Lettera</option>
             <option value="messaggio">Messaggio</option>
-            <option value="azione">Azione</option>
+            <option value="azione" [disabled]="!characters().length && !allowGeneric()">Azione</option>
             <option value="nota">Fuori personaggio</option>
           </select>
           }
@@ -149,6 +149,7 @@ interface RenderedSection extends NarrativeSection {
           }
         </div>
         @if(characterDraft()?.kind==='npc'){<p class="character-hint">Foto e dati provengono dal personaggio. Puoi aggiungere una descrizione per questa scena.</p>}
+        @if(characterDraft()?.kind==='azione'){<p class="character-hint">Scrivi cosa fa in terza persona, senza ripetere il nome.</p>}
         <label class="sr-only" [for]="fieldId">{{ inserting() ? 'Testo del nuovo blocco' : 'Testo del blocco selezionato' }}</label>
         <textarea
           #inlineArea
@@ -259,7 +260,7 @@ interface RenderedSection extends NarrativeSection {
               ✎ Modifica azione
             </button>
           }
-          <p class="action" [innerHTML]="renderInline(section.text)"></p>
+          <p class="action">@if (section.speaker) {<span>{{ section.speaker }}</span>{{ ' ' }}}<span [innerHTML]="renderInline(section.text)"></span></p>
         }
         @case ('pensiero') {
           <ng-container *ngTemplateOutlet="voiceContent; context: { $implicit: section, canEdit: canEdit }" />
@@ -381,7 +382,10 @@ interface RenderedSection extends NarrativeSection {
       line-height: 1.65;
     }
     .action {
-      font-style: italic;
+      margin: .8rem 0;
+      font-style: normal;
+      line-height: 1.65;
+      white-space: pre-wrap;
     }
     .voice-bubble { position: relative; width: fit-content; max-width: 100%; min-width: 0; isolation: isolate; box-sizing: border-box; }
     .speech-bubble { --speech-background: linear-gradient(var(--panel-color), var(--panel-color)), var(--bg-color); padding: .8rem 1rem; border: 1px solid var(--border-color); border-radius: 1.15rem; background: var(--speech-background); }
@@ -644,10 +648,10 @@ export class GdrTurn {
     const roster = this.characterRoster().length ? this.characterRoster() : this.characters();
     const resolve = (id: string | undefined,name:string) => this.findCharacter(roster,id,name);
     return sections.map(section => {
-      if (section.kind === 'dialogo' || section.kind === 'pensiero' || section.kind === 'messaggio') {
+      if (isCharacterNarrativeKind(section.kind) || section.kind === 'messaggio') {
         if (section.kind === 'messaggio' && !section.characterId) return section;
         const character = resolve(section.characterId,section.speaker);
-        return character ? {...section, characterId:character.id, speaker: character.name, portrait: safeNarrativeImage(character.portrait)} :
+        return character ? {...section, characterId:character.id, speaker: character.name, portrait: section.kind==='azione'?'':safeNarrativeImage(character.portrait)} :
           (section.characterId||narrativeNameMatches(roster,section.speaker).length>1?{...section,portrait:''}:section);
       }
       return {...section, blocks: section.blocks.map(block => {
@@ -698,7 +702,7 @@ export class GdrTurn {
   private readonly visibleDraft = computed(() => visibleNarrativeSource(this.draft(), this.characterRoster().length ? this.characterRoster() : this.characters()));
   protected readonly editorValue=computed(()=>this.characterDraft()?.body??this.visibleDraft().text);
   protected readonly emptyDialogue = computed(() => {
-    if (['dialogo','pensiero'].includes(this.characterDraft()?.kind ?? '')) return !this.editorValue().trim();
+    if (isCharacterNarrativeKind(this.characterDraft()?.kind ?? '')) return !this.editorValue().trim();
     const sections = this.draftParsed().sections;
     return sections.length === 1 && !!sections[0].correspondence && !sections[0].text.trim();
   });
@@ -788,7 +792,7 @@ export class GdrTurn {
     const area = this.area?.nativeElement;
     if (type === 'npc_full' && !this.deletable() && !this.insertable()) return;
     if (NARRATIVE_TEXT_FORMATS[type] && !this.deletable() && !this.insertable()) return;
-    if (!area || !type || (['dialogo', 'pensiero'].includes(type) && !this.characters().length && !this.allowGeneric()))
+    if (!area || !type || (isCharacterNarrativeKind(type) && !this.characters().length && !this.allowGeneric()))
       return;
     const start = storedSourceOffset(this.visibleDraft(), area.selectionStart),
       end = storedSourceOffset(this.visibleDraft(), area.selectionEnd);

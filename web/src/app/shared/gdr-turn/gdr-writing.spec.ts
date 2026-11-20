@@ -4,6 +4,12 @@ import { parseNarrative } from './gdr-turn.parser';
 import { serializeGdrBlocks } from '../gdr-blocks/gdr-markdown.serializer';
 
 describe('inserimento nel racconto', () => {
+  it('collega l’azione al personaggio senza copiarne il ritratto o inserire il nome nel gesto', () => {
+    const source = narrativeSnippet('azione', 'ti guarda con disprezzo.', {id:'daisy',name:'Daisy',portrait:'/assets/daisy.webp'});
+    expect(source).toBe('::: azione Daisy |  | daisy\nti guarda con disprezzo.\n:::');
+    expect(parseNarrative(source).sections[0]).toMatchObject({kind:'azione',speaker:'Daisy',characterId:'daisy',portrait:'',text:'ti guarda con disprezzo.'});
+    expect(narrativeSnippet('azione', 'Si avvicina.')).toBe('::: azione\nSi avvicina.\n:::');
+  });
   it('inserisce fra due paragrafi uguali senza confondere o riscrivere i blocchi', () => {
     const source = 'Testo uguale.\n\n::: dialogo Ada\nCiao.\n:::\n\nTesto uguale.';
     const offset = source.lastIndexOf('Testo uguale.');

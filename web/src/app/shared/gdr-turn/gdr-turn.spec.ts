@@ -11,6 +11,37 @@ function setup(source:string) {
  const buttons=(text:string)=>Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>).filter(b=>b.textContent?.trim()===text);
  return {fixture,buttons};
 }
+describe('azioni come frasi del personaggio',()=>{
+ afterEach(()=>TestBed.resetTestingModule());
+ it('mostra nome e gesto sulla stessa riga, senza avatar, nuvoletta o unione dei blocchi',()=>{
+  const {fixture}=setup('::: dialogo Daisy | | daisy\nAspetta.\n:::\n\n::: azione Vecchio nome | | daisy\nti guarda con disprezzo.\n:::\n\n::: azione Sally | | sally\nsi allontana.\n:::\n\n::: dialogo Daisy | | daisy\nTorna qui.\n:::');
+  fixture.componentRef.setInput('characterRoster',[{id:'daisy',name:'Daisy',portrait:'/assets/daisy.webp'},{id:'sally',name:'Sally',portrait:'/assets/sally.webp'}]);
+  fixture.componentRef.setInput('editable',false);fixture.detectChanges();
+  const actions=Array.from(fixture.nativeElement.querySelectorAll('.action') as NodeListOf<HTMLParagraphElement>);
+  expect(actions.map(p=>p.textContent)).toEqual(['Daisy ti guarda con disprezzo.','Sally si allontana.']);
+  expect(fixture.nativeElement.querySelectorAll('.dialogue')).toHaveLength(2);
+  for(const action of actions)expect(action.querySelector('img,button,.voice-bubble,em,i')).toBeNull();
+  fixture.componentRef.setInput('characterRoster',[{id:'daisy',name:'Daisy Nuova',portrait:''},{id:'sally',name:'Sally',portrait:''}]);fixture.detectChanges();
+  expect(actions[0].textContent).toBe('Daisy Nuova ti guarda con disprezzo.');
+ });
+ it('conserva le vecchie azioni anonime e non assegna un ID eliminato a un omonimo',()=>{
+  const {fixture}=setup('::: azione\nDaisy chiude la porta.\n:::\n\n::: azione Ada | | deleted\nsi ferma.\n:::');
+  fixture.componentRef.setInput('characterRoster',[{id:'other',name:'Ada',portrait:'/assets/a.webp'}]);fixture.detectChanges();
+  expect(Array.from(fixture.nativeElement.querySelectorAll('.action') as NodeListOf<HTMLParagraphElement>).map(p=>p.textContent)).toEqual(['Daisy chiude la porta.','Ada si ferma.']);
+ });
+ it('modifica solo il gesto e cambia personaggio senza perdere i blocchi circostanti',async()=>{
+  const {fixture,buttons}=setup('Prima.\n\n::: azione Ada | | ada-1\nti guarda.\n:::\n\nDopo.');
+  fixture.componentRef.setInput('characters',[{id:'ada-1',name:'Ada',portrait:''},{id:'ada-2',name:'Ada',portrait:''}]);fixture.detectChanges();
+  buttons('✎ Modifica azione')[0].click();fixture.detectChanges();await fixture.whenStable();
+  const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
+  expect(area.value).toBe('ti guarda.');expect(area.value).not.toContain('ada-1');
+  const selector=fixture.nativeElement.querySelector('select[id$="-voice"]') as HTMLSelectElement;
+  selector.selectedIndex=1;selector.dispatchEvent(new Event('change'));fixture.detectChanges();
+  area.value='si allontana.';area.dispatchEvent(new Event('input'));fixture.detectChanges();
+  const saved=vi.fn();fixture.componentInstance.sourceChange.subscribe(saved);buttons('Applica al testo')[0].click();
+  expect(saved).toHaveBeenCalledWith('Prima.\n\n::: azione Ada |  | ada-2\nsi allontana.\n:::\n\nDopo.');
+ });
+});
 describe('eliminazione dei blocchi della storia',()=>{
  afterEach(()=>TestBed.resetTestingModule());
  it('chiede conferma e rimuove solo la seconda di due frasi uguali, conservando dialoghi e ritorni a capo',()=>{

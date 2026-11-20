@@ -102,6 +102,7 @@ describe('anteprima prima della pubblicazione', () => {
 
   });
   it.each([
+    ['Azione', 'azione', false], ['Azione', 'azione', true],
     ['Dialogo', 'dialogo', false], ['Pensiero', 'pensiero', false],
     ['Dialogo', 'dialogo', true], ['Pensiero', 'pensiero', true],
   ] as const)('inserisce %s (%s) nella textbox senza modifica rapida (anteprima affiancata: %s)', async (label, kind, split) => {
