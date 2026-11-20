@@ -323,6 +323,8 @@ interface RenderedSection extends NarrativeSection {
     .speaker > .portrait-trigger { grid-column: 1; grid-row: 1 / span 2; width:40px; height:40px; min-width:0; min-height:0; border-radius:50%; }
     .speaker > .name-trigger { grid-column:2; font-weight:600; line-height:1.4; }
     .speaker > .avatar-placeholder { grid-column: 1; grid-row: 1 / span 2; }
+    .dialogue .speaker > .portrait-trigger, .dialogue .speaker > .avatar-placeholder { grid-row: 2; margin-top: .4rem; }
+    .speaker > .name-trigger, .speaker > .edit-speaker { grid-row: 1; }
     .character-backdrop { position:fixed; inset:0; z-index:1500; background:rgb(20 18 16 / .65); backdrop-filter:blur(6px); display:grid; place-items:center; padding:24px; }
     .character-modal { width:min(900px,100%); max-height:90dvh; overflow:auto; background:var(--bg-color, #f7f4ee); color:var(--text-color); border:1px solid var(--border-color); border-radius:20px; box-shadow:0 24px 80px #0005; }
     .character-modal header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:20px 24px; border-bottom:1px solid var(--border-color); }
@@ -381,8 +383,10 @@ interface RenderedSection extends NarrativeSection {
       font-style: italic;
     }
     .voice-bubble { position: relative; width: fit-content; max-width: 100%; min-width: 0; isolation: isolate; box-sizing: border-box; }
-    .speech-bubble { padding: .8rem 1rem; border: 1px solid var(--border-color); border-radius: 1.15rem 1.15rem 1.15rem .35rem; background: var(--panel-color); }
-    .speech-bubble::before { content: ''; position: absolute; top: .85rem; left: -.38rem; width: .65rem; height: .65rem; background: var(--panel-color); border-left: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); transform: rotate(45deg); }
+    .speech-bubble { --speech-background: linear-gradient(var(--panel-color), var(--panel-color)), var(--bg-color); padding: .8rem 1rem; border: 1px solid var(--border-color); border-radius: 1.15rem; background: var(--speech-background); }
+    .speech-bubble::before, .speech-bubble::after { content: ''; position: absolute; pointer-events: none; clip-path: polygon(100% 0, 0 50%, 100% 100%); }
+    .speech-bubble::before { top: calc(1.65rem - 7px); right: 100%; width: 10px; height: 14px; background: linear-gradient(var(--border-color), var(--border-color)), var(--speech-background); }
+    .speech-bubble::after { top: calc(1.65rem - 6px); right: calc(100% - 1px); width: 9px; height: 12px; background: var(--speech-background); }
     .thought-bubble { display: grid; align-content: center; padding: 1.7rem 1.9rem; min-height: 6rem; }
     .thought-bubble em { position: relative; }
     .cloud-outline { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
@@ -396,7 +400,7 @@ interface RenderedSection extends NarrativeSection {
     .thought-bubble::before, .thought-bubble::after { content: ''; position: absolute; border: 1px solid var(--border-color); border-radius: 50%; background: var(--panel-color); }
     .thought-bubble::before { width: .65rem; height: .5rem; left: -.3rem; top: 1.9rem; }
     .thought-bubble::after { width: .35rem; height: .28rem; left: -.9rem; top: 1.45rem; }
-    @media (max-width: 400px) { .voice-block { grid-template-columns: 32px minmax(0, 1fr); column-gap: .6rem; } .speaker > .portrait-trigger, .speaker img, .speaker .initial { width: 32px; height: 32px; } .thought-bubble { padding: 1.4rem 1.3rem; } }
+    @media (max-width: 400px) { .voice-block { grid-template-columns: 32px minmax(0, 1fr); column-gap: .6rem; } .speaker > .portrait-trigger, .speaker img, .speaker .initial { width: 32px; height: 32px; } .dialogue .speaker > .portrait-trigger, .dialogue .speaker > .avatar-placeholder { margin-top: .65rem; } .thought-bubble { padding: 1.4rem 1.3rem; } }
     .letter { margin: 1rem auto 1.5rem; max-width: 42rem; padding: clamp(1.2rem, 4vw, 2.6rem); color: #382c24; border: 1px solid #d9c8a8; border-radius: 3px 8px 5px 3px; background: linear-gradient(125deg, #fffaf0, #f3e7cd); box-shadow: 0 4px 14px #20180d14; font-family: 'Caveat', cursive; font-size: 1.6rem; }
     .letter p { line-height: 1.45; }
     .letter .letter-date { margin: 0 0 1.3rem; text-align: right; font-size: 1.3rem; }
