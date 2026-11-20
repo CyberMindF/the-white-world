@@ -277,7 +277,6 @@
     @if (!loading() && !managementMode) {
       <app-gdr-panel
         [adventure]="adventure().id"
-        [systemName]="adventureRules()?.systemName || ''"
         [rulesDocumentKey]="adventure().rules || 'maga-regole'"
         [fieldsDocumentKey]="adventure().character"
         [personaggioLabel]="

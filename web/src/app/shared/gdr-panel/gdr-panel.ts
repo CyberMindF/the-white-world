@@ -43,7 +43,6 @@ export class GdrPanel implements OnInit {
   @Input() fieldsDocumentKey?: GdrDocumentKey;
   // Il tab "Personaggio" si chiama così di default, ma ogni avventura può avere il proprio
   // nome per il personaggio (es. "La Tua Maga" ne "Il Prezzo della Verità").
-  @Input() systemName = '';
   @Input() personaggioLabel = 'Personaggio';
   @Input() personaggioIcon = '🧍';
   // Il laboratorio consulta i dati reali senza offrire scritture sulle partite.
