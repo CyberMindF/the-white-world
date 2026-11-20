@@ -7,7 +7,7 @@ import { parseNarrative, safeNarrativeImage } from '../gdr-turn/gdr-turn.parser'
 import { BLOCK_TYPES, SNIPPET_LABELS } from '../gdr-blocks/gdr-snippets';
 import { GdrImageLibrary, GdrLibraryImage } from '../gdr-characters/gdr-image-library';
 
-import { NarrativeCharacter, narrativeSnippet, replaceNarrativeSelection } from '../gdr-turn/gdr-writing';
+import { NarrativeCharacter, NARRATIVE_TEXT_FORMATS, narrativeSnippet, replaceNarrativeSelection } from '../gdr-turn/gdr-writing';
 import { storedSourceOffset, updateVisibleNarrativeSource, visibleNarrativeSource, visibleSourceOffset } from '../gdr-turn/gdr-visible-source';
 import { writeCorrespondence } from '../gdr-turn/gdr-correspondence';
 export type { NarrativeCharacter } from '../gdr-turn/gdr-writing';
@@ -148,7 +148,7 @@ export class GdrSourceEditor {
   }
   protected insert(type: string, area: HTMLTextAreaElement, customSnippet?: string): void {
     if (type === 'image' && !this.allowImages()) return;
-    if ((type !== 'image' && type !== 'paragraph' && BLOCK_TYPES.includes(type as typeof BLOCK_TYPES[number])) || type === 'subtitle' || type === 'emphasis' || type === 'npc_full') {
+    if ((type !== 'image' && type !== 'paragraph' && BLOCK_TYPES.includes(type as typeof BLOCK_TYPES[number])) || type === 'subtitle' || NARRATIVE_TEXT_FORMATS[type] || type === 'npc_full') {
       if (!this.document() && !this.masterTools()) return;
     }
     if (type === 'image' && !customSnippet) {
@@ -168,12 +168,13 @@ export class GdrSourceEditor {
       return;
     }
     this.voiceMessage.set('');
-    const replacement = replaceNarrativeSelection(text, start, end, snippet);
+    const formatMarker = NARRATIVE_TEXT_FORMATS[type] ?? '';
+    const replacement = replaceNarrativeSelection(text, start, end, snippet, !!formatMarker);
     const fenced = ['dialogo', 'pensiero', 'lettera', 'messaggio', 'azione', 'nota', 'callout'].includes(type);
     const heading = type === 'heading' || type === 'subtitle';
     const correspondenceBody = type === 'lettera' || type === 'messaggio' ? parseNarrative(snippet).sections[0]?.contentStart : undefined;
-    const contentOffset = correspondenceBody ?? (fenced ? snippet.indexOf('\n') + 1 : heading ? snippet.indexOf(' ') + 1 : type === 'emphasis' ? 1 : 0);
-    const contentLength = fenced ? snippet.lastIndexOf('\n') - contentOffset : type === 'emphasis' ? snippet.length - 2 : snippet.length - contentOffset;
+    const contentOffset = correspondenceBody ?? (fenced ? snippet.indexOf('\n') + 1 : heading ? snippet.indexOf(' ') + 1 : formatMarker.length);
+    const contentLength = fenced ? snippet.lastIndexOf('\n') - contentOffset : formatMarker ? snippet.length - formatMarker.length * 2 : snippet.length - contentOffset;
     const nextView = visibleNarrativeSource(replacement.source, this.characterRoster().length ? this.characterRoster() : this.characters());
     updateGdrTextarea(area, () => {
       this.sourceChange.emit(replacement.source);

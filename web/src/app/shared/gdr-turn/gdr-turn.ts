@@ -1,11 +1,13 @@
-import { Component, ElementRef, ViewChild, computed, effect, input, output, signal } from '@angular/core';
+import { Component, ElementRef, ViewChild, computed, effect, inject, input, output, signal } from '@angular/core';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { renderGdrInline } from '../gdr-inline-text';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { updateGdrTextarea } from '../gdr-textarea';
 import { PROFILE_FIELDS } from '../gdr-characters/character-profile';
 import { GdrBlocks } from '../gdr-blocks/gdr-blocks';
 import { BLOCK_TYPES, SNIPPET_LABELS } from '../gdr-blocks/gdr-snippets';
-import { NarrativeCharacter, findNarrativeCharacter, narrativeNameMatches, insertNarrativeBlock, narrativeSnippet, replaceNarrativeSelection } from './gdr-writing';
+import { NarrativeCharacter, NARRATIVE_TEXT_FORMATS, findNarrativeCharacter, narrativeNameMatches, insertNarrativeBlock, narrativeSnippet, replaceNarrativeSelection } from './gdr-writing';
 import {CharacterDraft,readCharacterDraft,writeCharacterDraft} from './gdr-character-draft';
 import { storedSourceOffset, updateVisibleNarrativeSource, visibleNarrativeSource, visibleSourceOffset } from './gdr-visible-source';
 import { NarrativeSection, parseNarrative, safeNarrativeImage } from './gdr-turn.parser';
@@ -110,6 +112,9 @@ interface RenderedSection extends NarrativeSection {
             }
             @if (deletable() || insertable()) {
               <option value="npc_full">PNG a tutta pagina</option>
+              <option value="emphasis">Corsivo</option>
+              <option value="strong">Grassetto</option>
+              <option value="underline">Sottolineato</option>
             }
             <option value="dialogo" [disabled]="!characters().length && !allowGeneric()">
               Dialogo
@@ -234,8 +239,8 @@ interface RenderedSection extends NarrativeSection {
             <p class="voice-bubble" [class.speech-bubble]="section.kind === 'dialogo'" [class.thought-bubble]="section.kind === 'pensiero'">
               @if (section.kind === 'pensiero') {
                 <span class="cloud-outline" aria-hidden="true"><span class="cloud-middle"></span><svg class="cloud-side cloud-left" focusable="false"><defs><pattern [attr.id]="fieldId + '-' + section.id + '-cloud'" width="12" height="26" patternUnits="userSpaceOnUse"><path d="M11 0 C-2 2 -2 24 11 26" /></pattern></defs><rect width="100%" height="100%" stroke="none" [attr.fill]="'url(#' + fieldId + '-' + section.id + '-cloud)'" /></svg><svg class="cloud-side cloud-right" focusable="false"><rect width="100%" height="100%" stroke="none" [attr.fill]="'url(#' + fieldId + '-' + section.id + '-cloud)'" /></svg><svg class="cloud-cap cloud-top" viewBox="0 0 400 32" preserveAspectRatio="none" focusable="false"><path vector-effect="non-scaling-stroke" d="M1 32 C1 20 8 14 24 16 C18 6 40 1 56 10 C70 1 89 2 102 11 C118 1 138 2 151 11 C166 1 186 2 199 11 C216 1 237 3 250 12 C268 2 288 4 301 13 C320 3 341 8 350 19 C375 11 399 18 399 32" /></svg><svg class="cloud-cap cloud-bottom" viewBox="0 0 400 32" preserveAspectRatio="none" focusable="false"><path vector-effect="non-scaling-stroke" d="M1 32 C1 20 8 14 24 16 C18 6 40 1 56 10 C70 1 89 2 102 11 C118 1 138 2 151 11 C166 1 186 2 199 11 C216 1 237 3 250 12 C268 2 288 4 301 13 C320 3 341 8 350 19 C375 11 399 18 399 32" /></svg></span>
-                <em>{{ section.text }}</em>
-              } @else {{{ section.text }}}
+                <em [innerHTML]="renderInline(section.text)"></em>
+              } @else {<span [innerHTML]="renderInline(section.text)"></span>}
             </p>
           </div>
     </ng-template>
@@ -253,7 +258,7 @@ interface RenderedSection extends NarrativeSection {
               ✎ Modifica azione
             </button>
           }
-          <p class="action">{{ section.text }}</p>
+          <p class="action" [innerHTML]="renderInline(section.text)"></p>
         }
         @case ('pensiero') {
           <ng-container *ngTemplateOutlet="voiceContent; context: { $implicit: section, canEdit: canEdit }" />
@@ -262,7 +267,7 @@ interface RenderedSection extends NarrativeSection {
           @if (canEdit) { <button type="button" class="edit-start" (click)="startEditing(section)">✎ Modifica lettera</button> }
           <article class="letter" aria-label="Lettera">
             @if (section.correspondence?.date) { <p class="letter-date">{{ section.correspondence.date }}</p> }
-            <p class="letter-body">{{ section.text }}</p>
+            <p class="letter-body" [innerHTML]="renderInline(section.text)"></p>
             @if (section.correspondence?.signature) { <p class="letter-signature">{{ section.correspondence.signature }}</p> }
           </article>
         }
@@ -273,7 +278,7 @@ interface RenderedSection extends NarrativeSection {
               @if (section.portrait) { <img [src]="section.portrait" alt="" loading="lazy" /> }
               <strong>{{ section.speaker || 'Messaggio' }}</strong>
             </header>
-            <p>{{ section.text }}</p>
+            <p [innerHTML]="renderInline(section.text)"></p>
             @if (section.correspondence?.date || section.correspondence?.time) {
               <footer class="chat-meta">
                 @if (section.correspondence.date) { <span>{{ section.correspondence.date }}</span> }
@@ -288,7 +293,7 @@ interface RenderedSection extends NarrativeSection {
               ✎ Modifica nota
             </button>
           }
-          <p class="note"><small>Fuori personaggio</small>{{ section.text }}</p>
+          <p class="note"><small>Fuori personaggio</small><span [innerHTML]="renderInline(section.text)"></span></p>
         }
       }
     </ng-template>
@@ -542,6 +547,8 @@ interface RenderedSection extends NarrativeSection {
   `,
 })
 export class GdrTurn {
+  private readonly sanitizer = inject(DomSanitizer);
+  protected renderInline(text: string): SafeHtml { return renderGdrInline(this.sanitizer,text); }
   readonly source = input.required<string>();
   readonly editable = input(false);
   readonly editBlocks = input(true);
@@ -772,6 +779,7 @@ export class GdrTurn {
   protected insertSnippet(type: string): void {
     const area = this.area?.nativeElement;
     if (type === 'npc_full' && !this.deletable() && !this.insertable()) return;
+    if (NARRATIVE_TEXT_FORMATS[type] && !this.deletable() && !this.insertable()) return;
     if (!area || !type || (['dialogo', 'pensiero'].includes(type) && !this.characters().length && !this.allowGeneric()))
       return;
     const start = storedSourceOffset(this.visibleDraft(), area.selectionStart),
@@ -786,12 +794,13 @@ export class GdrTurn {
       return;
     }
     this.message.set('');
-    const replacement = replaceNarrativeSelection(this.draft(), start, end, snippet);
+    const formatMarker = NARRATIVE_TEXT_FORMATS[type] ?? '';
+    const replacement = replaceNarrativeSelection(this.draft(), start, end, snippet, !!formatMarker);
     const characterDraft = readCharacterDraft(replacement.source);
     const nextView = visibleNarrativeSource(replacement.source, this.characterRoster().length ? this.characterRoster() : this.characters());
     const correspondenceBody = ['lettera','messaggio'].includes(type) ? parseNarrative(snippet).sections[0]?.contentStart : undefined;
-    const selectionStart = correspondenceBody === undefined ? replacement.start : replacement.start + correspondenceBody;
-    const selectionEnd = correspondenceBody === undefined ? replacement.end : replacement.start + snippet.lastIndexOf('\n');
+    const selectionStart = correspondenceBody === undefined ? replacement.start + formatMarker.length : replacement.start + correspondenceBody;
+    const selectionEnd = correspondenceBody === undefined ? replacement.end - formatMarker.length : replacement.start + snippet.lastIndexOf('\n');
     updateGdrTextarea(area, () => this.setDraft(replacement.source), characterDraft ? 0 : visibleSourceOffset(nextView, selectionStart), characterDraft?.body.length ?? visibleSourceOffset(nextView, selectionEnd));
   }
 

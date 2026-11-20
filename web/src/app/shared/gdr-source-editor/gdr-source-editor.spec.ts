@@ -142,12 +142,27 @@ describe('anteprima prima della pubblicazione', () => {
     expect(option('Titolo')).toBeUndefined();expect(option('Tabella')).toBeUndefined();
     fixture.componentRef.setInput('masterTools',true);fixture.detectChanges();
     await fixture.whenStable();
-    for(const label of ['Titolo','Sottotitolo','Riquadro','Elenco','Tabella','Corsivo']) expect(option(label)).toBeTruthy();
+    for(const label of ['Titolo','Sottotitolo','Riquadro','Elenco','Tabella','Corsivo','Grassetto','Sottolineato']) expect(option(label)).toBeTruthy();
     const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
     area.setSelectionRange(0,11);let result='';fixture.componentInstance.sourceChange.subscribe(value=>result=value);
     add('Sottotitolo');expect(result.trim()).toBe('### Un incontro');expect(parseNarrative(result).errors).toEqual([]);
     add('Riquadro');expect(result).toContain('::: callout\nUn incontro\n:::');expect(parseNarrative(result).errors).toEqual([]);
     fixture.componentRef.setInput('masterTools',false);fixture.detectChanges();expect(option('Titolo')).toBeUndefined();
+  });
+  it.each([['Grassetto','**','strong'],['Sottolineato','__','u'],['Corsivo','*','em']])('applica %s solo alla frase selezionata e lo mostra in anteprima', async (label,marker,tag) => {
+    const {fixture,option,add,button}=setup('Prima parola dopo.');
+    expect(option(label)).toBeUndefined();
+    fixture.componentRef.setInput('masterTools',true);
+    let saved='';fixture.componentInstance.sourceChange.subscribe(value=>{saved=value;fixture.componentRef.setInput('source',value);});
+    fixture.detectChanges();await fixture.whenStable();
+    const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;area.setSelectionRange(6,12);
+    add(label);
+    await vi.waitFor(()=>{fixture.detectChanges();expect(document.activeElement).toBe(area);expect(area.value.slice(area.selectionStart,area.selectionEnd)).toBe('parola');});
+    expect(saved).toBe(`Prima ${marker}parola${marker} dopo.`);
+    expect(fixture.nativeElement.querySelector('.inline-editor')).toBeNull();
+    button('Solo anteprima').click();fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector(`.preview-pane app-gdr-blocks p ${tag}`)?.textContent).toBe('parola');
+    fixture.componentRef.setInput('masterTools',false);fixture.detectChanges();expect(option(label)).toBeUndefined();
   });
   it('inserisce un’immagine scelta dalle miniature senza richiedere un percorso', () => {
     const {fixture,button,option,choose,add}=setup('');

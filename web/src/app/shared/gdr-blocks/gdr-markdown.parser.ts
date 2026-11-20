@@ -191,7 +191,7 @@ export function parseGdrMarkdown(source: string, ranges?: GdrSourceRange[]): Gdr
       j++;
     }
     const rawText = paragraphLines.join('\n').trim();
-    const emphasisMatch = /^\*(.+)\*$/s.exec(rawText);
+    const emphasisMatch = /^\*(?!\*)(.+)(?<!\*)\*$/s.exec(rawText);
     const data: GdrParagraphData = emphasisMatch
       ? { text: emphasisMatch[1].trim(), emphasis: true }
       : { text: rawText };

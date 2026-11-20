@@ -127,6 +127,23 @@ try {
         if(mode==='Testo e anteprima') assert.equal(await editor.locator(rendered).innerText(),'Non posso fidarmi.');
       }
     }
+    if(actor===1) {
+      await area.fill('::: lettera\n---\nUna parola importante.\n:::');
+      for(const label of ['Grassetto','Sottolineato']) {
+        await area.evaluate(el=>{const start=el.value.indexOf('parola');el.setSelectionRange(start,start+6);});
+        await choose(label);await editor.getByRole('button',{name:'Aggiungi',exact:true}).click();
+        await page.waitForFunction(()=>{const el=document.querySelector('#lab-turn');return document.activeElement===el&&el.value.slice(el.selectionStart,el.selectionEnd)==='parola';});
+      }
+      assert.equal((await area.inputValue()).includes('Una **__parola__** importante.'),true);
+      await editor.getByRole('button',{name:'Solo anteprima',exact:true}).click();
+      assert.equal(await editor.locator('.letter-body strong u').innerText(),'parola');
+      assert.ok(await editor.locator('.letter-body strong').evaluate(el=>Number(getComputedStyle(el).fontWeight)>=600));
+      assert.ok((await editor.locator('.letter-body u').evaluate(el=>getComputedStyle(el).textDecorationLine)).includes('underline'));
+      await editor.getByRole('button',{name:'Torna al testo',exact:true}).click();
+    } else {
+      const options=editor.getByLabel('Tipo di blocco',{exact:true}).locator('option');
+      assert.equal(await options.filter({hasText:/^(Grassetto|Sottolineato|Corsivo)$/}).count(),0);
+    }
     await area.fill(initial);await editor.getByRole('button',{name:'Solo anteprima',exact:true}).click();
     for (const width of [1280,390,320]) {
       await page.setViewportSize({width,height:1000});

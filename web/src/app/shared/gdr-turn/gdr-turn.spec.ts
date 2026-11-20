@@ -62,7 +62,7 @@ describe('eliminazione dei blocchi della storia',()=>{
   const dialogue='La voce di Shivay.\n\n::: dialogo Shivay | /assets/avatar.webp\nNon è una buona notizia.\n:::';
   const blocks:GdrBlockRow[]=[{id:'1',documentKey:'avventura',position:0,type:'npc_grid',data:{entries:[{name:'Shivay',alt:'Shivay',image:'/assets/intera.webp',description:'Prima riga.\nSeconda riga.'}]}},{id:'2',documentKey:'avventura',position:1,type:'paragraph',data:{text:dialogue,format:'gdr-narrative'}}];
   const {fixture}=setup(serializeGdrBlocks(blocks));fixture.componentRef.setInput('persistedBlocks',blocks);fixture.detectChanges();
-  const reading=()=>({photo:fixture.nativeElement.querySelector('.npc-card img')?.getAttribute('src'),description:fixture.nativeElement.querySelector('.npc-card p')?.textContent,avatar:fixture.nativeElement.querySelector('.speaker img')?.getAttribute('src'),dialogue:fixture.nativeElement.querySelector('.dialogue p')?.textContent});
+  const reading=()=>({photo:fixture.nativeElement.querySelector('.npc-card img')?.getAttribute('src'),description:fixture.nativeElement.querySelector('.npc-card p')?.innerHTML.replace(/<br>/g,'\n'),avatar:fixture.nativeElement.querySelector('.speaker img')?.getAttribute('src'),dialogue:fixture.nativeElement.querySelector('.dialogue p')?.textContent});
   const master=reading();expect(master).toEqual({photo:'/assets/intera.webp',description:'Prima riga.\nSeconda riga.',avatar:'/assets/avatar.webp',dialogue:'Non è una buona notizia.'});
   fixture.componentRef.setInput('editable',false);fixture.detectChanges();expect(reading()).toEqual(master);
  });

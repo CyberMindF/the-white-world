@@ -1,6 +1,6 @@
 import { Component, Input, Output, EventEmitter, inject, signal } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
-import { renderInlineLinks } from '../inline-text';
+import { renderGdrInline } from '../gdr-inline-text';
 import {
   GdrBlockRow,
   GdrCalloutData,
@@ -69,6 +69,6 @@ export class GdrBlocks {
   }
 
   protected renderInline(text: string): SafeHtml {
-    return renderInlineLinks(this.sanitizer, text);
+    return renderGdrInline(this.sanitizer, text);
   }
 }

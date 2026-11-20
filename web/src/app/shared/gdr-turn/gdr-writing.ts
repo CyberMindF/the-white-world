@@ -25,6 +25,8 @@ export function findNarrativeCharacter(roster: NarrativeCharacter[], id: string 
   return matches.length===1?matches[0]:undefined;
 }
 
+export const NARRATIVE_TEXT_FORMATS: Readonly<Record<string,string>> = {emphasis:'*',strong:'**',underline:'__'};
+
 export function narrativeSnippet(
   type: string,
   selected: string,
@@ -41,6 +43,8 @@ export function narrativeSnippet(
   if (type === 'heading') return `## ${selected || 'Titolo'}`;
   if (type === 'subtitle') return `### ${selected || 'Sottotitolo'}`;
   if (type === 'emphasis') return `*${selected || 'Testo in corsivo.'}*`;
+  if (type === 'strong') return `**${selected || 'Testo in grassetto.'}**`;
+  if (type === 'underline') return `__${selected || 'Testo sottolineato.'}__`;
   if (type === 'paragraph') return selected || 'Testo del paragrafo.';
   if (type === 'callout') return `::: callout\n${selected || 'Testo del riquadro.'}\n:::`;
   if (type === 'list' && selected) return selected.split(/\r?\n/).filter(line => line.trim()).map(line => '- ' + line).join('\n');
@@ -56,11 +60,12 @@ export function narrativeSnippet(
 }
 
 /** Sostituisce la selezione riusando i separatori esistenti, senza righe vuote ai bordi. */
-export function replaceNarrativeSelection(source: string, start: number, end: number, content: string): {
+export function replaceNarrativeSelection(source: string, start: number, end: number, content: string, inline = false): {
   source: string; start: number; end: number;
 } {
   const newline = source.includes('\r\n') ? '\r\n' : '\n';
   const separator = (left: string, right: string): string => {
+    if (inline) return '';
     if (!left || !right) return '';
     const ending = left.replace(/\r\n?/g, '\n').match(/\n*$/)![0].length;
     const starting = right.replace(/\r\n?/g, '\n').match(/^\n*/)![0].length;

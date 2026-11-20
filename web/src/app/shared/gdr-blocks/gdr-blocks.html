@@ -37,10 +37,10 @@
               (click)="editBlock.emit(blockIndex)"
               [attr.aria-label]="'Modifica: ' + asHeading(block.data).text"
             >
-              {{ asHeading(block.data).text }}<span aria-hidden="true"> ✎</span>
+              <span [innerHTML]="renderInline(asHeading(block.data).text)"></span><span aria-hidden="true"> ✎</span>
             </button>
           } @else {
-            {{ asHeading(block.data).text }}
+            <span [innerHTML]="renderInline(asHeading(block.data).text)"></span>
           }
         </h2>
       } @else {
@@ -52,10 +52,10 @@
               (click)="editBlock.emit(blockIndex)"
               [attr.aria-label]="'Modifica: ' + asHeading(block.data).text"
             >
-              {{ asHeading(block.data).text }}<span aria-hidden="true"> ✎</span>
+              <span [innerHTML]="renderInline(asHeading(block.data).text)"></span><span aria-hidden="true"> ✎</span>
             </button>
           } @else {
-            {{ asHeading(block.data).text }}
+            <span [innerHTML]="renderInline(asHeading(block.data).text)"></span>
           }
         </h3>
       }
@@ -79,7 +79,7 @@
       <figure class="avventura-figure">
         <button class="image-trigger" type="button" aria-label="Apri immagine" (click)="preview.set(asImage(block.data))"><img [src]="asImage(block.data).src" [alt]="asImage(block.data).alt" loading="lazy" /></button>
         @if (asImage(block.data).caption) {
-          <figcaption>{{ asImage(block.data).caption }}</figcaption>
+          <figcaption [innerHTML]="renderInline(asImage(block.data).caption!)"></figcaption>
         }
       </figure>
     }
@@ -89,7 +89,7 @@
           <article class="npc-card card glass-surface">
             @if(entry.image){<button class="image-trigger" type="button" [attr.aria-label]="'Apri scheda di ' + entry.name" (click)="openNpc(entry)"><img [src]="entry.image" [alt]="entry.alt" loading="lazy" /></button>}
             <h4>@if(entry.characterId||entry.image){<button class="image-trigger" type="button" (click)="openNpc(entry)">{{ entry.name }}</button>}@else{ {{entry.name}} }</h4>
-            <p>{{ entry.description }}</p>
+            <p [innerHTML]="renderInline(entry.description)"></p>
           </article>
         }
       </div>
@@ -97,7 +97,7 @@
     @case ('list') {
       <ul class="maga-list">
         @for (item of asList(block.data).items; track item) {
-          <li>{{ item }}</li>
+          <li [innerHTML]="renderInline(item)"></li>
         }
       </ul>
     }
@@ -105,13 +105,13 @@
       <div class="wild-table-wrap">
         <table class="wild-table">
           <tr>
-            <th>{{ asTable(block.data).header[0] }}</th>
-            <th>{{ asTable(block.data).header[1] }}</th>
+            <th [innerHTML]="renderInline(asTable(block.data).header[0])"></th>
+            <th [innerHTML]="renderInline(asTable(block.data).header[1])"></th>
           </tr>
           @for (row of asTable(block.data).rows; track $index) {
             <tr>
-              <td>{{ row[0] }}</td>
-              <td>{{ row[1] }}</td>
+              <td [innerHTML]="renderInline(row[0])"></td>
+              <td [innerHTML]="renderInline(row[1])"></td>
             </tr>
           }
         </table>
