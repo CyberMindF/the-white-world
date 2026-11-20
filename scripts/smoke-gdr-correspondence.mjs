@@ -100,6 +100,21 @@ try {
     const message=editor.locator('.chat-message');await message.waitFor();
     assert.ok((await message.innerText()).includes('Shivay'));assert.equal(await message.locator('img').getAttribute('src'),avatar);
     assert.ok((await message.innerText()).includes('Dopo cena'));
+    assert.equal(await message.locator('.chat-bubble .chat-contact').innerText(),'Shivay');
+    assert.equal(await message.locator('.chat-bubble img').count(),0);
+    for (const width of [1280,390,320]) {
+      await page.setViewportSize({width,height:1000});
+      const avatarBox=await message.locator('.chat-avatar').boundingBox(), bubbleBox=await message.locator('.chat-bubble').boundingBox();
+      assert.ok(avatarBox.x+avatarBox.width<bubbleBox.x, 'Avatar fuori dalla bolla');
+      assert.ok(Math.abs(avatarBox.y-bubbleBox.y)<1, 'Avatar allineato in alto');
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+      await message.screenshot({path:join(screenshots,`message-${actor}-${width}.png`),animations:'disabled'});
+      if (width===1280) {
+        await page.evaluate(()=>document.body.dataset.theme='the-white-world');
+        await message.screenshot({path:join(screenshots,`message-${actor}-dark.png`),animations:'disabled'});
+        await page.evaluate(()=>document.body.dataset.theme='white-world');
+      }
+    }
     assert.equal(await editor.locator('.edit-start, .edit-speaker, .gdr-edit-start, .inline-editor').count(),0);
     await editor.getByRole('button',{name:'Torna al testo',exact:true}).click();
     await choose('Messaggio');await person.selectOption({label:'Nome o numero libero'});

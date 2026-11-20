@@ -52,9 +52,11 @@ describe('modifica di lettere, messaggi e pensieri', () => {
     expect(parseNarrative(source).sections[0]).toMatchObject({characterId:'npc',correspondence:{time:'Dopo cena'}});
     fixture.componentRef.setInput('source',source);fixture.componentRef.setInput('characterRoster',[{id:'npc',name:'Ada Nuova',portrait:'/assets/new.webp'}]);fixture.detectChanges();
     expect(root.querySelector('.chat-contact')?.textContent).toContain('Ada Nuova');
-    expect(root.querySelector('.chat-contact img')?.getAttribute('src')).toBe('/assets/new.webp');
+    expect(root.querySelector('.chat-message > .chat-avatar')?.getAttribute('src')).toBe('/assets/new.webp');
+    expect(root.querySelector('.chat-bubble .chat-avatar')).toBeNull();
+    expect(root.querySelector('.chat-bubble .chat-contact')?.textContent).toContain('Ada Nuova');
     fixture.componentRef.setInput('source','::: messaggio\nCONTATTO: Ada\n---\nArrivo.\n:::');fixture.detectChanges();
-    expect(root.querySelector('.chat-contact img')).toBeNull();
+    expect(root.querySelector('.chat-avatar')).toBeNull();
   });
 
   it('salva un blocco narrativo condiviso con il suo ID e impedisce di applicare un corpo vuoto', async () => {

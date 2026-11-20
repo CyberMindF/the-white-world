@@ -274,18 +274,18 @@ interface RenderedSection extends NarrativeSection {
         }
         @case ('messaggio') {
           @if (canEdit) { <button type="button" class="edit-start" (click)="startEditing(section)">✎ Modifica messaggio</button> }
-          <article class="chat-message" aria-label="Messaggio">
-            <header class="chat-contact">
-              @if (section.portrait) { <img [src]="section.portrait" alt="" loading="lazy" /> }
-              <strong>{{ section.speaker || 'Messaggio' }}</strong>
-            </header>
-            <p [innerHTML]="renderInline(section.text)"></p>
-            @if (section.correspondence?.date || section.correspondence?.time) {
-              <footer class="chat-meta">
-                @if (section.correspondence.date) { <span>{{ section.correspondence.date }}</span> }
-                @if (section.correspondence.time) { <span>{{ section.correspondence.time }}</span> }
-              </footer>
-            }
+          <article class="chat-message" aria-label="Messaggio digitale">
+            @if (section.portrait) { <img class="chat-avatar" [src]="section.portrait" alt="" loading="lazy" /> }
+            <div class="chat-bubble">
+              <header class="chat-contact"><strong>{{ section.speaker || 'Messaggio' }}</strong></header>
+              <p [innerHTML]="renderInline(section.text)"></p>
+              @if (section.correspondence?.date || section.correspondence?.time) {
+                <footer class="chat-meta">
+                  @if (section.correspondence.date) { <span aria-label="Giorno del messaggio">{{ section.correspondence.date }}</span> }
+                  @if (section.correspondence.time) { <span class="chat-time" aria-label="Orario del messaggio"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6" /><path d="M8 4.5V8l2.5 1.5" /></svg>{{ section.correspondence.time }}</span> }
+                </footer>
+              }
+            </div>
           </article>
         }
         @case ('nota') {
@@ -405,11 +405,16 @@ interface RenderedSection extends NarrativeSection {
     .letter .letter-date { margin: 0 0 1.3rem; text-align: right; font-size: 1.3rem; }
     .letter .letter-body { margin: 0; }
     .letter .letter-signature { text-align: right; margin: 1.5rem 0 0; }
-    .chat-message { margin: 1rem auto 1.5rem; max-width: 34rem; padding: 1rem 1.15rem .75rem; background: var(--panel-color); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 1rem; box-shadow: 0 2px 8px #0000000a; }
-    .chat-contact { display: flex; gap: .65rem; align-items: center; font-size: .9rem; color: var(--accent-color); }
-    .chat-contact img { width: 36px; height: 36px; flex: 0 0 36px; object-fit: cover; border-radius: 50%; }
-    .chat-message p { margin: .6rem 0; line-height: 1.65; }
-    .chat-meta { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .65rem; font-size: .75rem; color: var(--muted-color); white-space: pre-wrap; }
+    .chat-message { display: flex; align-items: flex-start; gap: .8rem; width: fit-content; max-width: min(100%, 37rem); margin: 1rem 0 1.5rem; padding-left: 8px; box-sizing: border-box; color: var(--text-color); }
+    .chat-avatar { width: 36px; height: 36px; flex: 0 0 36px; object-fit: cover; border-radius: 50%; }
+    .chat-message:has(.chat-avatar) { padding-left: 0; }
+    .chat-bubble { --chat-background: color-mix(in srgb, var(--bg-color) 70%, #90979e 30%); position: relative; min-width: 0; padding: .65rem .9rem .45rem; background: var(--chat-background); border-radius: 0 .85rem .85rem .85rem; box-shadow: 0 1px 2px #00000020; }
+    .chat-bubble::before { content: ''; position: absolute; top: 0; right: 100%; width: 8px; height: 10px; background: var(--chat-background); clip-path: polygon(0 0, 100% 0, 100% 100%); pointer-events: none; }
+    .chat-contact { font-size: .85rem; line-height: 1.4; color: var(--accent-color); overflow-wrap: anywhere; }
+    .chat-message p { margin: .3rem 0 .4rem; line-height: 1.6; overflow-wrap: anywhere; }
+    .chat-meta { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: .25rem .7rem; font-size: .72rem; line-height: 1.4; color: color-mix(in srgb, var(--text-color) 80%, var(--muted-color)); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .chat-time { display: inline-flex; align-items: baseline; gap: .25rem; min-width: 0; }
+    .chat-time svg { width: .75rem; height: .75rem; flex: 0 0 .75rem; align-self: center; fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
     button:disabled, select:disabled { cursor: default; }
     .note {
       color: var(--muted-color);
