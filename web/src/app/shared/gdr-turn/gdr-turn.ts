@@ -259,7 +259,7 @@ interface RenderedSection extends NarrativeSection {
               ✎ Modifica azione
             </button>
           }
-          <p class="action">@if (section.speaker) {<span>{{ section.speaker }}</span>{{ ' ' }}}<span [innerHTML]="renderInline(section.text)"></span></p>
+          <p class="action">@if (section.speaker) {<span class="action-name">{{ section.speaker }}</span>{{ ' ' }}}<span [innerHTML]="renderInline(section.text)"></span></p>
         }
         @case ('pensiero') {
           <ng-container *ngTemplateOutlet="voiceContent; context: { $implicit: section, canEdit: canEdit }" />
@@ -382,9 +382,14 @@ interface RenderedSection extends NarrativeSection {
     }
     .action {
       margin: .8rem 0;
+      padding-inline-start: 1.5rem;
       font-style: normal;
       line-height: 1.65;
       white-space: pre-wrap;
+    }
+    .action-name {
+      color: var(--accent-color);
+      font-weight: 600;
     }
     .voice-bubble { position: relative; width: fit-content; max-width: 100%; min-width: 0; isolation: isolate; box-sizing: border-box; }
     .speech-bubble { --speech-background: linear-gradient(var(--panel-color), var(--panel-color)), var(--bg-color); padding: .8rem 1rem; border: 1px solid var(--border-color); border-radius: 1.15rem; background: var(--speech-background); }
