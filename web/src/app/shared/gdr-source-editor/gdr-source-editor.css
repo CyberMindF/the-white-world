@@ -21,6 +21,13 @@
 .toolbar label {
   margin: 0 0.2rem 0 0;
 }
+.insert-toolbar { align-items: end; gap: .65rem; }
+.toolbar-field { display: grid; gap: .35rem; min-width: 0; flex: 1 1 12rem; }
+.toolbar-field > label { padding: 0; }
+.character-choice { display: flex; align-items: center; gap: .45rem; min-width: 0; }
+.character-choice select, .toolbar-field > select { width: 100%; min-width: 0; }
+.character-choice select { flex: 1; }
+.insert-toolbar .add-block { flex: 0 0 auto; }
 .tools-label { color: var(--muted-color); font-size: .8rem; margin-right: .3rem; }
 .master-toolbar { background: var(--panel-color); }
 .image-picker { padding: 0 .9rem .8rem; border-bottom: 1px solid var(--border-color); }

@@ -1,5 +1,5 @@
 import { GdrBlockRow } from '../gdr-blocks/gdr-block.types';
-import { CorrespondenceData, parseCorrespondenceHeader } from './gdr-correspondence';
+import { CorrespondenceData, parseCorrespondenceHeader, readCorrespondenceBody } from './gdr-correspondence';
 import {
   GdrParseError,
   GdrSourceRange,
@@ -15,6 +15,7 @@ export interface NarrativeSection {
   characterId?: string;
   portrait: string;
   correspondence?: CorrespondenceData;
+  contentStart?: number;
   blocks: GdrBlockRow[];
   ranges: GdrSourceRange[];
   start: number;
@@ -88,10 +89,14 @@ export function parseNarrative(source: string): NarrativeResult {
         .split('|')
         .map((value) => value.trim());
       let correspondence: CorrespondenceData | undefined;
+      let bodyStart = start + 1;
       if (match[1] === 'lettera' || match[1] === 'messaggio') {
         speaker = portrait = characterId = '';
         try {
           correspondence = parseCorrespondenceHeader(match[2] ?? '');
+          const coded = readCorrespondenceBody(lines.slice(bodyStart,end),correspondence);
+          correspondence = coded.data;
+          bodyStart += coded.prefixLines;
           if (match[1] === 'messaggio') {
             speaker = correspondence.name;
             portrait = correspondence.portrait;
@@ -114,11 +119,12 @@ export function parseNarrative(source: string): NarrativeResult {
       sections.push({
         id: `section-${sections.length}`,
         kind: match[1] as NarrativeSection['kind'],
-        text: lines.slice(start + 1, end).join('\n'),
+        text: lines.slice(bodyStart, end).join('\n'),
         speaker,
         characterId,
         portrait: safeNarrativeImage(portrait),
         ...(correspondence ? { correspondence: { ...correspondence, portrait: safeNarrativeImage(correspondence.portrait) } } : {}),
+        ...(correspondence ? {contentStart:offsets[bodyStart]} : {}),
         ranges: [],
         start: offsets[start],
         end: offsets[end] + lines[end].length,

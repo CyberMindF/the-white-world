@@ -35,7 +35,7 @@ export function narrativeSnippet(
   if (type === 'dialogo' || type === 'pensiero')
     return `::: ${type} ${name}${portrait || character?.id ? ' | ' + portrait : ''}${character?.id ? ' | ' + character.id : ''}\n${selected || (type === 'pensiero' ? 'Scrivi qui i suoi pensieri.' : 'Scrivi qui le sue parole.')}\n:::`;
   if (type === 'lettera' || type === 'messaggio')
-    return writeCorrespondence({ kind: type, body: selected || (type === 'lettera' ? 'Scrivi qui la lettera.' : 'Scrivi qui il messaggio.'), name: '', characterId: '', portrait: '', signature: '', date: '', time: '' });
+    return writeCorrespondence({ kind: type, body: selected || (type === 'lettera' ? 'Scrivi qui la lettera.' : 'Scrivi qui il messaggio.'), name: type === 'messaggio' ? character?.name ?? '' : '', characterId: type === 'messaggio' ? character?.id ?? '' : '', portrait: type === 'messaggio' && !character?.id ? portrait : '', signature: type === 'lettera' ? character?.name ?? '' : '', date: '', time: '' }, true);
   if (type === 'azione' || type === 'nota')
     return `::: ${type}\n${selected || (type === 'azione' ? 'Descrivi cosa fa il personaggio.' : 'Scrivi la nota fuori personaggio.')}\n:::`;
   if (type === 'heading') return `## ${selected || 'Titolo'}`;

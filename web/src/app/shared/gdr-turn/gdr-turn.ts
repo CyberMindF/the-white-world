@@ -7,7 +7,6 @@ import { GdrBlocks } from '../gdr-blocks/gdr-blocks';
 import { BLOCK_TYPES, SNIPPET_LABELS } from '../gdr-blocks/gdr-snippets';
 import { NarrativeCharacter, findNarrativeCharacter, narrativeNameMatches, insertNarrativeBlock, narrativeSnippet, replaceNarrativeSelection } from './gdr-writing';
 import {CharacterDraft,readCharacterDraft,writeCharacterDraft} from './gdr-character-draft';
-import { CorrespondenceDraft, writeCorrespondence } from './gdr-correspondence';
 import { storedSourceOffset, updateVisibleNarrativeSource, visibleNarrativeSource, visibleSourceOffset } from './gdr-visible-source';
 import { NarrativeSection, parseNarrative, safeNarrativeImage } from './gdr-turn.parser';
 import { GdrBlockRow, GdrParagraphData } from '../gdr-blocks/gdr-block.types';
@@ -97,7 +96,7 @@ interface RenderedSection extends NarrativeSection {
           ><span>Solo questa parte del racconto.</span>
         </div>
         <div class="inline-tools">
-          @if(!characterDraft() && !correspondenceDraft()){
+          @if(!characterDraft()){
           <label [for]="fieldId + '-type'">Inserisci</label>
           <select
             #snippetType
@@ -116,12 +115,13 @@ interface RenderedSection extends NarrativeSection {
               Dialogo
             </option>
             <option value="pensiero" [disabled]="!characters().length && !allowGeneric()">Pensiero</option>
-            <option value="lettera">Lettera / Messaggio</option>
+            <option value="lettera">Lettera</option>
+            <option value="messaggio">Messaggio</option>
             <option value="azione">Azione</option>
             <option value="nota">Fuori personaggio</option>
           </select>
           }
-          @if (characters().length && !correspondenceDraft()) {
+          @if (characters().length) {
             <label [for]="fieldId + '-voice'">Personaggio</label>
             <select
               [id]="fieldId + '-voice'"
@@ -142,40 +142,8 @@ interface RenderedSection extends NarrativeSection {
             </select>
           }
         </div>
-        @if (correspondenceDraft(); as correspondence) {
-          <div class="correspondence-fields">
-            <label [for]="fieldId + '-format'">Formato</label>
-            <select [id]="fieldId + '-format'" [ngModel]="correspondence.kind" (ngModelChange)="updateCorrespondence({kind: $event})">
-              <option value="lettera">Lettera</option>
-              <option value="messaggio">Messaggio</option>
-            </select>
-            @if (correspondence.kind === 'lettera') {
-              <label [for]="fieldId + '-signature'">Firma (facoltativa)</label>
-              <input [id]="fieldId + '-signature'" type="text" [ngModel]="correspondence.signature" (ngModelChange)="updateCorrespondence({signature: $event})" />
-            } @else {
-              <label [for]="fieldId + '-contact'">Contatto</label>
-              <select [id]="fieldId + '-contact'" [ngModel]="correspondenceVoice()" (ngModelChange)="setCorrespondenceVoice(+$event)">
-                <option [ngValue]="-1">Nome o numero libero</option>
-                @if (correspondenceVoice() === -2) { <option [ngValue]="-2">{{ correspondence.name }} · non disponibile</option> }
-                @for (character of contactCharacters(); track $index) {
-                  <option [ngValue]="$index">{{ character.name }}{{ character.kind === 'pg' ? ' · PG' : character.kind === 'png' ? ' · PNG' : '' }}</option>
-                }
-              </select>
-              @if (correspondenceVoice() === -1) {
-                <label [for]="fieldId + '-contact-name'">Nome o numero</label>
-                <input [id]="fieldId + '-contact-name'" type="text" [ngModel]="correspondence.name" (ngModelChange)="updateCorrespondence({name: $event})" placeholder="Nome oppure +39…" />
-              }
-              <label [for]="fieldId + '-time'">Orario (facoltativo)</label>
-              <input [id]="fieldId + '-time'" type="text" [ngModel]="correspondence.time" (ngModelChange)="updateCorrespondence({time: $event})" placeholder="Es. 18:42" />
-            }
-            <label [for]="fieldId + '-date'">{{ correspondence.kind === 'lettera' ? 'Data' : 'Giorno' }} (facoltativo)</label>
-            <input [id]="fieldId + '-date'" type="text" [ngModel]="correspondence.date" (ngModelChange)="updateCorrespondence({date: $event})" placeholder="Es. Ieri, 12 novembre, terza luna…" />
-          </div>
-        }
         @if(characterDraft()?.kind==='npc'){<p class="character-hint">Foto e dati provengono dal personaggio. Puoi aggiungere una descrizione per questa scena.</p>}
-        <label [class.sr-only]="!correspondenceDraft()" [class.body-label]="!!correspondenceDraft()" [for]="fieldId">{{
-          correspondenceDraft() ? (correspondenceDraft()!.kind === 'lettera' ? 'Corpo della lettera' : 'Testo del messaggio') : inserting() ? 'Testo del nuovo blocco' : 'Testo del blocco selezionato'
-        }}</label>
+        <label class="sr-only" [for]="fieldId">{{ inserting() ? 'Testo del nuovo blocco' : 'Testo del blocco selezionato' }}</label>
         <textarea
           #inlineArea
           [id]="fieldId"
@@ -434,10 +402,6 @@ interface RenderedSection extends NarrativeSection {
     .chat-contact img { width: 36px; height: 36px; flex: 0 0 36px; object-fit: cover; border-radius: 50%; }
     .chat-message p { margin: .6rem 0; line-height: 1.65; }
     .chat-meta { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .65rem; font-size: .75rem; color: var(--muted-color); white-space: pre-wrap; }
-    .correspondence-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: .35rem; padding: .8rem; }
-    .correspondence-fields label, .body-label { font-size: .85rem; color: var(--muted-color); }
-    .body-label { display: block; padding: .2rem .8rem 0; }
-    .correspondence-fields input, .correspondence-fields select { width: 100%; min-width: 0; box-sizing: border-box; padding: .5rem .6rem; margin-bottom: .5rem; border: 1px solid var(--border-color); border-radius: 5px; background: var(--input-bg); color: var(--text-color); font: inherit; }
     button:disabled, select:disabled { cursor: default; }
     .note {
       color: var(--muted-color);
@@ -618,7 +582,6 @@ export class GdrTurn {
   protected readonly viewedCharacter = signal<NarrativeCharacter | null>(null);
   readonly characterRoster = input<NarrativeCharacter[]>([]);
   readonly characters = input<NarrativeCharacter[]>([]);
-  protected readonly contactCharacters = computed(() => this.characterRoster().length ? this.characterRoster() : this.characters());
   readonly allowGeneric = input(true);
   protected readonly blockTypes = BLOCK_TYPES;
   protected readonly snippetLabels = SNIPPET_LABELS;
@@ -717,10 +680,13 @@ export class GdrTurn {
   protected readonly inserting = computed(() => this.editing()?.inserting === true);
   protected readonly draft = signal('');
   protected readonly characterDraft=signal<CharacterDraft|null>(null);
-  protected readonly correspondenceDraft = signal<CorrespondenceDraft | null>(null);
   private readonly visibleDraft = computed(() => visibleNarrativeSource(this.draft(), this.characterRoster().length ? this.characterRoster() : this.characters()));
-  protected readonly editorValue=computed(()=>this.correspondenceDraft()?.body??this.characterDraft()?.body??this.visibleDraft().text);
-  protected readonly emptyDialogue=computed(()=>(!!this.correspondenceDraft() || ['dialogo', 'pensiero'].includes(this.characterDraft()?.kind ?? ''))&&!this.editorValue().trim());
+  protected readonly editorValue=computed(()=>this.characterDraft()?.body??this.visibleDraft().text);
+  protected readonly emptyDialogue = computed(() => {
+    if (['dialogo','pensiero'].includes(this.characterDraft()?.kind ?? '')) return !this.editorValue().trim();
+    const sections = this.draftParsed().sections;
+    return sections.length === 1 && !!sections[0].correspondence && !sections[0].text.trim();
+  });
   protected readonly selectedVoice=computed(()=>{
     const draft=this.characterDraft();if(!draft)return this.voice();
     const character=this.findCharacter(this.characters(),draft.characterId,draft.name);
@@ -729,30 +695,8 @@ export class GdrTurn {
   private setDraft(value:string):void{
     this.draft.set(value);
     this.characterDraft.set(readCharacterDraft(value));
-    const parsed = parseNarrative(value), section = parsed.sections[0];
-    this.correspondenceDraft.set(!parsed.errors.length && parsed.sections.length === 1 && section.correspondence && (section.kind === 'lettera' || section.kind === 'messaggio')
-      ? { ...section.correspondence, kind: section.kind, body: section.text } : null);
-  }
-  protected updateCorrespondence(patch: Partial<CorrespondenceDraft>): void {
-    const current = this.correspondenceDraft();
-    if (!current) return;
-    const next = { ...current, ...patch };
-    this.correspondenceDraft.set(next);
-    this.draft.set(writeCorrespondence(next));
-  }
-  protected readonly correspondenceVoice = computed(() => {
-    const draft = this.correspondenceDraft();
-    if (!draft?.characterId && !draft?.portrait) return -1;
-    const character = this.findCharacter(this.contactCharacters(), draft.characterId, draft.name);
-    return character ? this.contactCharacters().indexOf(character) : -2;
-  });
-  protected setCorrespondenceVoice(index: number): void {
-    const character = this.contactCharacters()[index];
-    if (character) this.updateCorrespondence({ name: character.name, characterId: character.id ?? '', portrait: character.id ? '' : safeNarrativeImage(character.portrait) });
-    else if (index === -1) this.updateCorrespondence({ characterId: '', portrait: '' });
   }
   protected setEditorValue(value:string):void{
-    if (this.correspondenceDraft()) { this.updateCorrespondence({body: value}); return; }
     const current=this.characterDraft();
     if(current){const next={...current,body:value};this.characterDraft.set(next);this.draft.set(writeCharacterDraft(next,this.characterRoster().length?this.characterRoster():this.characters()));}
     else this.setDraft(updateVisibleNarrativeSource(this.visibleDraft(), value, this.characterRoster().length ? this.characterRoster() : this.characters()));
@@ -845,7 +789,10 @@ export class GdrTurn {
     const replacement = replaceNarrativeSelection(this.draft(), start, end, snippet);
     const characterDraft = readCharacterDraft(replacement.source);
     const nextView = visibleNarrativeSource(replacement.source, this.characterRoster().length ? this.characterRoster() : this.characters());
-    updateGdrTextarea(area, () => this.setDraft(replacement.source), characterDraft ? 0 : visibleSourceOffset(nextView, replacement.start), characterDraft?.body.length ?? visibleSourceOffset(nextView, replacement.end));
+    const correspondenceBody = ['lettera','messaggio'].includes(type) ? parseNarrative(snippet).sections[0]?.contentStart : undefined;
+    const selectionStart = correspondenceBody === undefined ? replacement.start : replacement.start + correspondenceBody;
+    const selectionEnd = correspondenceBody === undefined ? replacement.end : replacement.start + snippet.lastIndexOf('\n');
+    updateGdrTextarea(area, () => this.setDraft(replacement.source), characterDraft ? 0 : visibleSourceOffset(nextView, selectionStart), characterDraft?.body.length ?? visibleSourceOffset(nextView, selectionEnd));
   }
 
   public startEditing(range: { start: number; end: number; ownerId?:string; ownerStart?:number; ownerEnd?:number }): void {

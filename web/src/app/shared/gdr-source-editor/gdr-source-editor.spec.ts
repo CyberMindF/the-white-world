@@ -13,20 +13,24 @@ describe('anteprima prima della pubblicazione', () => {
     fixture.componentRef.setInput('source',source);
     fixture.detectChanges();
     const button=(label:string) => Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>).find(b=>b.textContent?.trim()===label)!;
-    return {fixture,button};
+    const typeSelect=()=>fixture.nativeElement.querySelector('select[id$="-block-type"]') as HTMLSelectElement;
+    const option=(label:string)=>Array.from(typeSelect().options).find(option=>option.textContent?.trim()===label);
+    const choose=(label:string)=>{const select=typeSelect();select.value=option(label)!.value;select.dispatchEvent(new Event('change'));fixture.detectChanges();};
+    const add=(label:string)=>{choose(label);button('Aggiungi').click();fixture.detectChanges();};
+    return {fixture,button,option,choose,add};
   }
   it('richiede del testo e mostra l’anteprima senza emettere un invio', () => {
-    const {fixture,button}=setup('   ');
+    const {fixture,button,option,choose,add}=setup('   ');
     expect(button('Solo anteprima').disabled).toBe(true);
     fixture.componentRef.setInput('source','Mi avvicino alla porta.'); fixture.detectChanges();
     expect(button('Solo anteprima').disabled).toBe(false);
     fixture.componentInstance.openPreview(); fixture.detectChanges();
-    expect(fixture.debugElement.query(By.directive(GdrTurn)).componentInstance.editable()).toBe(true);
+    expect(fixture.debugElement.query(By.directive(GdrTurn)).componentInstance.editable()).toBe(false);
     button('Torna al testo').click(); fixture.detectChanges();
     expect(fixture.debugElement.query(By.directive(GdrTurn))).toBeNull();
   });
   it('lascia l’anteprima affiancata in sola lettura e torna al testo dopo aver svuotato la bozza', () => {
-    const {fixture,button}=setup('La storia continua.');
+    const {fixture,button,option,choose,add}=setup('La storia continua.');
     button('Testo e anteprima').click(); fixture.detectChanges();
     expect(fixture.debugElement.query(By.directive(GdrTurn)).componentInstance.editable()).toBe(false);
     fixture.componentInstance.openPreview(); fixture.detectChanges();
@@ -35,51 +39,67 @@ describe('anteprima prima della pubblicazione', () => {
     expect(button('Solo anteprima').disabled).toBe(true);
   });
   it('mostra strumenti brevi senza immagini o comandi di sintassi nella vista giocatrice', () => {
-    const {fixture,button}=setup('Ciao');
-    expect(button('Dialogo')).toBeTruthy();
-    expect(button('Azione')).toBeTruthy();
-    expect(button('Nota')).toBeTruthy();
-    expect(button('Immagine')).toBeUndefined();
-    expect(button('PNG a tutta pagina')).toBeUndefined();
+    const {fixture,button,option,choose,add}=setup('Ciao');
+    expect(option('Dialogo')).toBeTruthy();expect(button('Dialogo')).toBeUndefined();expect(button('Aggiungi')).toBeTruthy();
+    expect(option('Azione')).toBeTruthy();
+    expect(option('Nota')).toBeTruthy();
+    expect(option('Immagine')).toBeUndefined();
+    expect(option('PNG a tutta pagina')).toBeUndefined();
     expect(button('Cambia voce nel dialogo')).toBeUndefined();
     expect(fixture.nativeElement.querySelector('pre, code')).toBeNull();
     expect(fixture.nativeElement.textContent).toContain('Personaggio');
     fixture.componentRef.setInput('allowImages',true); fixture.detectChanges();
-    expect(button('Immagine')).toBeTruthy();
+    expect(option('Immagine')).toBeTruthy();
   });
   it('trasforma la frase selezionata in un dialogo del personaggio scelto', async () => {
-    const {fixture,button}=setup('Ciao');
+    const {fixture,button,option,choose,add}=setup('Ciao');
     fixture.componentRef.setInput('characters',[{name:'Ada',portrait:''}]); fixture.detectChanges();
     await fixture.whenStable();
     let updated='';
     fixture.componentInstance.sourceChange.subscribe(value=>updated=value);
     const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
     area.setSelectionRange(0,4);
-    button('Dialogo').click(); fixture.detectChanges();
+    add('Dialogo'); fixture.detectChanges();
     expect(updated).toContain('::: dialogo Ada\nCiao\n:::');
   });
-  it.each([false, true])('apre i campi Lettera / Messaggio anche per masterTools=%s', async (masterTools) => {
-    const {fixture,button}=setup('Un saluto.');
+  it.each([
+    ['Lettera', 'lettera', false], ['Messaggio', 'messaggio', false],
+    ['Lettera', 'lettera', true], ['Messaggio', 'messaggio', true],
+  ] as const)('inserisce %s (%s, master: %s) con codici modificabili nella textbox', async (label,kind,masterTools) => {
+    const {fixture,button,choose}=setup('Un saluto.');
     fixture.componentRef.setInput('masterTools',masterTools);
+    fixture.componentRef.setInput('characters',[{id:'pg',name:'Daisy',portrait:''}]);
     fixture.componentRef.setInput('characterRoster',[{id:'npc',name:'Ada',portrait:'/assets/a.webp',kind:'png'}]);
-    fixture.componentInstance.sourceChange.subscribe(source=>fixture.componentRef.setInput('source',source));
-    fixture.detectChanges();await fixture.whenStable();
-    const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
-    area.setSelectionRange(0,10);button('Lettera / Messaggio').click();fixture.detectChanges();
-    await vi.waitFor(()=>{
-      fixture.detectChanges();
-      expect(fixture.nativeElement.querySelector('[id$="-format"]')).not.toBeNull();
-    });
-    expect((fixture.nativeElement.querySelector('.inline-editor textarea') as HTMLTextAreaElement).value).toBe('Un saluto.');
-    expect(fixture.nativeElement.querySelector('.inline-editor')?.textContent).toContain('Firma (facoltativa)');
-    expect(fixture.debugElement.query(By.directive(GdrTurn)).componentInstance.characterRoster()[0].id).toBe('npc');
+    let saved='';fixture.componentInstance.sourceChange.subscribe(source=>{saved=source;fixture.componentRef.setInput('source',source);});
+    fixture.detectChanges();await fixture.whenStable();choose(label);await fixture.whenStable();
+    if(kind==='messaggio'){const person=fixture.nativeElement.querySelector('select[id$="-voice"]') as HTMLSelectElement;person.selectedIndex=1;person.dispatchEvent(new Event('change'));fixture.detectChanges();await fixture.whenStable();}
+    expect(saved).toBe('');expect(fixture.nativeElement.querySelector('.insertion-details')).toBeNull();
+    const area=fixture.nativeElement.querySelector('.source-pane textarea') as HTMLTextAreaElement;
+    area.setSelectionRange(0,10);button('Aggiungi').click();fixture.detectChanges();
+    await vi.waitFor(()=>{fixture.detectChanges();expect(document.activeElement).toBe(area);expect(area.value.slice(area.selectionStart,area.selectionEnd)).toBe('Un saluto.');});
+    expect(area.value).toContain('DATA: (Elimina se non ti serve)');
+    expect(area.value).not.toContain('characterId');expect(area.value).not.toContain('"signature"');
+    expect(fixture.nativeElement.querySelector('.source-pane').hidden).toBe(false);
+    expect(fixture.nativeElement.querySelector('.inline-editor')).toBeNull();
+    area.value=area.value.replace('DATA: (Elimina se non ti serve)','DATA: Terza luna');
+    if(kind==='lettera') area.value=area.value.replace(/^FIRMA:.*\n/m,'');
+    else area.value=area.value.replace('ORA: (Elimina se non ti serve)','ORA: Dopo cena');
+    area.dispatchEvent(new Event('input'));fixture.detectChanges();await fixture.whenStable();
+    const section=parseNarrative(saved).sections[0];expect(section.kind).toBe(kind);
+    expect(section.correspondence?.date).toBe('Terza luna');expect(section.text).toBe('Un saluto.');
+    if(kind==='lettera')expect(section.correspondence?.signature).toBe('');
+    else {expect(section.characterId).toBe('npc');expect(section.correspondence?.time).toBe('Dopo cena');}
+    button('Solo anteprima').click();fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.inline-editor, button.edit-start, button.edit-speaker')).toBeNull();
+    expect(fixture.debugElement.query(By.directive(GdrTurn)).componentInstance.editable()).toBe(false);
+
   });
   it.each([
     ['Dialogo', 'dialogo', false], ['Pensiero', 'pensiero', false],
     ['Dialogo', 'dialogo', true], ['Pensiero', 'pensiero', true],
   ] as const)('inserisce %s (%s) nella textbox senza modifica rapida (anteprima affiancata: %s)', async (label, kind, split) => {
     const original = 'Prima.\n\nCiao\n\nDopo.';
-    const {fixture,button}=setup(original);
+    const {fixture,button,option,choose,add}=setup(original);
     fixture.componentRef.setInput('characters',[{id:'ada-1',name:'Ada',portrait:'/assets/ada.webp'}]);
     let saved='';fixture.componentInstance.sourceChange.subscribe(value=>{saved=value;fixture.componentRef.setInput('source',value);});
     const editing=vi.fn();fixture.componentInstance.editingChange.subscribe(editing);
@@ -87,7 +107,7 @@ describe('anteprima prima della pubblicazione', () => {
     if(split) { button('Testo e anteprima').click();fixture.detectChanges(); }
     const area=fixture.nativeElement.querySelector('.source-pane textarea') as HTMLTextAreaElement;
     const start=original.indexOf('Ciao');area.setSelectionRange(start,start+4);
-    button(label).click();fixture.detectChanges();
+    add(label);fixture.detectChanges();
     await vi.waitFor(()=>{
       fixture.detectChanges();
       expect(document.activeElement).toBe(area);
@@ -101,49 +121,65 @@ describe('anteprima prima della pubblicazione', () => {
     expect(fixture.debugElement.query(By.directive(GdrTurn))?.componentInstance.editable() ?? false).toBe(false);
     expect(parseNarrative(saved).sections[1]).toMatchObject({kind,characterId:'ada-1',speaker:'Ada',text:'Ciao'});
   });
+  it('mantiene il personaggio scelto cambiando tipo e permette un contatto libero nel messaggio', async () => {
+    const {fixture,button,choose}=setup('Ciao.');
+    fixture.componentRef.setInput('characters',[{id:'pg',name:'Daisy',portrait:''}]);
+    fixture.componentRef.setInput('characterRoster',[{id:'npc',name:'Ada',portrait:''},{id:'pg',name:'Daisy',portrait:''}]);
+    let saved='';fixture.componentInstance.sourceChange.subscribe(value=>{saved=value;fixture.componentRef.setInput('source',value);});
+    fixture.detectChanges();await fixture.whenStable();choose('Messaggio');await fixture.whenStable();
+    const person=fixture.nativeElement.querySelector('select[id$="-voice"]') as HTMLSelectElement;
+    expect(person.selectedOptions[0].textContent).toContain('Daisy');
+    person.selectedIndex=0;person.dispatchEvent(new Event('change'));fixture.detectChanges();await fixture.whenStable();
+    const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;area.setSelectionRange(0,5);
+    button('Aggiungi').click();fixture.detectChanges();await fixture.whenStable();
+    area.value=area.value.replace('CONTATTO: (Elimina se non ti serve)','CONTATTO: +39 123');area.dispatchEvent(new Event('input'));fixture.detectChanges();
+    expect(parseNarrative(saved).sections[0]).toMatchObject({kind:'messaggio',speaker:'+39 123',characterId:'',text:'Ciao.'});
+    expect(area.value).not.toContain('characterId');
+
+  });
   it('offre l’impaginazione solo al master e converte la selezione in titoli o riquadri validi', async () => {
-    const {fixture,button}=setup('Un incontro');
-    expect(button('Titolo')).toBeUndefined();expect(button('Tabella')).toBeUndefined();
+    const {fixture,button,option,choose,add}=setup('Un incontro');
+    expect(option('Titolo')).toBeUndefined();expect(option('Tabella')).toBeUndefined();
     fixture.componentRef.setInput('masterTools',true);fixture.detectChanges();
     await fixture.whenStable();
-    for(const label of ['Titolo','Sottotitolo','Riquadro','Elenco','Tabella','Corsivo']) expect(button(label)).toBeTruthy();
+    for(const label of ['Titolo','Sottotitolo','Riquadro','Elenco','Tabella','Corsivo']) expect(option(label)).toBeTruthy();
     const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
     area.setSelectionRange(0,11);let result='';fixture.componentInstance.sourceChange.subscribe(value=>result=value);
-    button('Sottotitolo').click();expect(result.trim()).toBe('### Un incontro');expect(parseNarrative(result).errors).toEqual([]);
-    button('Riquadro').click();expect(result).toContain('::: callout\nUn incontro\n:::');expect(parseNarrative(result).errors).toEqual([]);
-    fixture.componentRef.setInput('masterTools',false);fixture.detectChanges();expect(button('Titolo')).toBeUndefined();
+    add('Sottotitolo');expect(result.trim()).toBe('### Un incontro');expect(parseNarrative(result).errors).toEqual([]);
+    add('Riquadro');expect(result).toContain('::: callout\nUn incontro\n:::');expect(parseNarrative(result).errors).toEqual([]);
+    fixture.componentRef.setInput('masterTools',false);fixture.detectChanges();expect(option('Titolo')).toBeUndefined();
   });
   it('inserisce un’immagine scelta dalle miniature senza richiedere un percorso', () => {
-    const {fixture,button}=setup('');
+    const {fixture,button,option,choose,add}=setup('');
     fixture.componentRef.setInput('allowImages',true);
     fixture.componentRef.setInput('images',[{src:'/assets/castello.webp',label:'Il castello'}]);fixture.detectChanges();
     let result='';fixture.componentInstance.sourceChange.subscribe(value=>result=value);
-    button('Immagine').click();fixture.detectChanges();
+    add('Immagine');fixture.detectChanges();
     expect(result).toBe('');expect(fixture.nativeElement.querySelector('.library-tools')).toBeNull();
     (fixture.nativeElement.querySelector('button[aria-label="Inserisci Il castello"]') as HTMLButtonElement).click();fixture.detectChanges();
     expect(result.trim()).toBe('![Il castello](/assets/castello.webp)');expect(parseNarrative(result).errors).toEqual([]);
     expect(fixture.nativeElement.querySelector('.image-picker')).toBeNull();
   });
   it('inserisce il PNG selezionato a tutta pagina senza passare dalla libreria immagini',async()=>{
-    const {fixture,button}=setup('');fixture.componentRef.setInput('masterTools',true);
+    const {fixture,button,option,choose,add}=setup('');fixture.componentRef.setInput('masterTools',true);
     fixture.componentRef.setInput('characters',[{name:'Shivay',kind:'png',portrait:'/assets/avatar.webp',photo:'/assets/intera.webp',description:'Una compagna.'}]);fixture.detectChanges();await fixture.whenStable();
     let updated='';fixture.componentInstance.sourceChange.subscribe(value=>updated=value);
-    button('PNG a tutta pagina').click();
+    add('PNG a tutta pagina');
     const parsed=parseNarrative(updated);expect(parsed.errors).toEqual([]);expect(parsed.sections[0].blocks[0]).toMatchObject({type:'npc_grid',data:{layout:'full',entries:[{name:'Shivay',image:'/assets/intera.webp',description:'Una compagna.'}]}});
     expect(fixture.nativeElement.querySelector('.image-picker')).toBeNull();
   });
   it('non aggiunge righe vuote in fondo e riusa quelle attorno alla selezione', async()=>{
-    const {fixture,button}=setup('');await fixture.whenStable();
+    const {fixture,button,option,choose,add}=setup('');await fixture.whenStable();
     let updated='';fixture.componentInstance.sourceChange.subscribe(value=>updated=value);
     const area=fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
-    button('Azione').click();expect(updated).toBe('::: azione\nDescrivi cosa fa il personaggio.\n:::');
+    add('Azione');expect(updated).toBe('::: azione\nDescrivi cosa fa il personaggio.\n:::');
     const source='Prima.\r\n\r\nCiao.\r\n\r\nDopo.';
     fixture.componentRef.setInput('source',source);fixture.detectChanges();await fixture.whenStable();
     const start=area.value.indexOf('Ciao.');area.setSelectionRange(start,start+5);
-    button('Nota').click();expect(updated).toBe('Prima.\r\n\r\n::: nota\nCiao.\n:::\r\n\r\nDopo.');
+    add('Nota');expect(updated).toBe('Prima.\r\n\r\n::: nota\nCiao.\n:::\r\n\r\nDopo.');
   });
   it('conserva ID diversi nascosti durante scrittura, nuovi inserimenti e apertura dei campi della lettera', async () => {
-    const {fixture,button}=setup('::: dialogo Ada | | ada-2\nCiao.\n:::');
+    const {fixture,button,option,choose,add}=setup('::: dialogo Ada | | ada-2\nCiao.\n:::');
     fixture.componentRef.setInput('characters',[{id:'ada-1',name:'Ada',portrait:'/assets/a.webp'},{id:'ada-2',name:'Ada',portrait:'/assets/b.webp'}]);
     let saved='';fixture.componentInstance.sourceChange.subscribe(value=>{saved=value;fixture.componentRef.setInput('source',value);});
     fixture.detectChanges();await fixture.whenStable();
@@ -151,27 +187,27 @@ describe('anteprima prima della pubblicazione', () => {
     expect(area.value).toBe('::: dialogo Ada\nCiao.\n:::');
     area.value=area.value.replace('Ciao.','Una nuova battuta.');area.dispatchEvent(new Event('input'));fixture.detectChanges();await fixture.whenStable();
     expect(parseNarrative(saved).sections[0].characterId).toBe('ada-2');
-    area.setSelectionRange(area.value.length,area.value.length);button('Pensiero').click();fixture.detectChanges();
+    area.setSelectionRange(area.value.length,area.value.length);add('Pensiero');fixture.detectChanges();
     await vi.waitFor(()=>{fixture.detectChanges();expect(area.value).toContain('::: pensiero Ada');});
     expect(area.value).not.toContain('ada-');expect(area.value).not.toContain('|');
     expect(parseNarrative(saved).sections.map(s=>s.characterId)).toEqual(['ada-2','ada-1']);
-    area.setSelectionRange(area.value.length,area.value.length);button('Lettera / Messaggio').click();fixture.detectChanges();
-    await vi.waitFor(()=>{fixture.detectChanges();expect(fixture.nativeElement.querySelector('[id$="-format"]')).not.toBeNull();});
-    expect((fixture.nativeElement.querySelector('.inline-editor textarea') as HTMLTextAreaElement).value).toBe('Scrivi qui la lettera.');
+    await fixture.whenStable();area.setSelectionRange(area.value.length,area.value.length);add('Lettera');fixture.detectChanges();await fixture.whenStable();
+    expect(fixture.nativeElement.querySelector('.inline-editor')).toBeNull();
+    expect(area.value).toContain('::: lettera');expect(area.value).toContain('Scrivi qui la lettera.');
     expect(parseNarrative(saved).sections.map(s=>s.characterId)).toEqual(['ada-2','ada-1','']);
   });
   it('offre gli stessi strumenti per il testo iniziale e per il seguito del master',()=>{
     const {fixture}=setup('');fixture.componentRef.setInput('allowImages',true);fixture.componentRef.setInput('document',true);fixture.detectChanges();
-    const labels=()=>Array.from(fixture.nativeElement.querySelectorAll('.toolbar button') as NodeListOf<HTMLButtonElement>).map(b=>b.textContent?.trim());
+    const labels=()=>Array.from(fixture.nativeElement.querySelector('select[id$="-block-type"]').options as HTMLOptionsCollection).map(option=>option.textContent?.trim());
     const documentTools=labels();fixture.componentRef.setInput('document',false);fixture.componentRef.setInput('masterTools',true);fixture.detectChanges();
     expect(labels()).toEqual(documentTools);expect(labels()).toContain('Scheda PNG');
   });
   it('inserisce la scheda di un PNG con la foto intera e usa il ritratto per il dialogo', async()=>{
-    const {fixture,button}=setup('');fixture.componentRef.setInput('masterTools',true);
+    const {fixture,button,option,choose,add}=setup('');fixture.componentRef.setInput('masterTools',true);
     fixture.componentRef.setInput('characters',[{name:'Shivay',kind:'png',portrait:'/assets/ritaglio.webp',photo:'/assets/intera.webp',description:'Una compagna'}]);fixture.detectChanges();await fixture.whenStable();
     let updated='';fixture.componentInstance.sourceChange.subscribe(value=>updated=value);
-    button('Scheda PNG').click();expect(updated).toContain('image: /assets/intera.webp');expect(updated).not.toContain('/assets/ritaglio.webp');expect(parseNarrative(updated).errors).toEqual([]);
-    button('Dialogo').click();expect(updated).toContain('| /assets/ritaglio.webp');
+    add('Scheda PNG');expect(updated).toContain('image: /assets/intera.webp');expect(updated).not.toContain('/assets/ritaglio.webp');expect(parseNarrative(updated).errors).toEqual([]);
+    add('Dialogo');expect(updated).toContain('| /assets/ritaglio.webp');
   });
 
 });

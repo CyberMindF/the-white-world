@@ -73,29 +73,30 @@ const assertPosition=async(area,before,label)=>{
 try {
   await page.goto(`${base}/tavolo-da-gioco/gdr/gioca/${adventureId}`);
   const area=page.locator('#lab-turn'), editor=page.locator('app-gdr-source-editor').filter({has:area});
+  const add=async label=>{await editor.getByLabel('Tipo di blocco',{exact:true}).selectOption({label});await editor.getByRole('button',{name:'Aggiungi',exact:true}).click();};
   for(const width of [1280,390]) {
     await page.setViewportSize({width,height:900});
     for(const mode of ['Solo testo','Testo e anteprima']) {
       await editor.getByRole('button',{name:mode,exact:true}).click();
       await area.fill(longText);let before=await placeSelection(area);
-      await editor.getByRole('button',{name:'Titolo',exact:true}).click();
+      await add('Titolo');
       let after=await assertPosition(area,before,`${width}px ${mode} titolo`);
       assert.equal(after.selected,'Riga 010');
       await page.keyboard.type('Titolo riscritto');
       assert.ok((await area.inputValue()).includes('## Titolo riscritto'));
       await area.fill(longText);before=await placeSelection(area);
-      await editor.getByRole('button',{name:'Dialogo',exact:true}).click();
-      const dialogue=editor.locator('.inline-editor textarea');await dialogue.waitFor();await settled();
-      assert.equal(await dialogue.inputValue(),'Riga 010');
-      assert.equal(await dialogue.evaluate(a=>document.activeElement===a),true);
+      await add('Dialogo');
+      after=await assertPosition(area,before,`${width}px ${mode} dialogo`);
+      assert.equal(after.selected,'Riga 010');assert.equal(await editor.locator('.inline-editor').count(),0);
       assert.ok((await area.inputValue()).includes('::: dialogo Daisy'));
-      assert.ok(!(await dialogue.inputValue()).includes('daisy'));
-      await dialogue.fill('Battuta riscritta.');await editor.getByRole('button',{name:'Applica al testo',exact:true}).click();
+      assert.equal((await area.inputValue()).includes('|'),false);
+      await page.keyboard.type('Battuta riscritta.');
+
     }
   }
   await editor.getByRole('button',{name:'Solo testo',exact:true}).click();
   await area.fill(longText);let before=await placeSelection(area);
-  await editor.getByRole('button',{name:'Immagine',exact:true}).click();
+  await add('Immagine');
   await editor.locator('.image-choice').first().click();
   await assertPosition(area,before,'immagine dalla libreria');
   // Anche la toolbar della modifica rapida deve conservare la posizione nel blocco lungo.

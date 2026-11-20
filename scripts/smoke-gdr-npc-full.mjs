@@ -72,12 +72,11 @@ try {
   assert.equal(blocks[0].type,'npc_grid');assert.equal(blocks[0].data.layout,'full');assert.equal(blocks[0].data.entries[0].name,'Shivay Lorenne');
   const area=page.locator('#lab-turn'),editor=page.locator('app-gdr-source-editor').filter({has:area});
   await editor.locator('select').first().selectOption({index:1});
-  await editor.getByRole('button',{name:'PNG a tutta pagina',exact:true}).click();
+  await editor.getByLabel('Tipo di blocco',{exact:true}).selectOption({label:'PNG a tutta pagina'});await editor.getByRole('button',{name:'Aggiungi',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('#lab-turn')?.value.startsWith('::: npc full'));
   const draft=await area.inputValue();assert.ok(draft.startsWith('::: npc full'));assert.ok(draft.includes('characterId: shivay'));assert.equal(draft.includes(photo),false);assert.equal(draft.includes(avatar),false);
-  const body=editor.locator('.inline-editor textarea');await body.waitFor();assert.equal(await body.inputValue(),'');
-  await body.fill('Una descrizione per questa scena.');await editor.getByRole('button',{name:'Applica al testo',exact:true}).click();
-  await page.waitForFunction(()=>document.querySelector('#lab-turn')?.value.includes('Una descrizione per questa scena.'));
+  assert.equal(await editor.locator('.inline-editor').count(),0);
+  assert.equal(await area.isVisible(),true);
   assert.equal(await editor.locator('.image-picker').count(),0);
   user=2;await page.evaluate(()=>sessionStorage.setItem('gdr-test-user','2'));await page.reload();
   for(const width of [1280,390,320]) {
@@ -92,7 +91,7 @@ try {
     });
     assert.ok(Math.abs(sizes.width-sizes.gridWidth)<5,JSON.stringify(sizes));assert.ok(Math.abs(sizes.ratio-sizes.natural)<.01,JSON.stringify(sizes));assert.equal(sizes.src,photo);
     assert.ok((await npc.innerText()).includes('Shivay Lorenne'));assert.ok((await npc.innerText()).includes('La compagna di Daisy.'));
-    assert.equal(await page.getByRole('button',{name:'PNG a tutta pagina',exact:true}).count(),0);
+    assert.equal(await page.locator('select[id$="-block-type"] option').filter({hasText:'PNG a tutta pagina'}).count(),0);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     await npc.screenshot({path:join(screenshots,`png-full-player-${width}.png`),animations:'disabled'});
   }

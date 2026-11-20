@@ -1,69 +1,48 @@
 <div class="editor">
   <div class="editor-controls">
-    <div class="toolbar" role="group" aria-label="Inserisci nel testo">
-      <label [for]="editorId() + '-voice'">Personaggio</label>
-      @if (characters()[characterIndex()]?.portrait) {
-        <img
-          class="voice-avatar"
-          [src]="characters()[characterIndex()].portrait"
-          alt="Ritratto del personaggio selezionato"
-        />
-      }
-      <select
-        [id]="editorId() + '-voice'"
-        [disabled]="inlineEditing()"
-        [ngModel]="characterIndex()"
-        (ngModelChange)="characterIndex.set(+$event)"
-      >
-        @for (character of characters(); track $index) {
-          <option [ngValue]="$index">
-            {{ character.name
-            }}{{ character.kind ? (character.kind === 'pg' ? ' · PG' : ' · PNG') : '' }}
-          </option>
-        }
-        @if (!characters().length) {
-          <option [ngValue]="0">
-            {{ allowGeneric() ? 'Il mio personaggio' : 'Nessun personaggio disponibile' }}
-          </option>
-        }
-      </select>
-      <button
-        class="btn"
-        type="button"
-        [disabled]="inlineEditing() || (!characters().length && !allowGeneric())"
-        (click)="insert('dialogo', sourceArea)"
-      >
-        Dialogo
-      </button>
-      <button class="btn" type="button" [disabled]="!characters().length && !allowGeneric()" (click)="insert('pensiero', sourceArea)">Pensiero</button>
-      <button class="btn" type="button" (click)="insert('azione', sourceArea)">Azione</button>
-      <button class="btn" type="button" (click)="insert('lettera', sourceArea)">Lettera / Messaggio</button>
-      <button class="btn" type="button" (click)="insert('nota', sourceArea)">
-        Nota
-      </button>
-      @if (!document() && !masterTools() && allowImages()) {
-        <button class="btn" type="button" (click)="insert('image', sourceArea)">Immagine</button>
-      }
-    </div>
-    @if (masterTools() || document()) {
-      <div class="toolbar master-toolbar" role="group" aria-label="Impaginazione della storia">
-        <span class="tools-label">Storia</span>
-        @for (type of blockTypes; track type) {
-          @if (type !== 'image' || allowImages()) {
-            <button class="btn" type="button" (click)="insert(type, sourceArea)">{{ type === 'callout' ? 'Riquadro' : type === 'npc_grid' ? 'Scheda PNG' : snippetLabels[type] }}</button>
-          }
-        }
-        <button class="btn" type="button" (click)="insert('npc_full', sourceArea)">PNG a tutta pagina</button>
-        <button class="btn" type="button" (click)="insert('subtitle', sourceArea)">Sottotitolo</button>
-        <button class="btn" type="button" (click)="insert('emphasis', sourceArea)">Corsivo</button>
+    <div class="toolbar insert-toolbar" role="group" aria-label="Inserisci nel testo">
+      <div class="toolbar-field character-field">
+        <label [for]="editorId() + '-voice'">Personaggio</label>
+        <div class="character-choice">
+          @if (selectedCharacter()?.portrait) { <img class="voice-avatar" [src]="selectedCharacter()!.portrait" alt="Ritratto del personaggio selezionato" /> }
+          <select [id]="editorId() + '-voice'"
+            [ngModel]="blockType() === 'messaggio' ? contactIndex() : characterIndex()" (ngModelChange)="selectCharacter(+$event)">
+            @if (blockType() === 'messaggio') { <option [ngValue]="-1">Nome o numero libero</option> }
+            @for (character of selectionCharacters(); track $index) {
+              <option [ngValue]="$index">{{ character.name }}{{ character.kind === 'pg' ? ' · PG' : character.kind === 'png' ? ' · PNG' : '' }}</option>
+            }
+            @if (!selectionCharacters().length && blockType() !== 'messaggio') {
+              <option [ngValue]="0">{{ allowGeneric() ? 'Il mio personaggio' : 'Nessun personaggio disponibile' }}</option>
+            }
+          </select>
+        </div>
       </div>
-    }
+      <div class="toolbar-field block-type-field">
+        <label [for]="editorId() + '-block-type'">Tipo di blocco</label>
+        <select [id]="editorId() + '-block-type'" [ngModel]="blockType()" (ngModelChange)="selectBlockType($event)">
+          <optgroup label="Scrittura">
+            @for (option of writingTypes; track option.type) { <option [value]="option.type">{{ option.label }}</option> }
+            @if (allowImages() && !masterTools() && !document()) { <option value="image">Immagine</option> }
+          </optgroup>
+          @if (masterTools() || document()) {
+            <optgroup label="Storia">
+              @for (type of blockTypes; track type) {
+                @if (type !== 'image' || allowImages()) { <option [value]="type">{{ type === 'callout' ? 'Riquadro' : type === 'npc_grid' ? 'Scheda PNG' : snippetLabels[type] }}</option> }
+              }
+              <option value="npc_full">PNG a tutta pagina</option>
+              <option value="subtitle">Sottotitolo</option>
+              <option value="emphasis">Corsivo</option>
+            </optgroup>
+          }
+        </select>
+      </div>
+      <button class="btn add-block" type="button" [disabled]="addDisabled()" (click)="addBlock(sourceArea)">Aggiungi</button>
+    </div>
     <div class="view-tools" role="group" aria-label="Visualizzazione editor">
       <button
         class="btn"
         type="button"
         [attr.aria-pressed]="mode() === 'source'"
-        [disabled]="inlineEditing()"
         (click)="setMode('source')"
       >
         Solo testo
@@ -72,7 +51,6 @@
         class="btn"
         type="button"
         [attr.aria-pressed]="mode() === 'split'"
-        [disabled]="inlineEditing()"
         (click)="setMode('split')"
       >
         Testo e anteprima
@@ -81,7 +59,7 @@
         class="btn"
         type="button"
         [attr.aria-pressed]="mode() === 'preview'"
-        [disabled]="inlineEditing() || !source().trim()"
+        [disabled]="!source().trim()"
         (click)="setMode('preview')"
       >
         Solo anteprima
@@ -102,7 +80,6 @@
       <label [for]="editorId()">{{ label() }}</label>
       <textarea
         #sourceArea
-        [readOnly]="inlineEditing()"
         [id]="editorId()"
         [rows]="document() || masterTools() ? 18 : 7"
         (focus)="setScrollDriver('source')" (pointerdown)="setScrollDriver('source')"
@@ -123,19 +100,17 @@
         <div class="preview-heading">
           <p class="preview-label">Anteprima</p>
           @if (mode() === 'preview') {
-            <button class="btn" type="button" [disabled]="inlineEditing()" (click)="setMode('source')">Torna al testo</button>
+            <button class="btn" type="button" (click)="setMode('source')">Torna al testo</button>
           }
         </div>
         @if (source().trim()) {
           <app-gdr-turn
             [source]="source()"
-            [editable]="mode() === 'preview'"
-            [deletable]="masterTools() || document()"
+            [editable]="false"
             [characters]="characters()"
             [characterRoster]="characterRoster()"
             [allowGeneric]="allowGeneric()"
             (sourceChange)="sourceChange.emit($event)"
-            (editingChange)="inlineEditing.set($event); editingChange.emit($event)"
           />
         } @else {
           <p class="hint">La tua scrittura prenderà forma qui.</p>
@@ -152,13 +127,14 @@
   }
   <footer class="editor-footer">
     @if (mode() === 'preview') {
-      <p class="hint">Clicca un titolo o ✎ per modificare quel punto direttamente nell’anteprima.</p>
+      <p class="hint">Per modificare il testo torna alla casella di scrittura.</p>
     }
     <details>
       <summary>Come funziona la scrittura</summary>
       <ul>
         <li>Pensiero riporta in corsivo ciò che pensa il personaggio selezionato.</li>
-        <li>Lettera / Messaggio apre i campi dedicati: scegli il formato e compila il testo. Firma, data e orario sono facoltativi.</li>
+        <li>Scegli personaggio e tipo di blocco e premi Aggiungi. Compila DATA:, ORA:, FIRMA: o CONTATTO: direttamente nel testo; elimina le righe che non ti servono.</li>
+        <li>Per lettere e messaggi, scrivi il corpo sotto il separatore --- e modifica o elimina le righe dei dati sopra di esso.</li>
         <li><strong>Dialogo</strong>: scegli il personaggio e inserisci le sue parole.</li>
         <li><strong>Azione</strong>: racconta cosa fa.</li>
         <li><strong>Nota</strong>: scrivi al master fuori dalla storia.</li>
@@ -168,7 +144,7 @@
           <li><strong>PNG a tutta pagina</strong>: scegli il PNG nel menu Personaggio e inserisci foto intera, nome e descrizione.</li>
           <li><strong>Immagine</strong>: scegli una miniatura per inserirla nel testo.</li>
         }
-        <li>Puoi selezionare una frase e premere un tasto per trasformarla.</li>
+        <li>Puoi selezionare una frase, scegliere il tipo di blocco e premere Aggiungi per trasformarla.</li>
         <li>Con <strong>Anteprima</strong> controlli il risultato, poi scegli <strong>Pubblica turno</strong>.</li>
       </ul>
     </details>

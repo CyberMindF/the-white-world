@@ -72,41 +72,50 @@ try {
     await page.goto(`${base}/tavolo-da-gioco/gdr/gioca/${adventureId}`);
     const area = page.locator('#lab-turn'), editor = page.locator('app-gdr-source-editor').filter({has: area});
     await area.waitFor();
-    // Stessi strumenti per master e giocatrice; i contatti includono i PNG pubblici.
-    await editor.getByRole('button', {name:'Lettera / Messaggio',exact:true}).click();
-    await editor.getByLabel('Formato',{exact:true}).selectOption('lettera');
-    await editor.getByLabel('Corpo della lettera',{exact:true}).fill('Cara Ada,\n\nci vediamo domani.');
-    await editor.getByLabel('Firma (facoltativa)',{exact:true}).fill('Daisy');
-    await editor.getByLabel('Data (facoltativo)',{exact:true}).fill('Terza luna');
-    await editor.getByLabel('Formato',{exact:true}).selectOption('messaggio');
-    const contact = editor.getByLabel('Contatto',{exact:true});
-    const option = contact.locator('option').filter({hasText:'Shivay'});
-    assert.equal(await option.count(),1);
-    await contact.selectOption(await option.getAttribute('value'));
-    await editor.getByLabel('Orario (facoltativo)',{exact:true}).fill('Dopo cena');
-    await editor.getByLabel('Formato',{exact:true}).selectOption('lettera');
-    assert.equal(await editor.getByLabel('Firma (facoltativa)',{exact:true}).inputValue(),'Daisy');
-    await editor.getByLabel('Formato',{exact:true}).selectOption('messaggio');
-    await editor.getByRole('button',{name:'Applica al testo',exact:true}).click();
-    const message = editor.locator('.chat-message'); await message.waitFor();
-    assert.ok((await message.innerText()).includes('Shivay'));
-    assert.equal(await message.locator('img').getAttribute('src'),avatar);
-    assert.ok((await area.inputValue()).includes('"characterId":"shivay"'));
-    assert.equal((await area.inputValue()).includes(avatar),false);
-    // Testo letterale, senza HTML eseguibile, e contatto libero senza collegamento automatico.
-    await editor.getByRole('button',{name:'✎ Modifica messaggio',exact:true}).click();
-    await editor.getByLabel('Contatto',{exact:true}).selectOption({label:'Nome o numero libero'});
-    await editor.getByLabel('Nome o numero',{exact:true}).fill('+39 123 456');
-    await editor.getByLabel('Testo del messaggio',{exact:true}).fill('<img src=x onerror=alert(1)>\nArrivo.');
-    await editor.getByRole('button',{name:'Applica al testo',exact:true}).click();
-    assert.equal(await message.locator('img').count(),0);
-    assert.ok((await message.innerText()).includes('<img src=x onerror=alert(1)>'));
+    const choose = async label => editor.getByLabel('Tipo di blocco',{exact:true}).selectOption({label});
+    const person = editor.getByLabel('Personaggio',{exact:true});
+    const code = async (label,value) => area.fill((await area.inputValue()).replace(new RegExp('^'+label+':.*$','m'),label+': '+value));
+    // Un solo editor: dati facoltativi e corpo si scrivono nella stessa textbox.
+    await choose('Lettera');
+    await area.fill('Cara Ada,\n\nci vediamo domani.');await area.evaluate(el=>el.select());
+    await editor.getByRole('button',{name:'Aggiungi',exact:true}).click();
+    assert.equal(await area.isVisible(),true);assert.equal(await editor.locator('.inline-editor, .insertion-details').count(),0);
+    await page.waitForFunction(()=>document.querySelector('#lab-turn')?.value.includes('DATA: (Elimina se non ti serve)'));
+    await code('DATA','Terza luna');await code('FIRMA','Daisy');
+    assert.equal((await area.inputValue()).includes('"signature"'),false);
+    for(const width of [1280,390,320]) {
+      await page.setViewportSize({width,height:1000});
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+      await editor.screenshot({path:join(screenshots,`insertion-${actor}-${width}.png`),animations:'disabled'});
+    }
+    await choose('Messaggio');
+    const option=person.locator('option').filter({hasText:'Shivay'});assert.equal(await option.count(),1);
+    await person.selectOption(await option.getAttribute('value'));
+    await area.fill('Arrivo.');await area.evaluate(el=>el.select());await editor.getByRole('button',{name:'Aggiungi',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelector('#lab-turn')?.value.includes('ORA: (Elimina se non ti serve)'));
+    await code('DATA','Ieri');await code('ORA','Dopo cena');
+    assert.equal(await area.isVisible(),true);assert.equal(await editor.locator('.inline-editor').count(),0);
+    assert.equal((await area.inputValue()).includes('characterId'),false);
+    await editor.getByRole('button',{name:'Solo anteprima',exact:true}).click();
+    const message=editor.locator('.chat-message');await message.waitFor();
+    assert.ok((await message.innerText()).includes('Shivay'));assert.equal(await message.locator('img').getAttribute('src'),avatar);
+    assert.ok((await message.innerText()).includes('Dopo cena'));
+    assert.equal(await editor.locator('.edit-start, .edit-speaker, .gdr-edit-start, .inline-editor').count(),0);
+    await editor.getByRole('button',{name:'Torna al testo',exact:true}).click();
+    await choose('Messaggio');await person.selectOption({label:'Nome o numero libero'});
+    await area.fill('<img src=x onerror=alert(1)>\nArrivo.');await area.evaluate(el=>el.select());
+    await editor.getByRole('button',{name:'Aggiungi',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelector('#lab-turn')?.value.includes('CONTATTO: (Elimina se non ti serve)'));await code('CONTATTO','+39 123 456');
+    await area.fill((await area.inputValue()).replace(/^(?:DATA|ORA):.*\n/gm,''));
+    await editor.getByRole('button',{name:'Solo anteprima',exact:true}).click();
+    assert.equal(await message.locator('img, .chat-meta').count(),0);assert.ok((await message.innerText()).includes('<img src=x onerror=alert(1)>'));
+    assert.equal((await message.innerText()).includes('Elimina se non ti serve'),false);
     await editor.getByRole('button',{name:'Torna al testo',exact:true}).click();
     for (const [label,kind,rendered] of [['Pensiero','pensiero','.thought em'],['Dialogo','dialogo','.dialogue p']]) {
       for (const mode of ['Solo testo','Testo e anteprima']) {
         await area.fill('Non posso fidarmi.');await area.evaluate(el=>el.select());
         await editor.getByRole('button',{name:mode,exact:true}).click();
-        await editor.getByRole('button',{name:label,exact:true}).click();
+        await choose(label);await person.selectOption({label:'Daisy · PG'});await editor.getByRole('button',{name:'Aggiungi',exact:true}).click();
         await page.waitForFunction(()=>{
           const field=document.querySelector('#lab-turn');
           return document.activeElement===field && field.value.slice(field.selectionStart,field.selectionEnd)==='Non posso fidarmi.';

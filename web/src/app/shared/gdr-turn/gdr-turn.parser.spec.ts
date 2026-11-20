@@ -94,6 +94,19 @@ describe('posizioni per la modifica rapida', () => {
 });
 
 describe('lettere, messaggi e pensieri', () => {
+  it('legge i codici opzionali nella textbox senza includerli nel corpo', () => {
+    const source='::: messaggio\nCONTATTO: +39 123\nDATA: Terza luna\nORA: Dopo cena\n---\nCiao.\nDATA: questa riga fa parte del testo.\n:::';
+    const result=parseNarrative(source);
+    expect(result.errors).toEqual([]);
+    expect(result.sections[0]).toMatchObject({speaker:'+39 123',text:'Ciao.\nDATA: questa riga fa parte del testo.',correspondence:{name:'+39 123',date:'Terza luna',time:'Dopo cena'}});
+    for(const fields of ['DATA: (Elimina se non ti serve)\nFIRMA: (Elimina se non ti serve)\n','']){
+      const letter=parseNarrative('::: lettera\n'+fields+'---\nUna lettera.\n:::').sections[0];
+      expect(letter).toMatchObject({text:'Una lettera.',correspondence:{signature:'',date:''}});
+    }
+  });
+  it('conserva il testo se una riga sembra un codice ma manca il separatore', () => {
+    expect(parseNarrative('::: lettera\nDATA: un esempio\nTesto libero.\n:::').sections[0].text).toBe('DATA: un esempio\nTesto libero.');
+  });
   it('conserva testo e campi liberi, anche con virgolette, barre e righe vuote', () => {
     const source = writeCorrespondence({ kind: 'messaggio', name: '+39 123 | "Ada"', characterId: '', portrait: '', signature: 'A.\nB.', date: 'Terza luna | ieri', time: 'Al tramonto', body: 'Prima riga.\n\n🪄 Seconda riga.' });
     const parsed = parseNarrative('Prima.\r\n\r\n' + source.replace(/\n/g, '\r\n') + '\r\n\r\nDopo.');

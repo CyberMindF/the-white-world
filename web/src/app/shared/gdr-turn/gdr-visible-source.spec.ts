@@ -74,4 +74,27 @@ describe('riferimenti dei personaggi nascosti nella textbox', () => {
       expect(visibleSourceOffset(view, original)).toBe(start);
     }
   });
+
+  it('nasconde anche i dati di lettera e messaggio e li conserva modificando il corpo', () => {
+    const source='::: messaggio {"name":"Ada","characterId":"ada-2","date":"Terza luna","time":"18:42"}\nCiao.\n:::';
+    const view=visibleNarrativeSource(source,roster);
+    expect(view.text).toBe('::: messaggio\nCONTATTO: Ada\nDATA: Terza luna\nORA: 18:42\n---\nCiao.\n:::');
+    const edited=updateVisibleNarrativeSource(view,view.text.replace('Ciao.','Arrivo.'),roster);
+    expect(parseNarrative(edited).sections[0]).toMatchObject({characterId:'ada-2',text:'Arrivo.',correspondence:{date:'Terza luna',time:'18:42'}});
+    const letter=updateVisibleNarrativeSource(visibleNarrativeSource(edited),view.text.replace('messaggio','lettera').replace('Ciao.','Arrivo.'),roster);
+    expect(parseNarrative(letter).sections[0]).toMatchObject({kind:'lettera',correspondence:{name:'Ada',characterId:'ada-2',date:'Terza luna',time:'18:42'}});
+  });
+
+  it('modifica e rimuove i codici dei vecchi messaggi senza ripristinare i dati nascosti', () => {
+    const source='::: messaggio {"name":"Ada","characterId":"ada-2","date":"Ieri","time":"18:42"}\nCiao.\n:::';
+    const view=visibleNarrativeSource(source,roster);
+    const edited=updateVisibleNarrativeSource(view,view.text.replace('DATA: Ieri','DATA: Domani'),roster);
+    expect(parseNarrative(edited).sections[0]).toMatchObject({characterId:'ada-2',correspondence:{date:'Domani',time:'18:42'}});
+    const next=visibleNarrativeSource(edited,roster);
+    const removed=updateVisibleNarrativeSource(next,next.text.replace(/^DATA:.*\n|^ORA:.*\n/gm,''),roster);
+    expect(parseNarrative(removed).sections[0]).toMatchObject({characterId:'ada-2',correspondence:{date:'',time:''}});
+    const contact=visibleNarrativeSource(removed,roster);
+    const free=updateVisibleNarrativeSource(contact,contact.text.replace('CONTATTO: Ada','CONTATTO: +39 123'),roster);
+    expect(parseNarrative(free).sections[0]).toMatchObject({characterId:'',speaker:'+39 123',portrait:''});
+  });
 });

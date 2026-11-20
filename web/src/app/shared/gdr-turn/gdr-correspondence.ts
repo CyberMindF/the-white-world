@@ -25,8 +25,40 @@ export function parseCorrespondenceHeader(header: string): CorrespondenceData {
   return data;
 }
 
-export function writeCorrespondence(draft: CorrespondenceDraft): string {
-  const { kind, body, ...fields } = draft;
-  const header = Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== ''));
-  return `::: ${kind}${Object.keys(header).length ? ' ' + JSON.stringify(header) : ''}\n${body}\n:::`;
+export const OPTIONAL_CORRESPONDENCE_FIELD = '(Elimina se non ti serve)';
+
+export function correspondenceReferenceHeader(kind: CorrespondenceDraft['kind'], fields: CorrespondenceData, visible = false): string {
+  const hidden = kind === 'lettera'
+    ? {name:fields.name,characterId:fields.characterId,portrait:fields.portrait,time:fields.time}
+    : {characterId:fields.characterId,portrait:fields.portrait,signature:fields.signature};
+  const header = visible ? {} : Object.fromEntries(Object.entries(hidden).filter(([, value]) => value !== ''));
+  return `::: ${kind}${Object.keys(header).length ? ' ' + JSON.stringify(header) : ''}`;
+}
+
+export function correspondencePrefix(kind: CorrespondenceDraft['kind'], fields: CorrespondenceData, placeholders = false, visible = false): string {
+  const rows = kind === 'lettera'
+    ? [['DATA',fields.date],['FIRMA',fields.signature]]
+    : [['CONTATTO',fields.name],['DATA',fields.date],['ORA',fields.time]];
+  const codes = rows.filter(([, value]) => value || placeholders).map(([label,value]) => `${label}: ${value ? /[\r\n]|^"/.test(value) ? JSON.stringify(value) : value : OPTIONAL_CORRESPONDENCE_FIELD}`);
+  return correspondenceReferenceHeader(kind,fields,visible) + (codes.length ? '\n' + codes.join('\n') + '\n---' : '');
+}
+
+export function readCorrespondenceBody(lines: string[], initial: CorrespondenceData): {data:CorrespondenceData;prefixLines:number} {
+  const data = {...initial};
+  const keys: Record<string, keyof CorrespondenceData> = {DATA:'date',GIORNO:'date',ORA:'time',ORARIO:'time',FIRMA:'signature',CONTATTO:'name',NOME:'name',NUMERO:'name'};
+  for (let i=0;i<lines.length;i++) {
+    if (lines[i].trim() === '---') return {data,prefixLines:i+1};
+    if (!lines[i].trim()) continue;
+    const match = /^\s*([A-Z]+):\s*(.*)$/i.exec(lines[i]);
+    if (!match || !keys[match[1].toUpperCase()]) break;
+    let value = match[2].trim();
+    if (value === OPTIONAL_CORRESPONDENCE_FIELD) value = '';
+    else if (value.startsWith('"')) { try {const decoded:unknown=JSON.parse(value);if(typeof decoded==='string')value=decoded;} catch { /* Testo libero, comprese virgolette non chiuse. */ } }
+    data[keys[match[1].toUpperCase()]] = value;
+  }
+  return {data:initial,prefixLines:0};
+}
+
+export function writeCorrespondence(draft: CorrespondenceDraft, placeholders = false): string {
+  return correspondencePrefix(draft.kind,draft,placeholders) + `\n${draft.body}\n:::`;
 }

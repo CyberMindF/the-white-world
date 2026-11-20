@@ -9,6 +9,7 @@ import { GdrImageLibrary, GdrLibraryImage } from '../gdr-characters/gdr-image-li
 
 import { NarrativeCharacter, narrativeSnippet, replaceNarrativeSelection } from '../gdr-turn/gdr-writing';
 import { storedSourceOffset, updateVisibleNarrativeSource, visibleNarrativeSource, visibleSourceOffset } from '../gdr-turn/gdr-visible-source';
+import { writeCorrespondence } from '../gdr-turn/gdr-correspondence';
 export type { NarrativeCharacter } from '../gdr-turn/gdr-writing';
 @Component({
   selector: 'app-gdr-source-editor',
@@ -31,14 +32,22 @@ export class GdrSourceEditor {
   readonly characters = input<NarrativeCharacter[]>([]);
   readonly characterRoster = input<NarrativeCharacter[]>([]);
   readonly editorId = input('gdr-source');
-  protected readonly inlineEditing = signal(false);
   protected readonly mode = signal<'split' | 'source' | 'preview'>('source');
   protected readonly characterIndex = signal(0);
+  protected readonly blockType = signal('dialogo');
+  protected readonly contactIndex = signal(0);
+  protected readonly writingTypes = [
+    {type:'paragraph',label:'Testo'}, {type:'dialogo',label:'Dialogo'}, {type:'pensiero',label:'Pensiero'},
+    {type:'azione',label:'Azione'}, {type:'nota',label:'Nota'}, {type:'lettera',label:'Lettera'}, {type:'messaggio',label:'Messaggio'},
+  ];
+  protected readonly contactCharacters = computed(() => this.characterRoster().length ? this.characterRoster() : this.characters());
+  protected readonly selectionCharacters = computed(() => this.blockType() === 'messaggio' ? this.contactCharacters() : this.characters());
+  protected readonly selectedCharacter = computed(() => this.selectionCharacters()[this.blockType() === 'messaggio' ? this.contactIndex() : this.characterIndex()]);
+  protected readonly addDisabled = computed(() => (['dialogo','pensiero'].includes(this.blockType()) && !this.characters().length && !this.allowGeneric()));
   protected readonly voiceMessage = signal('');
   protected readonly imagePickerOpen = signal(false);
   private readonly sourceArea = viewChild<ElementRef<HTMLTextAreaElement>>('sourceArea');
   private readonly previewPane = viewChild<ElementRef<HTMLElement>>('previewPane');
-  private readonly narrativeEditor = viewChild(GdrTurn);
   private scrollDriver: 'source' | 'preview' = 'source';
   private readonly syncedPositions = new WeakMap<HTMLElement, number>();
   private readonly parsed = computed(() => parseNarrative(this.source()));
@@ -46,20 +55,49 @@ export class GdrSourceEditor {
   protected readonly recognized = computed(() =>
     this.parsed().sections.reduce((n, s) => n + (s.kind === 'document' ? s.blocks.length : 1), 0),
   );
-  protected readonly blockTypes = BLOCK_TYPES;
+  protected readonly blockTypes = BLOCK_TYPES.filter(type => type !== 'paragraph');
   protected readonly snippetLabels = SNIPPET_LABELS;
   protected readonly visibleSource = computed(() => visibleNarrativeSource(this.source(), this.characterRoster().length ? this.characterRoster() : this.characters()));
   protected updateSource(value: string): void {
     this.sourceChange.emit(updateVisibleNarrativeSource(this.visibleSource(), value, this.characterRoster().length ? this.characterRoster() : this.characters()));
   }
+  protected selectCharacter(index: number): void {
+    if (this.blockType() === 'messaggio') this.contactIndex.set(index);
+    else this.characterIndex.set(index);
+  }
+  protected selectBlockType(type: string): void {
+    const previous = this.selectedCharacter();
+    this.blockType.set(type);
+    if (!previous) return;
+    const index = this.selectionCharacters().findIndex(character => previous.id ? character.id === previous.id : character.name === previous.name);
+    if (index >= 0) this.selectCharacter(index);
+  }
+  protected addBlock(area: HTMLTextAreaElement): void {
+    if (this.addDisabled()) return;
+    const type = this.blockType();
+    let snippet: string | undefined;
+    if (type === 'lettera' || type === 'messaggio') {
+      const character = this.selectedCharacter();
+      snippet = writeCorrespondence({ kind: type, body: area.value.slice(area.selectionStart, area.selectionEnd) || (type === 'lettera' ? 'Scrivi qui la lettera.' : 'Scrivi qui il messaggio.'),
+        name: type === 'messaggio' ? character?.name ?? '' : '',
+        characterId: type === 'messaggio' ? character?.id ?? '' : '',
+        portrait: type === 'messaggio' && !character?.id ? safeNarrativeImage(character?.portrait ?? '') : '',
+        signature: type === 'lettera' ? character?.name ?? '' : '',
+        date: '', time: '',
+      }, true);
+    }
+    this.insert(type, area, snippet);
+  }
 
   constructor() {
     effect(() => {
-      if (this.mode() === 'preview' && !this.source().trim() && !this.inlineEditing()) this.mode.set('source');
+      if (this.mode() === 'preview' && !this.source().trim()) this.mode.set('source');
       this.modeChange.emit(this.mode());
     });
     effect(() => {
       if (this.characterIndex() >= this.characters().length) this.characterIndex.set(0);
+      if (this.contactIndex() >= this.contactCharacters().length) this.contactIndex.set(this.contactCharacters().length ? 0 : -1);
+      if ((!this.masterTools() && !this.document() && !this.writingTypes.some(option => option.type === this.blockType()) && this.blockType() !== 'image') || (this.blockType() === 'image' && !this.allowImages())) this.blockType.set('dialogo');
     });
     effect(onCleanup => {
       this.source();
@@ -99,7 +137,7 @@ export class GdrSourceEditor {
     this.syncedPositions.set(to, to.scrollTop);
   }
   public openPreview(): void {
-    if (this.source().trim() && !this.inlineEditing()) this.setMode('preview');
+    if (this.source().trim()) this.setMode('preview');
   }
   protected insertImage(src: string, area: HTMLTextAreaElement): void {
     if (!this.allowImages() || !safeNarrativeImage(src)) return;
@@ -110,12 +148,8 @@ export class GdrSourceEditor {
   }
   protected insert(type: string, area: HTMLTextAreaElement, customSnippet?: string): void {
     if (type === 'image' && !this.allowImages()) return;
-    if ((type !== 'image' && BLOCK_TYPES.includes(type as typeof BLOCK_TYPES[number])) || type === 'subtitle' || type === 'emphasis' || type === 'npc_full') {
+    if ((type !== 'image' && type !== 'paragraph' && BLOCK_TYPES.includes(type as typeof BLOCK_TYPES[number])) || type === 'subtitle' || type === 'emphasis' || type === 'npc_full') {
       if (!this.document() && !this.masterTools()) return;
-    }
-    if (this.inlineEditing()) {
-      this.voiceMessage.set('Applica prima la modifica rapida.');
-      return;
     }
     if (type === 'image' && !customSnippet) {
       this.imagePickerOpen.update(value => !value);
@@ -137,14 +171,13 @@ export class GdrSourceEditor {
     const replacement = replaceNarrativeSelection(text, start, end, snippet);
     const fenced = ['dialogo', 'pensiero', 'lettera', 'messaggio', 'azione', 'nota', 'callout'].includes(type);
     const heading = type === 'heading' || type === 'subtitle';
-    const contentOffset = fenced ? snippet.indexOf('\n') + 1 : heading ? snippet.indexOf(' ') + 1 : type === 'emphasis' ? 1 : 0;
+    const correspondenceBody = type === 'lettera' || type === 'messaggio' ? parseNarrative(snippet).sections[0]?.contentStart : undefined;
+    const contentOffset = correspondenceBody ?? (fenced ? snippet.indexOf('\n') + 1 : heading ? snippet.indexOf(' ') + 1 : type === 'emphasis' ? 1 : 0);
     const contentLength = fenced ? snippet.lastIndexOf('\n') - contentOffset : type === 'emphasis' ? snippet.length - 2 : snippet.length - contentOffset;
-    const opensInlineEditor = ['lettera', 'messaggio', 'npc_grid', 'npc_full'].includes(type);
     const nextView = visibleNarrativeSource(replacement.source, this.characterRoster().length ? this.characterRoster() : this.characters());
     updateGdrTextarea(area, () => {
       this.sourceChange.emit(replacement.source);
-      this.setMode(opensInlineEditor ? 'preview' : this.mode() === 'preview' ? 'split' : this.mode());
+      this.setMode(this.mode() === 'preview' ? 'source' : this.mode());
     }, visibleSourceOffset(nextView, replacement.start + contentOffset), visibleSourceOffset(nextView, replacement.start + contentOffset + contentLength));
-    if(opensInlineEditor)requestAnimationFrame(()=>this.narrativeEditor()?.startEditing({start:replacement.start,end:replacement.end}));
   }
 }
