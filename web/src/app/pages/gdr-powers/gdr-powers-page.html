@@ -112,6 +112,7 @@
           }
           <fieldset class="system-availability" aria-describedby="system-availability-hint">
             <legend>Sistemi collegati</legend>
+            <div class="system-options">
             @for (system of systems(); track system.id) {
               <label class="check">
                 <input type="checkbox" [checked]="draft.systemIds.includes(system.id)" (change)="toggleSystem(system.id, $any($event.target).checked)" />
@@ -120,6 +121,7 @@
             } @empty {
               <p>Nessun sistema disponibile. Crea un sistema nella sezione «Sistemi».</p>
             }
+            </div>
             <p id="system-availability-hint" class="hint">Seleziona i sistemi in cui rendere disponibile questa voce e premi «Salva voce». Per scollegare un sistema, rimuovi prima la voce dai suoi personaggi. Assegna le voci ai PG e PNG dai dettagli del personaggio.</p>
           </fieldset>
 
